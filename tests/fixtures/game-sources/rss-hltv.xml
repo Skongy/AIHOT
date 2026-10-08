@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+  <title>HLTV.org - The home of competitive Counter-Strike</title>
+  <description>HLTV.org is the leading Counter-Strike site in the world, featuring news, demos, pictures, statistics, on-site coverage and much much more!</description>
+  <link>https://www.hltv.org/</link>
+  <language>en</language>
+  <ttl>60</ttl>
+  <image>
+    <url>https://www.hltv.org/img/static/openGraphHltvLogo.png</url>
+    <title>HLTV.org - The home of competitive Counter-Strike</title>
+    <link>https://www.hltv.org/</link>
+  </image>
+  <link xmlns="http://www.w3.org/2005/Atom" rel="self" type="application/rss+xml" href="https://www.hltv.org/rss/news"></link>
+  <item>
+    <title>Matchups set for EPL quarter-finals </title>
+    <description>Falcons are set to face off against Spirit in the headline matchup.</description>
+    <link>https://www.hltv.org/news/45673/matchups-set-for-epl-quarter-finals</link>
+    <guid isPermaLink="false">hltvnews45673</guid>
+    <pubDate>Wed, 7 Oct 2026 21:00:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/cFSt1-f8mK5Pk7nlOosL7O.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=474&amp;q=75&amp;w=800&amp;s=bee2b30e56d7dc2521582b240d1b9503"></media:content>
+  </item>
+<item>
+    <title>Spirit secure last spot in the Spodek over M80 </title>
+    <description>Two back-breaking clutches on Cache ensured Spirit swept the series in two.</description>
+    <link>https://www.hltv.org/news/45672/spirit-secure-last-spot-in-the-spodek-over-m80</link>
+    <guid isPermaLink="false">hltvnews45672</guid>
+    <pubDate>Wed, 7 Oct 2026 20:18:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/Ln2RsqRl2ZofQ-P5ASr1ZK.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=474&amp;q=75&amp;w=800&amp;s=706ab29acc6e5aedc39ac9f8f68b6a70"></media:content>
+  </item>
+<item>
+    <title>The best highlights from EPL S24 groups </title>
+    <description>Keep up with the best plays as the Swiss group stage of the $1 million tournament unfolds over the next five days in Katowice.</description>
+    <link>https://www.hltv.org/news/45619/the-best-highlights-from-epl-s24-groups</link>
+    <guid isPermaLink="false">hltvnews45619</guid>
+    <pubDate>Wed, 7 Oct 2026 20:15:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/gEuiiH2mYoGwdmgHAT6eni.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=474&amp;q=75&amp;w=800&amp;s=0d0ddf1a49f8896743b6d0ceffb74f6d"></media:content>
+  </item>
+<item>
+    <title>Sources: cmtry to join Astralis on loan </title>
+    <description>A KRL report and HLTV sources state the Ukrainian will switch to rifling.</description>
+    <link>https://www.hltv.org/news/45671/sources-cmtry-to-join-astralis-on-loan</link>
+    <guid isPermaLink="false">hltvnews45671</guid>
+    <pubDate>Wed, 7 Oct 2026 19:35:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/Pm1GT2JTURfeUa4Dybc1sv.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=473&amp;q=75&amp;w=800&amp;s=72a9044970b899b046bc73030fb90bc4"></media:content>
+  </item>
+<item>
+    <title>Aleksib: &quot;We need to enjoy the game more; all these setbacks make you overthink&quot; </title>
+    <description>NAVI's Major fate is not secured just yet after another group stage exit.</description>
+    <link>https://www.hltv.org/news/45668/aleksib-we-need-to-enjoy-the-game-more-all-these-setbacks-make-you-overthink</link>
+    <guid isPermaLink="false">hltvnews45668</guid>
+    <pubDate>Wed, 7 Oct 2026 19:27:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/kxBAK2azgJotj-mgdad5ID.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=474&amp;q=75&amp;w=800&amp;s=012721915f63716d3cd10c82f8196d8d"></media:content>
+  </item>
+<item>
+    <title>HObbit: &quot;For me nowadays it's like a dream&quot; </title>
+    <description>HObbit says playing for PARIVISION is &quot;a big honor&quot; for him.</description>
+    <link>https://www.hltv.org/news/45670/hobbit-for-me-nowadays-its-like-a-dream</link>
+    <guid isPermaLink="false">hltvnews45670</guid>
+    <pubDate>Wed, 7 Oct 2026 18:37:00 GMT</pubDate>
+    <media:content url="https://img-cdn.hltv.org/gallerypicture/_MRtEdaOSE11c5uJUsValx.jpg?auto=compress&amp;ixlib=java-2.1.0&amp;m=%2Fm.png&amp;mw=107&amp;mx=20&amp;my=473&amp;q=75&amp;w=800&amp;s=99fd18c462b7b0c792f86c8a199a9b6f"></media:content>
+  </item>
+</channel>
+</rss>

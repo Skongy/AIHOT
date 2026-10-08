@@ -1,4 +1,1022 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。上游的 18 个 AI 信源已移除；游戏信源名单由后续变更（import-game-sources，信源官提供）补上。",
-  "sources": []
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。名单来自信源官 v1（媒体 16 个）和官方信源 v1（15 个），见 openspec 变更 connect-game-sources。单款游戏官方公告源（王者、英雄联盟、米游社原神/星铁、永劫无间、和平精英）带标题规则：命中保留词的一定保留，否则命中丢弃词的丢掉，其余交给预筛。",
+  "sources": [
+    {
+      "id": "rss-gcores",
+      "name": "机核",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.gcores.com/rss",
+        "allowUrlPrefixes": [
+          "https://www.gcores.com/articles/"
+        ],
+        "denyUrlPrefixes": [
+          "https://www.gcores.com/radios/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-ign-cn",
+      "name": "IGN中国",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.ign.com.cn/feed.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-gnn",
+      "name": "巴哈姆特GNN",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://gnn.gamer.com.tw/rss.xml",
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "【試片】",
+            "【試閱】",
+            "【影評】",
+            "劇場版",
+            "動畫化",
+            "改編動畫",
+            "動畫電影",
+            "電視動畫",
+            "輕小說",
+            "小說版",
+            "真人電影",
+            "真人版影集"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 30,
+      "tags": [
+        "媒体",
+        "繁体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-yystv",
+      "name": "游研社",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.yystv.cn/rss/feed",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-chuapp",
+      "name": "触乐",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.chuapp.com/feed",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-youxichaguan",
+      "name": "游茶",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.youxichaguan.com/feed",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-hltv",
+      "name": "HLTV",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.hltv.org/rss/news",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "英文",
+        "电竞"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-gamersky",
+      "name": "游民星空",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.gamersky.com/news/",
+        "itemSelector": "ul.pictxt li",
+        "linkSelector": "div.tit a",
+        "publishedAtSelector": "div.time",
+        "allowUrlPrefixes": [
+          "https://www.gamersky.com/news/20"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-3dm",
+      "name": "3DM",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.3dmgame.com/news/",
+        "itemSelector": "div.Revision_list li",
+        "linkSelector": "a.bt",
+        "publishedAtSelector": "span.time",
+        "allowUrlPrefixes": [
+          "https://www.3dmgame.com/news/20"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-a9vg",
+      "name": "A9VG",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.a9vg.com/list/news",
+        "itemSelector": "li.a9-rich-card-list_item-gap",
+        "linkSelector": "a",
+        "titleSelector": ".a9-rich-card-list_label",
+        "publishedAtRegex": "(20\\d\\d-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d)",
+        "allowUrlPrefixes": [
+          "https://www.a9vg.com/article/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-17173",
+      "name": "17173",
+      "kind": "web_list",
+      "config": {
+        "url": "https://news.17173.com/",
+        "itemSelector": "ul.ptlist-news li.item",
+        "linkSelector": "div.tit a",
+        "allowUrlPrefixes": [
+          "https://news.17173.com/content/"
+        ],
+        "detail": {
+          "maxFetches": 10
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-sina-esports",
+      "name": "新浪电竞",
+      "kind": "web_list",
+      "config": {
+        "url": "https://dj.sina.com.cn/",
+        "itemSelector": "h3.article_title",
+        "linkSelector": "a",
+        "allowUrlPrefixes": [
+          "https://dj.sina.com.cn/article/"
+        ],
+        "detail": {
+          "maxFetches": 10,
+          "publishedAtSelector": "span.timer"
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "电竞"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-wanplus",
+      "name": "玩加电竞",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.wanplus.cn/",
+        "allowUrlPrefixes": [
+          "https://www.wanplus.cn/article/"
+        ],
+        "detail": {
+          "maxFetches": 10,
+          "publishedAtSelector": "span.com-time"
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "电竞"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-youxituoluo",
+      "name": "游戏陀螺",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.youxituoluo.com/",
+        "itemSelector": "ul.article_list li",
+        "linkSelector": "a.title",
+        "allowUrlPrefixes": [
+          "https://www.youxituoluo.com/"
+        ],
+        "detail": {
+          "maxFetches": 10,
+          "titleSelector": "div.title_detail",
+          "titleAuthoritative": true
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 90,
+      "tags": [
+        "媒体",
+        "行业"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-indienova",
+      "name": "indienova",
+      "kind": "web_list",
+      "config": {
+        "url": "https://indienova.com/indie-game-news/",
+        "itemSelector": "div.article-panel",
+        "linkSelector": "h4 a",
+        "allowUrlPrefixes": [
+          "https://indienova.com/indie-game-news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "媒体",
+        "独立游戏"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "web-nppa-games",
+      "name": "国家新闻出版署·国产网络游戏审批",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nppa.gov.cn/bsfw/jggs/yxspjg/gcwlyxspxx/",
+        "itemSelector": "ul.m2nrul li",
+        "linkSelector": "a",
+        "publishedAtSelector": "span",
+        "allowUrlPrefixes": [
+          "https://www.nppa.gov.cn/bsfw/jggs/yxspjg/gcwlyxspxx/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "官方",
+        "版号"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-pvp-news",
+      "name": "王者荣耀官网·新闻公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://apps.game.qq.com/wmp/v3.1/?p0=18&p1=searchNewsKeywordsList&page=1&pagesize=15&order=sIdxTime&r0=cors&type=iTarget&source=web_pc&id=0",
+        "itemsPath": "msg.result",
+        "titlePaths": [
+          "sTitle"
+        ],
+        "publishedAtPath": "sIdxTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "iNewsId",
+        "urlTemplate": "https://pvp.qq.com/web201706/newsdetail.shtml?tid={iNewsId}",
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "honor-of-kings",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "王者荣耀"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-lol-news",
+      "name": "英雄联盟官网·新闻公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://apps.game.qq.com/cmc/zmMcnTargetContentList?r0=json&page=1&num=16&target=24&source=web_pc",
+        "itemsPath": "data.result",
+        "titlePaths": [
+          "sTitle"
+        ],
+        "publishedAtPath": "sIdxTime",
+        "publishedAtUtcOffset": "+08:00",
+        "externalIdPath": "iDocID",
+        "urlTemplate": "https://lol.qq.com/news/detail.shtml?docid={iDocID}",
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "league-of-legends",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "英雄联盟"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-miyoushe-ys",
+      "name": "原神·米游社官方公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://bbs-api-static.miyoushe.com/painter/wapi/getNewsList?client_type=4&gids=2&last_id=&page_size=20&type=1",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "post.subject"
+        ],
+        "publishedAtPath": "post.created_at",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "post.post_id",
+        "urlTemplate": "https://www.miyoushe.com/ys/article/{post.post_id}",
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "genshin-impact",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "原神"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-miyoushe-sr",
+      "name": "崩坏：星穹铁道·米游社官方公告",
+      "kind": "json_list",
+      "config": {
+        "url": "https://bbs-api-static.miyoushe.com/painter/wapi/getNewsList?client_type=4&gids=6&last_id=&page_size=20&type=1",
+        "itemsPath": "data.list",
+        "titlePaths": [
+          "post.subject"
+        ],
+        "publishedAtPath": "post.created_at",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "post.post_id",
+        "urlTemplate": "https://www.miyoushe.com/sr/article/{post.post_id}",
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "honkai-star-rail",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "崩坏：星穹铁道"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-yjwujian",
+      "name": "永劫无间官网·新闻公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.yjwujian.cn/",
+        "itemSelector": "ul.news-list li",
+        "linkSelector": "a",
+        "publishedAtSelector": "span.date",
+        "allowUrlPrefixes": [
+          "https://www.yjwujian.cn/news/official/",
+          "https://www.yjwujian.cn/news/update/"
+        ],
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "naraka-bladepoint",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "永劫无间"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-gp-qq",
+      "name": "和平精英官网·新闻公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://gp.qq.com/main.shtml",
+        "itemSelector": "a.sec2-info-rg",
+        "titleSelector": "p.sec2-info-body-text",
+        "allowUrlPrefixes": [
+          "https://gp.qq.com/gicp/news/"
+        ],
+        "detail": {
+          "maxFetches": 8,
+          "publishedAtSelector": "p.date"
+        },
+        "ingestNoiseFilter": {
+          "keepIfMatches": [
+            "版本更新",
+            "版本前瞻",
+            "新版本",
+            "更新说明",
+            "资料片",
+            "停服",
+            "停运",
+            "关服",
+            "赛季",
+            "定档",
+            "公测",
+            "上线时间",
+            "dlc",
+            "新角色",
+            "新英雄",
+            "平衡",
+            "联动",
+            "回归"
+          ],
+          "dropMarkersTitleOnly": [
+            "封禁",
+            "活动",
+            "皮肤",
+            "装扮",
+            "祈愿",
+            "跃迁",
+            "召唤",
+            "周免",
+            "礼包",
+            "限时销售"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "peacekeeper-elite",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "和平精英"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-lolesports",
+      "name": "LoL Esports 新闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://lolesports.com/zh-CN/news",
+        "itemSelector": "a[href^=\"/news/\"]",
+        "titleSelector": "[class*=\"textStyle_headline\"]",
+        "publishedAtRegex": ">((?:January|February|March|April|May|June|July|August|September|October|November|December) \\d{1,2}, 20\\d\\d)<",
+        "publishedAtUtcOffset": "+00:00",
+        "allowUrlPrefixes": [
+          "https://lolesports.com/news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "league-of-legends",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英雄联盟",
+        "电竞",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-cs2",
+      "name": "Steam·CS2 更新",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/730/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "valve",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "CS2",
+        "电竞"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-dota2",
+      "name": "Steam·Dota 2 更新",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/570/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "valve",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Dota 2",
+        "电竞"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-ps-blog-zh-hant",
+      "name": "PlayStation 中文博客",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://blog.zh-hant.playstation.com/feed/",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sony",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "繁体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-xbox-wire",
+      "name": "Xbox Wire",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://news.xbox.com/en-us/feed/",
+        "allowUrlPrefixes": [
+          "https://news.xbox.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "microsoft",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-nintendo-jp",
+      "name": "任天堂日本·新着情報",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.nintendo.co.jp/news/whatsnew.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nintendo",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "日文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-nintendo-hk",
+      "name": "任天堂香港·最新消息",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.nintendo.com.hk/topics/",
+        "baseUrl": "https://www.nintendo.com/hk/topics/",
+        "itemSelector": "a.ncmn-u-linkbox",
+        "titleSelector": ".ncmn-softUnit__name",
+        "publishedAtSelector": ".ncmn-softUnit__release",
+        "allowUrlPrefixes": [
+          "https://www.nintendo.com/hk/topics/article/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "nintendo",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "tags": [
+        "官方",
+        "繁体"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-news",
+      "name": "Steam 官方新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-netease-ir",
+      "name": "网易投资者关系",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://ir.netease.com/rss/news-releases.xml",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "netease",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": [
+        "官方",
+        "英文",
+        "财报"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    }
+  ]
 }
