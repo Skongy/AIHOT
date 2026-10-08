@@ -7,11 +7,15 @@
 ## ADDED Requirements
 
 ### Requirement: 游戏资讯类别
-站点 MUST 正好提供四个游戏类别：新游（`new-games`）、版本（`updates`）、电竞（`esports`）、行业（`industry`）。key 为 `industry` 的类别 MUST 存在，用来收容没归上类的资料，也收厂商、发行、版号、评测和观点类内容。站点 SHALL NOT 另设攻略、评测或观点类别。类别 key 上线后 SHALL NOT 再改。
+站点 MUST 正好提供三个游戏类别：新游（`new-games`）、电竞（`esports`）、行业（`industry`）。key 为 `industry` 的类别 MUST 存在，用来收容没归上类的资料，也收已上线游戏的版本更新、新赛季、DLC、国服停服或回归，以及厂商、发行、版号、评测和观点类内容。站点 SHALL NOT 另设版本、攻略、评测或观点类别。类别 key 上线后 SHALL NOT 再改。
 
 #### Scenario: 筛选栏
 - **WHEN** 读者打开资讯页或全部动态的筛选
-- **THEN** 类别选项正好是 新游、版本、电竞、行业，没有 模型、产品、论文 这类 AI 类别，也没有 攻略
+- **THEN** 类别选项正好是 新游、电竞、行业，没有 模型、产品、论文 这类 AI 类别，也没有 版本、攻略
+
+#### Scenario: 版本更新归行业
+- **WHEN** 结构化步骤处理一篇已上线游戏的新赛季或 DLC 公告
+- **THEN** 类别是行业，首标签可以是“赛季/活动”或“DLC/资料片”
 
 #### Scenario: 分类订阅地址
 - **WHEN** 订阅者请求 /feed/category/ai-models.xml

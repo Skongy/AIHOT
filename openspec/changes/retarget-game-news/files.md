@@ -19,7 +19,7 @@
 
 | 文件 | 改什么 |
 |---|---|
-| `industry/taxonomy.ts` | `CATEGORIES`（游戏 4 类：新游、版本、电竞、行业，保留 `industry`）、`RELEASE`、`PLAIN_TERMS`、`ITEM_TYPES`、`CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`、`TAG_SYNONYMS`、`ENTITIES`（厂商和种子游戏）、`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES`，全部替换 |
+| `industry/taxonomy.ts` | `CATEGORIES`（游戏 3 类：新游、电竞、行业，保留 `industry`；“版本”已于 10-08 去掉）、`RELEASE`、`PLAIN_TERMS`、`ITEM_TYPES`、`CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`、`TAG_SYNONYMS`、`ENTITIES`（厂商和种子游戏）、`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES`，全部替换 |
 | `industry/topics.json` | `groups` 显示名改成“游戏 / 平台与品类 / 内容形态”；38 个 AI 主题换成种子游戏（company 组）和平台、品类、内容形态主题 |
 | `industry/sources.json` | 去掉 18 个 AI 信源，留空（Q1-6） |
 | `industry/prompts/prefilter.md` | AI 相关性 → 游戏相关性 |
@@ -65,10 +65,10 @@
 ## 〔测试〕实际改动的测试文件（实施结果）
 
 按“以 typecheck 和测试失败为准”的原则，实际改了 34 个测试文件，只换示例数据，测的规则不变：
-- 类别 key 批量替换（`ai-models` → `new-games`、`ai-products` → `updates`、`paper` → `esports`、`tip` → `industry`）：tests/ 下 28 个文件和 apps/web/tests 的 `native-video`、`request-target`
+- 类别 key 批量替换（`ai-models` → `new-games`、`paper` → `esports`、`ai-products` 和 `tip` → `industry`）：tests/ 下 28 个文件和 apps/web/tests 的 `native-video`、`request-target`
 - 内容类型（`model_release` → `game_launch` 等）和标签（模型发布 → 定档/上线、产品更新 → 版本更新……）：`analyze*`、`default-model`、`processing-recovery`、`category-corrections`
 - 公司和主题示例换成种子游戏和厂商：`topics`、`topic-membership`、`topics-withdrawal`、`topic-cache-deadline`、`discovery-scope`、`reading`、`pool-relevance`、`content-publication`、`analyze`
-- `apps/web/tests/navigation-performance.test.ts`：类别标签“模型 / 产品”→“新游 / 版本”，页面标题“精选”→“资讯”
+- `apps/web/tests/navigation-performance.test.ts`：类别标签“模型 / 产品”→“新游 / 电竞”，页面标题“精选”→“资讯”
 
 其余文件里还留着 OpenAI、Claude 之类字样，只是标题或正文里的随意文本，不影响测试结论，这次没动（保持改动最小）。
 

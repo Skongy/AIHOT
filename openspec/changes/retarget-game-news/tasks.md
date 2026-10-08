@@ -24,7 +24,7 @@
 
 ## 3. 分类体系（industry/taxonomy.ts）
 
-- [x] 3.1 `CATEGORIES` 换成 Q1-3 确认的游戏类别（保留 key `industry`），写好 `guide`、`section`、`commentary`、`feedLabel`
+- [x] 3.1 `CATEGORIES` 换成 Q1-3 确认的游戏类别（保留 key `industry`），写好 `guide`、`section`、`commentary`、`feedLabel`（10-08 用户审 PR #2 后去掉“版本”，现为新游 / 电竞 / 行业三类；版本更新、赛季、DLC、国服停服或回归归行业）
 - [x] 3.2 `RELEASE`（新游计数或 null）、`PLAIN_TERMS`、`ITEM_TYPES` 换成游戏版本
 - [x] 3.3 `CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`、`TAG_SYNONYMS` 换成游戏词表（近义词包括：上线→定档/上线、公测→定档/上线、更新→版本更新、卡池→版本更新、版号→版号/政策……）
 - [x] 3.4 `ENTITIES` 换成种子厂商和种子游戏（Q1-5），游戏要写全常用别名（简称、英文名、国服名）

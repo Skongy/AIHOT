@@ -18,7 +18,7 @@ test("new models require a launch classification as well as an official, new mod
   const base = { category: "new-games", tags: ["定档/上线"], authority: 0, previous: null,
     entry: { sourceId: "official", firstParty: true } } as EditionEntry;
   const rows = [base, { ...base, tags: ["评测/口碑"] }, { ...base, tags: ["版本更新"] },
-    { ...base, category: "updates" }, { ...base, authority: 3 },
+    { ...base, category: "industry" }, { ...base, authority: 3 },
     { ...base, previous: { key: "2026-09-30", title: "已报过的发布" } }, { ...base, tags: [] }];
   assert.equal(dailyMetrics(rows).modelsReleased, 1);
   assert.equal(dailyMetrics(rows).totalEvents, 7);
@@ -43,7 +43,7 @@ test("category corrections revise every standard report atomically without selec
   for (const r of contents) await sql`INSERT INTO reports (kind,key,window_start,window_end,content,generated_at,origin)
     VALUES (${r.kind},${r.key},now(),now(),${sql.json(r.content as never)},now(),'imported')`;
   const [before] = await sql`SELECT selected,seat,score,visible_after,selected_ready_at FROM publications WHERE article_id=${articleId}`;
-  const change = (actor: string) => overrideFields(articleId, { fields: { category: "updates", tags: ["DLC/资料片", "米哈游"] }, version: 0, reason: "工具不是模型" }, actor);
+  const change = (actor: string) => overrideFields(articleId, { fields: { category: "industry", tags: ["DLC/资料片", "米哈游"] }, version: 0, reason: "是 DLC 不是新游" }, actor);
   await sql.unsafe(`CREATE FUNCTION reject_category_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
     IF NEW.actor = 'reject-category' THEN RAISE EXCEPTION 'category audit rejected'; END IF; RETURN NEW; END $$`);
   await sql.unsafe("CREATE TRIGGER reject_category_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION reject_category_audit()");
@@ -62,12 +62,12 @@ test("category corrections revise every standard report atomically without selec
     const c = saved!.content;
     assert.equal(c.leadItemId, articleId);
     if (r.kind === "daily") {
-      assert.deepEqual(c.sections, [{ label: "版本更新", items: [entry] }]);
+      assert.deepEqual(c.sections, [{ label: "行业动态", items: [entry] }]);
       assert.equal(c.metrics.modelsReleased, 0);
       assert.deepEqual(c.highlights, [articleId]);
       assert.equal(c.lead.title, "冻结头条");
     } else {
-      assert.deepEqual(c.themes, [{ heading: "版本更新", summary: null, storyRefs: [entry] }]);
+      assert.deepEqual(c.themes, [{ heading: "行业动态", summary: null, storyRefs: [entry] }]);
       assert.deepEqual(c.storyOrder, [articleId]);
       assert.equal(c.overview, "保留总述");
     }

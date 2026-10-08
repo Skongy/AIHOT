@@ -12,7 +12,7 @@ fork 现在仍是上游的“AI 行业示范站”：站名 MyHOT，行业词 AI
 
 - **站点身份与文案**（`site/site.ts`、`site/public/*`、`site/changelog.json`、`site/brand/nameplates/*`）：行业词 `subject` 从 “AI” 改成 “游戏”。站名、`organization` 改成 GAMEHOT，`mcpPrefix`、`crawlerName` 用 `gamehot`，slogan 是“国内玩家每天该知道的游戏热点”。首页标题、描述、tagline、关键词、关于页、分享卡、报告用语都改成国内玩家的视角。日报报头字重新生成。
 - **分类体系**（`industry/taxonomy.ts`）：
-  - 改为 4 个游戏类别：新游、版本、电竞、行业（`industry` 兜底，也收厂商、发行、版号、评测、观点；见 design.md D5）
+  - 改为 3 个游戏类别：新游、电竞、行业（`industry` 兜底，也收版本更新、赛季、DLC、国服停服或回归，以及厂商、发行、版号、评测、观点；见 design.md D5。2026-10-08 用户审 PR #2 时去掉了“版本”类别）
   - 分类标签、主题标签、实体标签、近义词表、`ITEM_TYPES`、`RELEASE`（“N 款新游”）、`PLAIN_TERMS` 全部换成游戏版本
   - `ENTITIES`、`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES` 换成游戏厂商和少量种子游戏
   - **BREAKING**（只影响已部署的实例）：类别 key 改了，旧的 `/all?category=ai-models`、`/feed/category/ai-models.xml` 会失效。fork 还没上线，实际没有影响
