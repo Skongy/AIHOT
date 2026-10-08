@@ -369,14 +369,24 @@ export async function dailyEdition(date: string, start: Date, end: Date): Promis
   };
 }
 
+/** Category key → [min, max] full entries in the daily. Absent or empty: upstream size (MAIN_ENTRIES). */
+export type SectionQuotas = Readonly<Record<string, readonly [number, number]>>;
+
 /**
  * The issue from the ranked entries, by rule: a roundup that mentions events of this issue is listed
  * under the most important of them; a follow-up of a covered event takes a full entry only when the
  * party itself acted (not as commentary) or four or more sources carry its new facts, else it is a flash;
  * then the most important entries in full, at most two per source, and the next ones as flashes. The
  * first entry leads the issue and the next three are its highlights.
+ *
+ * When `quotas` is set (REPORTS.dailyLayout.sectionQuotas), full entries also respect per-category
+ * floors then caps: try each category's min first (shortfall is fine), then fill up to max by
+ * importance; anything over the cap becomes a flash. Without quotas, behaviour matches upstream.
  */
-export function arrangeDaily(entries: EditionEntry[]): { main: EditionEntry[]; flashes: EditionEntry[]; stats: Record<string, number> } {
+export function arrangeDaily(
+  entries: EditionEntry[],
+  quotas?: SectionQuotas | null,
+): { main: EditionEntry[]; flashes: EditionEntry[]; stats: Record<string, number> } {
   const byStory = new Map(entries.filter((e) => e.storyId !== null).map((e) => [e.storyId!, e]));
   const under = new Map<EditionEntry, EditionEntry[]>();
   for (const e of entries) {
@@ -399,13 +409,58 @@ export function arrangeDaily(entries: EditionEntry[]): { main: EditionEntry[]; f
   const main: EditionEntry[] = [];
   const rest: EditionEntry[] = [];
   const perSource = new Map<string, number>();
-  for (const e of live) {
+  const catCount = new Map<string, number>();
+  const picked = new Set<EditionEntry>();
+  const tryTake = (e: EditionEntry, maxForCat: number | null) => {
+    if (picked.has(e) || !full(e)) return false;
     const n = perSource.get(e.entry.sourceId) ?? 0;
-    if (main.length < MAIN_ENTRIES && n < PER_SOURCE && full(e)) {
-      main.push(e);
-      perSource.set(e.entry.sourceId, n + 1);
-    } else rest.push(e);
+    if (n >= PER_SOURCE) return false;
+    const cat = e.category ?? "industry";
+    const have = catCount.get(cat) ?? 0;
+    if (maxForCat !== null && have >= maxForCat) return false;
+    if (!quotas && main.length >= MAIN_ENTRIES) return false;
+    main.push(e);
+    picked.add(e);
+    perSource.set(e.entry.sourceId, n + 1);
+    catCount.set(cat, have + 1);
+    return true;
+  };
+
+  if (quotas && Object.keys(quotas).length > 0) {
+    // Pass 1: floors — try each configured category's min, in the pack's category order.
+    for (const cat of Object.keys(quotas)) {
+      const [min] = quotas[cat]!;
+      for (const e of live) {
+        if ((catCount.get(cat) ?? 0) >= min) break;
+        if ((e.category ?? "industry") !== cat) continue;
+        tryTake(e, min);
+      }
+    }
+    // Pass 2: fill up to each category's max by importance order.
+    for (const e of live) {
+      const cat = e.category ?? "industry";
+      const bound = quotas[cat];
+      const max = bound ? bound[1] : MAIN_ENTRIES; // unlisted categories share the old global cap via tryTake without quotas... use generous
+      tryTake(e, bound ? bound[1] : null);
+    }
+    for (const e of live) if (!picked.has(e)) rest.push(e);
+  } else {
+    for (const e of live) {
+      const n = perSource.get(e.entry.sourceId) ?? 0;
+      if (main.length < MAIN_ENTRIES && n < PER_SOURCE && full(e)) {
+        main.push(e);
+        perSource.set(e.entry.sourceId, n + 1);
+      } else rest.push(e);
+    }
   }
   const flashes = rest.slice(0, FLASH_ENTRIES);
   return { main, flashes, stats: { roundupsFolded: folded.size, followUpsAsFlashes: live.filter((e) => !full(e)).length, left: rest.length - flashes.length } };
+}
+
+/** First sentence of a summary for the daily's one-line lead (。！？ and ASCII !?). */
+export function leadSentence(summary: string): string {
+  const t = summary.trim();
+  if (!t) return t;
+  const m = t.match(/^[\s\S]*?[。！？!?]/);
+  return (m?.[0] ?? t).trim();
 }

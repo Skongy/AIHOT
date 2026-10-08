@@ -202,6 +202,13 @@ export const REPORTS = {
   shareUnit: "件大事",
   /** 日报时段内有资料经过评判、但没有新大事时的标题与导语。 */
   quiet: { title: "今日安静，无大事发生", paragraph: `${subjectAfter("北京时间 {start} 至 {end}，没有新的", "大事")}。` },
+  /**
+   * 日报分类速览的条数下限/上限（按 taxonomy 类别 key）。不设时 arrangeDaily 保持上游行为。
+   * 先尽量满足下限（不够不硬凑），再按重要性补到上限；超过上限的进快讯。
+   */
+  dailyLayout: {
+    sectionQuotas: { "new-games": [2, 4], esports: [2, 4], industry: [3, 5] } as Record<string, readonly [number, number]>,
+  },
 };
 
 /** 运维告警（只发给站长）里随部署而变的几处说法。 */

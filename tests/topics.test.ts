@@ -91,26 +91,24 @@ async function members(slug: string): Promise<string[]> {
 }
 
 test("a company topic takes the articles about it, not the ones that only mention it", async () => {
-  const about = await report({ at: hoursAgo(30), title: `原神 新版本前瞻 ${T}`, subjects: ["genshin-impact"] });
-  const product = await report({ at: hoursAgo(31), title: `新角色卡池上线 ${T}`, subjects: ["genshin-impact"] });
-  const english = await report({ at: hoursAgo(32), title: `新版本发布 ${T}`, originalTitle: `Genshin Impact launches a new version ${T}`, subjects: ["genshin-impact", "honor-of-kings"] });
-  const subpoena = await report({ at: hoursAgo(33), title: `王者荣耀 收到监管部门问询 ${T}`, subjects: ["honor-of-kings", "genshin-impact", "tencent"] });
-  const lowerCase = await report({ at: hoursAgo(34), title: `honor of kings 公布新赛季 ${T}`, subjects: ["honor-of-kings", "genshin-impact"] });
-  const pact = await report({ at: hoursAgo(35), title: `二十余家游戏公司签署适龄提示倡议 ${T}`, subjects: ["honor-of-kings", "genshin-impact", "netease"] });
-  const metadata = await report({ at: hoursAgo(36), title: `ArknightsDB 数据站上线，王者荣耀 参与联动 ${T}`, subjects: ["arknights", "honor-of-kings"] });
-  const adjacent = await report({ at: hoursAgo(37), title: `发布Arknights的新活动 ${T}`, subjects: ["arknights", "honor-of-kings"] });
-  const headline = await report({ at: hoursAgo(38), title: `原神 被一篇盘点提到 ${T}`, subjects: ["netease"] });
+  const about = await report({ at: hoursAgo(30), title: `喵喵的结合 新版本前瞻 ${T}`, subjects: ["mewgenics"] });
+  const product = await report({ at: hoursAgo(31), title: `主机版发售日公布 ${T}`, subjects: ["mewgenics"] });
+  const english = await report({ at: hoursAgo(32), title: `新版本发布 ${T}`, originalTitle: `Mewgenics launches a language update ${T}`, subjects: ["mewgenics", "baldurs-gate-3"] });
+  const subpoena = await report({ at: hoursAgo(33), title: `博德之门 3 收到平台政策问询 ${T}`, subjects: ["baldurs-gate-3", "mewgenics", "larian"] });
+  const lowerCase = await report({ at: hoursAgo(34), title: `baldur's gate 3 公布新补丁 ${T}`, subjects: ["baldurs-gate-3", "mewgenics"] });
+  const pact = await report({ at: hoursAgo(35), title: `二十余家游戏公司签署适龄提示倡议 ${T}`, subjects: ["baldurs-gate-3", "mewgenics", "valve"] });
+  const metadata = await report({ at: hoursAgo(36), title: `MewgenicsDB 数据站上线，博德之门 3 参与联动 ${T}`, subjects: ["mewgenics", "baldurs-gate-3"] });
+  const adjacent = await report({ at: hoursAgo(37), title: `发布Mewgenics的新活动 ${T}`, subjects: ["mewgenics", "baldurs-gate-3"] });
+  const headline = await report({ at: hoursAgo(38), title: `喵喵的结合 被一篇盘点提到 ${T}`, subjects: ["valve"] });
   const agent = await report({ at: hoursAgo(39), title: `手游新作发布 ${T}`, tags: ["手游"] });
 
-  const genshin = await members("genshin-impact");
-  for (const id of [about, product, english]) assert.ok(genshin.includes(id), "about Genshin Impact");
-  for (const id of [subpoena, lowerCase, pact, headline]) assert.ok(!genshin.includes(id), "only mentions Genshin Impact");
-  const hok = await members("honor-of-kings");
-  for (const id of [subpoena, lowerCase, metadata]) assert.ok(hok.includes(id), "about Honor of Kings");
-  for (const id of [english, pact]) assert.ok(!hok.includes(id), "only mentions Honor of Kings");
-  const arknights = await members("arknights");
-  assert.ok(arknights.includes(adjacent), "Arknights next to Chinese text");
-  assert.ok(!arknights.includes(metadata), "ArknightsDB is not Arknights");
+  const mew = await members("mewgenics");
+  for (const id of [about, product, english, adjacent]) assert.ok(mew.includes(id), "about Mewgenics");
+  for (const id of [subpoena, lowerCase, pact, headline]) assert.ok(!mew.includes(id), "only mentions Mewgenics");
+  assert.ok(!mew.includes(metadata), "MewgenicsDB is not Mewgenics");
+  const bg3 = await members("baldurs-gate-3");
+  for (const id of [subpoena, lowerCase, metadata]) assert.ok(bg3.includes(id), "about Baldur's Gate 3");
+  for (const id of [english, pact]) assert.ok(!bg3.includes(id), "only mentions Baldur's Gate 3");
   assert.ok((await members("mobile")).includes(agent), "a platform topic takes its tag");
 
   // The article page names the topics it belongs to.
@@ -118,8 +116,8 @@ test("a company topic takes the articles about it, not the ones that only mentio
     const res = await app.inject({ method: "GET", url: `/api/site/items/${id}` });
     return (JSON.parse(res.body) as { topics: Array<{ slug: string }> }).topics.map((t) => t.slug);
   };
-  assert.deepEqual(await topicsOf(about), ["genshin-impact", "launches"]);
-  assert.deepEqual(await topicsOf(subpoena), ["honor-of-kings", "launches"]);
+  assert.deepEqual(await topicsOf(about), ["mewgenics", "launches"]);
+  assert.deepEqual(await topicsOf(subpoena), ["baldurs-gate-3", "launches"]);
   assert.deepEqual(await topicsOf(pact), ["launches"]);
   assert.deepEqual(await topicsOf(agent), ["mobile", "launches"]);
 });
@@ -131,23 +129,23 @@ test("a story page names the topics of its reports", async () => {
 });
 
 test("withdrawn articles stay out of lists and counts", async () => {
-  const kept = await report({ at: hoursAgo(5), title: `星穹铁道 新版本上线 ${T}`, subjects: ["honkai-star-rail"] });
-  const withdrawn = await report({ at: hoursAgo(4), title: `星穹铁道 撤回的消息 ${T}`, subjects: ["honkai-star-rail"] });
+  const kept = await report({ at: hoursAgo(5), title: `杀戮尖塔 2 新版本上线 ${T}`, subjects: ["slay-the-spire-2"] });
+  const withdrawn = await report({ at: hoursAgo(4), title: `杀戮尖塔 2 撤回的消息 ${T}`, subjects: ["slay-the-spire-2"] });
   await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${withdrawn}`;
 
-  const data = await page("honkai-star-rail");
+  const data = await page("slay-the-spire-2");
   assert.deepEqual(ids(data.items), [kept]);
   assert.equal(data.topic.total, 1);
-  const summary = (await listTopicSummaries()).topics.find((t) => t.slug === "honkai-star-rail")!;
-  assert.equal(summary.latest?.title, `星穹铁道 新版本上线 ${T}`, "the index shows the newest public article");
+  const summary = (await listTopicSummaries()).topics.find((t) => t.slug === "slay-the-spire-2")!;
+  assert.equal(summary.latest?.title, `杀戮尖塔 2 新版本上线 ${T}`, "the index shows the newest public article");
 });
 
 test("every topic has a page; unknown topics and pages past the end have none", async () => {
-  const empty = await page("naraka-bladepoint");
+  const empty = await page("binding-of-isaac-rebirth");
   assert.equal(empty.topic.indexable, false, "a topic without content is not indexed");
   assert.deepEqual(empty.items, []);
   assert.equal(await loadTopicPage("not-a-topic", 1, new Date()), null);
-  assert.equal(await loadTopicPage("naraka-bladepoint", 2, new Date()), null);
+  assert.equal(await loadTopicPage("binding-of-isaac-rebirth", 2, new Date()), null);
   const index = await app.inject({ method: "GET", url: "/api/site/topics" });
   const body = JSON.parse(index.body) as { groups: Array<{ key: string }>; topics: Array<{ slug: string }> };
   assert.deepEqual(body.groups.map((g) => g.key), ["company", "field", "genre"]);

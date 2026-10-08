@@ -134,6 +134,11 @@ export const StructureSchema = z.object({
   tags: z.array(z.string()).max(12).catch([]),
   subjects: z.array(z.string()).max(6).catch([]),
   fact: FactSchema,
+  /** Future dates the body states explicitly (launch, test, patch, event, shutdown); used by the daily watchlist. */
+  upcoming: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}/).transform((s) => s.slice(0, 10)),
+    what: z.string().trim().min(1).max(30),
+  })).max(5).optional().catch([]),
 });
 
 const UnderstandSchema = z.object({
@@ -181,10 +186,14 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
       return quote ? [{ text: c.text ?? quote, quote }] : [];
     }).slice(0, 4),
   };
+  const upcoming = (data.upcoming ?? [])
+    .filter((u) => u?.date && u?.what)
+    .map((u) => ({ date: u.date.slice(0, 10), what: u.what.trim().slice(0, 30) }))
+    .slice(0, 5);
   return {
     category: data.category, tags: normalizeTags(data.tags),
     subjects: [...new Set(data.subjects.map((s) => s.trim().toLowerCase()).filter((s) => s in ENTITIES))],
-    scope, fact,
+    scope, fact, upcoming,
   };
 }
 
@@ -469,6 +478,7 @@ export function normalizeAnalysis(run: AnalysisRun) {
     reasonZh: run.writing?.reasonZh ?? null,
     scope: run.structure?.scope ?? "unknown",
     fact: run.structure?.fact ?? null,
+    upcoming: run.structure?.upcoming ?? [],
   };
 }
 
@@ -503,6 +513,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     ...(w ? { writer: w.kind, writerModel: w.model, itemType: w.itemType ?? null, authorRole: w.authorRole ?? null } : {}),
     ...(w?.identityGuard?.outcome === "fallback" ? { identityGuard: w.identityGuard } : {}),
     scope: out.scope, fact: out.fact,
+    ...(out.upcoming?.length ? { upcoming: out.upcoming } : {}),
   };
   const committed = await sql.begin(async (tx) => {
     const [current] = await tx<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${articleId} FOR UPDATE`;

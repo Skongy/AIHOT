@@ -282,7 +282,11 @@ function FrontPage({ report, pages, leadStory, count }: { report: ReportDetail; 
   const highlights = report.highlights.filter((h) => !leadStory || keyOf(h) !== keyOf(leadStory)).slice(0, 3);
   const inPage = new Set(pages.flatMap((p) => p.items.map((c) => c.itemId)).filter(Boolean));
   const period = daily ? "今日" : report.kind === "weekly" ? "本周" : "本月";
-  const index = [...pages.map((p) => ({ id: p.id, label: p.label, n: `${p.items.length} 件` })), ...(report.flashes.length > 0 ? [{ id: "s-flash", label: "快讯", n: `${report.flashes.length} 条` }] : [])];
+  const index = [
+    ...pages.map((p) => ({ id: p.id, label: p.label, n: `${p.items.length} 件` })),
+    ...(report.flashes.length > 0 ? [{ id: "s-flash", label: "快讯", n: `${report.flashes.length} 条` }] : []),
+    ...(report.watchlist?.length ? [{ id: "s-watch", label: "明日关注", n: `${report.watchlist.length} 条` }] : []),
+  ];
 
   return (
     <section aria-label="头版" className="grid @[880px]:grid-cols-[minmax(0,1fr)_300px] @[1040px]:grid-cols-[minmax(0,1fr)_340px]">
@@ -519,6 +523,31 @@ export function ReportPaper({ report, index }: { report: ReportDetail; index: Re
                   {f.available && <span className="ml-2 text-[12px] text-ink-4">{f.sourceName}</span>}
                   {f.available && f.followUp && <Badge className="ml-2 align-[1px]" title={`${monthDay(f.followUp)}的日报报道过这件事，这里是新进展`}>跟进</Badge>}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </SectionPage>
+      )}
+
+      {!!report.watchlist?.length && (
+        <SectionPage id="s-watch" no={pages.length + (report.flashes.length > 0 ? 2 : 1)} label="明日关注">
+          <ul className="divide-y divide-line">
+            {report.watchlist.map((w, i) => (
+              <li key={`${w.date}-${w.what}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-4 text-[15px] leading-[1.7]">
+                <span className="num shrink-0 text-[13px] font-semibold text-accent">{w.date.slice(5)}</span>
+                {w.itemId ? (
+                  <Link viewTransition to={`/items/${w.itemId}`} className="min-w-0 flex-1 font-medium text-ink transition-colors hover:text-accent">
+                    {w.what}
+                  </Link>
+                ) : (
+                  <span className="min-w-0 flex-1 font-medium text-ink">{w.what}</span>
+                )}
+                <span className="shrink-0 text-[12px] text-ink-4">{w.sourceName}</span>
+                {w.sourceUrl && (
+                  <a href={w.sourceUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[12px] text-ink-3 transition-colors hover:text-accent">
+                    原文
+                  </a>
+                )}
               </li>
             ))}
           </ul>

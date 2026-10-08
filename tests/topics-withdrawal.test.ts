@@ -23,19 +23,19 @@ before(async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, next_fetch_at) VALUES (${SOURCE}, 'Media', 'rss', 'T2', 'editorial', '2100-01-01')`;
   older = await report(1, 3);
   newer = await report(2, 1);
-  corrected = await report(3, 2, "genshin-impact");
+  corrected = await report(3, 2, "mewgenics");
   // All scenarios share this one cold index, then exercise the cache without waiting a minute.
-  await loadTopicPage("arknights", 1);
+  await loadTopicPage("binding-of-isaac-rebirth", 1);
 });
 after(async () => {
   await stopBoss();
   await closeDb();
 });
 
-async function report(n: number, hoursAgo: number, subject = "arknights"): Promise<string> {
+async function report(n: number, hoursAgo: number, subject = "binding-of-isaac-rebirth"): Promise<string> {
   const at = new Date(Date.now() - hoursAgo * 3600_000);
   const { articleId } = await upsertMaterial({
-    sourceId: SOURCE, url: `https://example.com/withdrawal-${T}-${n}`, title: `Arknights report ${n}`, bodyText: "body", bodyHtml: "<p>body</p>", bodyStatus: "ok", via: "fetch", publishedAt: at,
+    sourceId: SOURCE, url: `https://example.com/withdrawal-${T}-${n}`, title: `Isaac report ${n}`, bodyText: "body", bodyHtml: "<p>body</p>", bodyStatus: "ok", via: "fetch", publishedAt: at,
   });
   await sql`UPDATE articles SET discovered_at = ${at}, timeline_at = ${at}, grouped_at = now() WHERE id = ${articleId}`;
   await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, score, selected, subjects, tags)
@@ -46,33 +46,33 @@ async function report(n: number, hoursAgo: number, subject = "arknights"): Promi
 
 test("a withdrawn report leaves the topic page and the index while the topic index is still cached", async () => {
   // Both are read into the cached index.
-  const before = await loadTopicPage("arknights", 1);
+  const before = await loadTopicPage("binding-of-isaac-rebirth", 1);
   assert.ok(before?.items.some((i) => i.id === newer));
-  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "arknights")?.latest?.title, `arknights 消息 2`);
+  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "binding-of-isaac-rebirth")?.latest?.title, `binding-of-isaac-rebirth 消息 2`);
 
   await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${newer}`;
-  const page = await loadTopicPage("arknights", 1);
-  assert.equal(page?.topic.latest?.title, `arknights 消息 1`, "the page's last update");
-  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "arknights")?.latest?.title, `arknights 消息 1`, "the index page's headline");
+  const page = await loadTopicPage("binding-of-isaac-rebirth", 1);
+  assert.equal(page?.topic.latest?.title, `binding-of-isaac-rebirth 消息 1`, "the page's last update");
+  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "binding-of-isaac-rebirth")?.latest?.title, `binding-of-isaac-rebirth 消息 1`, "the index page's headline");
   assert.deepEqual(page?.items.map((i) => i.id), [older], "the list (rows were always checked again)");
 });
 
 test("a correction refreshes named content and its topic membership before the index expires", async () => {
-  const title = `原神 更正后的版本消息 ${T}`;
+  const title = `喵喵的结合 更正后的版本消息 ${T}`;
   await overrideFields(corrected, { fields: { title }, version: 0, reason: "更正标题" }, "test-topics");
-  const retitled = await loadTopicPage("genshin-impact", 1);
+  const retitled = await loadTopicPage("mewgenics", 1);
   assert.equal(retitled?.items[0]?.title, title, "the list");
   assert.equal(retitled?.topic.latest?.title, title, "the page headline");
-  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "genshin-impact")?.latest?.title, title, "the directory headline");
+  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "mewgenics")?.latest?.title, title, "the directory headline");
 
   await overrideFields(corrected, { fields: { category: "industry" }, version: 1, reason: "实际是行业消息" }, "test-topics");
-  const reclassified = await loadTopicPage("genshin-impact", 1);
+  const reclassified = await loadTopicPage("mewgenics", 1);
   assert.equal(reclassified?.items[0]?.id, corrected, "it remains a selected report");
 
-  await overrideFields(corrected, { fields: { tags: ["玩家话题", "entity:honkai-star-rail"] }, version: 2, reason: "更正主体公司" }, "test-topics");
-  const moved = await loadTopicPage("genshin-impact", 1);
+  await overrideFields(corrected, { fields: { tags: ["玩家话题", "entity:baldurs-gate-3"] }, version: 2, reason: "更正主体公司" }, "test-topics");
+  const moved = await loadTopicPage("mewgenics", 1);
   assert.deepEqual(moved?.items, [], "the old topic list drops it");
   assert.equal(moved?.topic.latest, null, "the old topic headline drops it");
-  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "genshin-impact")?.latest, null, "the directory drops the old membership");
-  assert.equal((await loadTopicPage("honkai-star-rail", 1, new Date()))?.items[0]?.id, corrected, "the corrected membership is retained");
+  assert.equal((await listTopicSummaries()).topics.find((t) => t.slug === "mewgenics")?.latest, null, "the directory drops the old membership");
+  assert.equal((await loadTopicPage("baldurs-gate-3", 1, new Date()))?.items[0]?.id, corrected, "the corrected membership is retained");
 });

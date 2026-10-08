@@ -46,7 +46,7 @@ export const TOPIC_TAGS = [
 ] as const;
 
 /** 可选的实体标签（厂商与平台）。 */
-export const ENTITY_TAGS = ["腾讯游戏", "网易游戏", "米哈游", "鹰角网络", "游戏科学", "拳头游戏", "索尼", "任天堂", "微软游戏", "Valve"] as const;
+export const ENTITY_TAGS = ["Valve", "Larian", "Mega Crit", "Nicalis", "腾讯游戏", "网易游戏", "米哈游", "鹰角网络", "游戏科学", "拳头游戏", "索尼", "任天堂", "微软游戏"] as const;
 
 /** 模型常写的近义词，统一成词表里的写法。 */
 export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
@@ -73,6 +73,12 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
  * otherNames 是官方账号名、工作室名等其他称呼，把事实的主体对到发布方时也认它们。
  */
 export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; otherNames?: string[] }> = {
+  // Steam 种子游戏（主题页）
+  "binding-of-isaac-rebirth": { name: "以撒的结合：重生", displayTag: null, aliases: ["以撒的结合：重生", "以撒的结合", "The Binding of Isaac: Rebirth", "Binding of Isaac", "BoI", "Isaac"], otherNames: ["Afterbirth", "Afterbirth+", "Repentance", "Repentance+"] },
+  "slay-the-spire-2": { name: "杀戮尖塔 2", displayTag: null, aliases: ["杀戮尖塔 2", "杀戮尖塔2", "Slay the Spire 2", "StS 2", "STS2"] },
+  mewgenics: { name: "喵喵的结合", displayTag: null, aliases: ["喵喵的结合", "Mewgenics"] },
+  "baldurs-gate-3": { name: "博德之门 3", displayTag: null, aliases: ["博德之门 3", "博德之门3", "Baldur's Gate 3", "Baldurs Gate 3", "BG3"] },
+  // 仍可能出现在媒体报道里的手游/端游（无主题页，仅身份识别）
   "honor-of-kings": { name: "王者荣耀", displayTag: null, aliases: ["王者荣耀", "Honor of Kings"] },
   "genshin-impact": { name: "原神", displayTag: null, aliases: ["原神", "Genshin Impact"] },
   "honkai-star-rail": { name: "崩坏：星穹铁道", displayTag: null, aliases: ["崩坏：星穹铁道", "星穹铁道", "崩铁", "Honkai: Star Rail"] },
@@ -81,6 +87,11 @@ export const ENTITIES: Record<string, { name: string; displayTag: string | null;
   "black-myth-wukong": { name: "黑神话：悟空", displayTag: null, aliases: ["黑神话：悟空", "黑神话", "Black Myth: Wukong"] },
   "naraka-bladepoint": { name: "永劫无间", displayTag: null, aliases: ["永劫无间", "NARAKA: BLADEPOINT"] },
   arknights: { name: "明日方舟", displayTag: null, aliases: ["明日方舟", "Arknights"] },
+  // 厂商
+  valve: { name: "Valve", displayTag: "Valve", aliases: ["Valve", "V社"] },
+  larian: { name: "Larian Studios", displayTag: "Larian", aliases: ["Larian", "Larian Studios", "拉瑞安"] },
+  "mega-crit": { name: "Mega Crit", displayTag: "Mega Crit", aliases: ["Mega Crit", "MegaCrit"] },
+  nicalis: { name: "Nicalis", displayTag: "Nicalis", aliases: ["Nicalis"] },
   tencent: { name: "腾讯游戏", displayTag: "腾讯游戏", aliases: ["腾讯游戏", "腾讯", "Tencent Games", "Tencent"], otherNames: ["天美工作室群", "光子工作室群", "TiMi Studio Group", "LightSpeed Studios"] },
   netease: { name: "网易游戏", displayTag: "网易游戏", aliases: ["网易游戏", "网易", "NetEase Games", "NetEase"], otherNames: ["雷火"] },
   mihoyo: { name: "米哈游", displayTag: "米哈游", aliases: ["米哈游", "miHoYo", "HoYoverse"] },
@@ -90,14 +101,13 @@ export const ENTITIES: Record<string, { name: string; displayTag: string | null;
   sony: { name: "索尼互动娱乐", displayTag: "索尼", aliases: ["索尼", "Sony", "PlayStation"], otherNames: ["Sony Interactive Entertainment"] },
   nintendo: { name: "任天堂", displayTag: "任天堂", aliases: ["任天堂", "Nintendo"] },
   microsoft: { name: "微软游戏", displayTag: "微软游戏", aliases: ["Xbox", "微软", "Microsoft Gaming"] },
-  valve: { name: "Valve", displayTag: "Valve", aliases: ["Valve", "V社"] },
 };
 
-/**
- * 身份词典：摘要和标题里出现的游戏或厂商，必须在原文里也出现过，否则退回原标题、丢掉摘要（防止模型张冠李戴）。
- * 行业没有这个问题时可以留空数组。
- */
 export const IDENTITY_LEXICON: ReadonlyArray<{ id: string; name: string; patterns: RegExp[] }> = [
+  { id: "binding-of-isaac-rebirth", name: "以撒的结合：重生", patterns: [/以撒的结合|binding\s+of\s+isaac|\bboi\b/i] },
+  { id: "slay-the-spire-2", name: "杀戮尖塔 2", patterns: [/杀戮尖塔\s*2|slay\s+the\s+spire\s*2|\bsts\s*2\b/i] },
+  { id: "mewgenics", name: "喵喵的结合", patterns: [/喵喵的结合|mewgenics/i] },
+  { id: "baldurs-gate-3", name: "博德之门 3", patterns: [/博德之门\s*3|baldur'?s?\s+gate\s*3|\bbg3\b/i] },
   { id: "honor-of-kings", name: "王者荣耀", patterns: [/王者荣耀|honor\s+of\s+kings/i] },
   { id: "genshin-impact", name: "原神", patterns: [/原神|genshin/i] },
   { id: "honkai-star-rail", name: "崩坏：星穹铁道", patterns: [/星穹铁道|崩铁|star\s?rail/i] },
@@ -106,6 +116,10 @@ export const IDENTITY_LEXICON: ReadonlyArray<{ id: string; name: string; pattern
   { id: "black-myth-wukong", name: "黑神话：悟空", patterns: [/黑神话|black\s?myth/i] },
   { id: "naraka-bladepoint", name: "永劫无间", patterns: [/永劫无间|naraka/i] },
   { id: "arknights", name: "明日方舟", patterns: [/明日方舟|arknights/i] },
+  { id: "valve", name: "Valve", patterns: [/\bvalve\b|V社/i] },
+  { id: "larian", name: "Larian Studios", patterns: [/larian|拉瑞安/i] },
+  { id: "mega-crit", name: "Mega Crit", patterns: [/mega\s?crit/i] },
+  { id: "nicalis", name: "Nicalis", patterns: [/nicalis/i] },
   { id: "tencent", name: "腾讯游戏", patterns: [/腾讯|tencent/i] },
   { id: "netease", name: "网易游戏", patterns: [/网易|netease/i] },
   { id: "mihoyo", name: "米哈游", patterns: [/米哈游|mihoyo|hoyoverse/i] },
@@ -115,11 +129,12 @@ export const IDENTITY_LEXICON: ReadonlyArray<{ id: string; name: string; pattern
   { id: "sony", name: "索尼互动娱乐", patterns: [/索尼|\bsony\b|playstation/i] },
   { id: "nintendo", name: "任天堂", patterns: [/任天堂|nintendo/i] },
   { id: "microsoft", name: "微软游戏", patterns: [/微软|microsoft|\bxbox\b/i] },
-  { id: "valve", name: "Valve", patterns: [/\bvalve\b|V社/i] },
 ];
 
-/** 这些域名上的文章，发布方就是对应的厂商（Steam 商店、应用商店这类托管平台不算）。 */
 export const PUBLISHER_DOMAINS: ReadonlyArray<{ entityId: string; domains: readonly string[] }> = [
+  { entityId: "larian", domains: ["larian.com"] },
+  { entityId: "mega-crit", domains: ["megacrit.com"] },
+  { entityId: "nicalis", domains: ["nicalis.com"] },
   { entityId: "mihoyo", domains: ["mihoyo.com", "hoyoverse.com"] },
   { entityId: "hypergryph", domains: ["hypergryph.com"] },
   { entityId: "riot", domains: ["riotgames.com"] },

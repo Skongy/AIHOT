@@ -15,11 +15,11 @@ test("topic directory and pool counts stop reusing a withdrawn entry after one m
   await sql`INSERT INTO articles(id,source_id,identity_key,url,title,timeline_at,discovered_at)
     VALUES(${id},${id},${id},${`https://example.org/${id}`},'明日方舟',now(),now())`;
   await sql`INSERT INTO publications(article_id,source_id,title,summary,url,timeline_at,discovered_at,sort_at,selected,eligible,visible_after,tags,channel,category)
-    VALUES(${id},${id},'明日方舟 更新','摘要',${`https://example.org/${id}`},now(),now(),now(),true,true,now()-interval '1 minute',ARRAY['entity:arknights'],'news','new-games')`;
-  assert.equal((await loadTopicPage("arknights", 1))!.topic.poolTotal, 1);
+    VALUES(${id},${id},'喵喵的结合 更新','摘要',${`https://example.org/${id}`},now(),now(),now(),true,true,now()-interval '1 minute',ARRAY['entity:mewgenics'],'news','new-games')`;
+  assert.equal((await loadTopicPage("mewgenics", 1))!.topic.poolTotal, 1);
   await sql`UPDATE publications SET visibility='withdrawn' WHERE article_id=${id}`;
   t.mock.timers.tick(61_000);
-  const page = (await loadTopicPage("arknights", 1))!;
+  const page = (await loadTopicPage("mewgenics", 1))!;
   assert.deepEqual(page.items, []);
   assert.equal(page.topic.poolTotal, 0, "an expired count cannot be returned during its background refresh");
   t.mock.timers.tick(61_000);

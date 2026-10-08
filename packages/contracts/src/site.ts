@@ -299,6 +299,8 @@ export interface ReportDetail {
   /** As edited: daily categories, weekly and monthly themes. */
   sections: Array<{ label: string; summary: string | null; items: ReportCitation[] }>;
   flashes: ReportCitation[];
+  /** Daily only: items whose body named a date equal to tomorrow (Beijing). Empty/omitted when none. */
+  watchlist?: Array<{ date: string; what: string; itemId: string | null; title: string; sourceName: string; sourceUrl: string }>;
   /**
    * The front page's picture: from the lead item (a daily's lead, a weekly or monthly's first highlight),
    * else from another public report of that event. Captioned with the story when it is not the lead's own.

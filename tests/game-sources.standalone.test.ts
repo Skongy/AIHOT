@@ -30,11 +30,15 @@ const MEDIA = [
   "web-gamersky", "web-3dm", "web-a9vg", "web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-nppa-games",
 ];
 const OFFICIAL = [
+  // disabled (Steam-focus): mobile/F2P single-game + LoL Esports
   "json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports",
   "rss-steam-cs2", "rss-steam-dota2", "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-netease-ir",
+  // Steam seed-game news
+  "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3",
 ];
-/** Single-game announcement feeds carry the agreed title rule; platform and publisher feeds (mostly reveals and dates) do not. */
+/** Disabled mobile/F2P announcement feeds still carry the old title rule in config (kept for re-enable). Steam seed feeds do not. */
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
+const DISABLED_OFFICIAL = new Set(["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports"]);
 /** Listings that print no absolute date: their detail pages (or a later listing) date them. */
 const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-gp-qq"]);
 
@@ -61,6 +65,11 @@ test("every game source has a config its kind implements and the agreed defaults
   // Q2-1 default: media T2, the regulator T1; official sources T1 except the Steam store feed (developers' own posts, T1_5).
   for (const id of MEDIA) assert.equal(byId.get(id)!.tier, id === "web-nppa-games" ? "T1" : "T2", id);
   for (const id of OFFICIAL) assert.equal(byId.get(id)!.tier, id === "rss-steam-news" ? "T1_5" : "T1", id);
+  for (const id of DISABLED_OFFICIAL) assert.equal(byId.get(id)!.enabled, false, id);
+  for (const id of ["rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
+    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
+  }
 });
 
 test("the title rule sits on the single-game announcement sources only", () => {
@@ -68,7 +77,7 @@ test("the title rule sits on the single-game announcement sources only", () => {
   assert.deepEqual(withRule.sort(), [...SINGLE_GAME].sort());
   const rules = SINGLE_GAME.map((id) => JSON.stringify(byId.get(id)!.config.ingestNoiseFilter));
   assert.equal(new Set(rules).size, 1, "one shared rule");
-  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2"]) {
+  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
   }
 });

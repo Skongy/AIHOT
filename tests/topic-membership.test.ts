@@ -16,15 +16,15 @@ test("topic lists and pool counts share the exact membership predicate", async (
   const now = new Date(+at + 1000);
   const cases = [
     { title: "", original: null, tags: ["手游"], topics: ["mobile"] },
-    { title: "League of Legends 手游", original: null, tags: [], topics: [] },
-    { title: "", original: null, tags: ["entity:league-of-legends"], topics: ["league-of-legends"] },
-    { title: "Unrelated", original: null, tags: ["entity:league-of-legends", "entity:genshin-impact"], topics: [] },
-    { title: "Unrelated", original: "LEAGUE OF LEGENDS launches a new mode", tags: ["entity:league-of-legends", "entity:genshin-impact"], topics: ["league-of-legends"] },
-    { title: "Arknightsdata", original: null, tags: ["entity:arknights", "entity:genshin-impact"], topics: [] },
-    { title: "发布Arknights的新活动", original: null, tags: ["entity:arknights", "entity:genshin-impact"], topics: ["arknights"] },
-    { title: "Unselected", original: null, tags: ["手游", "entity:league-of-legends"], topics: ["mobile", "league-of-legends"], selected: false },
-    { title: "Withdrawn", original: null, tags: ["手游", "entity:league-of-legends"], topics: ["mobile", "league-of-legends"], visibility: "withdrawn" },
-    { title: "Future", original: null, tags: ["手游", "entity:league-of-legends"], topics: ["mobile", "league-of-legends"], future: true },
+    { title: "Baldur's Gate 3 手游", original: null, tags: [], topics: [] },
+    { title: "", original: null, tags: ["entity:baldurs-gate-3"], topics: ["baldurs-gate-3"] },
+    { title: "Unrelated", original: null, tags: ["entity:baldurs-gate-3", "entity:mewgenics"], topics: [] },
+    { title: "Unrelated", original: "BALDUR'S GATE 3 launches a new mode", tags: ["entity:baldurs-gate-3", "entity:mewgenics"], topics: ["baldurs-gate-3"] },
+    { title: "MewgenicsDB", original: null, tags: ["entity:mewgenics", "entity:baldurs-gate-3"], topics: [] },
+    { title: "发布Mewgenics的新活动", original: null, tags: ["entity:mewgenics", "entity:baldurs-gate-3"], topics: ["mewgenics"] },
+    { title: "Unselected", original: null, tags: ["手游", "entity:baldurs-gate-3"], topics: ["mobile", "baldurs-gate-3"], selected: false },
+    { title: "Withdrawn", original: null, tags: ["手游", "entity:baldurs-gate-3"], topics: ["mobile", "baldurs-gate-3"], visibility: "withdrawn" },
+    { title: "Future", original: null, tags: ["手游", "entity:baldurs-gate-3"], topics: ["mobile", "baldurs-gate-3"], future: true },
   ];
   await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${prefix}, ${prefix}, 'rss', 'T1')`;
   for (const [i, row] of cases.entries()) {
@@ -36,7 +36,7 @@ test("topic lists and pool counts share the exact membership predicate", async (
       VALUES (${id}, ${prefix}, ${row.title}, ${row.original}, ${`https://example.org/${id}`}, ${at}, ${at},
         ${at}, ${row.future ? new Date(+now + 1) : at}, ${row.selected ?? true}, true, ${row.visibility ?? "public"}, 'news', ${row.tags})`;
   }
-  const topics = ["league-of-legends", "arknights", "mobile"].map(slug => findTopic(slug)!);
+  const topics = ["baldurs-gate-3", "mewgenics", "mobile"].map(slug => findTopic(slug)!);
   const membership = new Map((await sql<{ id: string; topics: string[] }[]>`
     SELECT p.article_id AS id, ${topicMembership(topics)} AS topics FROM publications p WHERE p.source_id = ${prefix}`)
     .map(row => [row.id, row.topics]));
