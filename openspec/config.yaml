@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN
+  All artifacts must be written in zh-CN.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  项目：Skongy/AIHOT —— 基于 KKKKhazix/AIHOT（MIT）的 fork，目标是面向国内玩家的游戏资讯热点站。
+  栏目只有四个：资讯、热点、AI 日报、主题（一游戏一页）。不做史低、商城、战绩、工具。风格参考小黑盒。
+  技术栈：Node.js 24.11+ 直接运行 TypeScript（无后端构建）、npm workspaces（apps/api Fastify、apps/worker pg-boss、
+  apps/web React Router SSR + Tailwind、packages/backend、packages/contracts、industry/、site/、modules/*）、PostgreSQL 17、Docker Compose。
+
+  开发流程（硬性规定）：
+  - 先规格后代码：任何代码改动前，先在 openspec/changes/<id>/ 写 proposal.md、tasks.md（必要时 design.md 与 spec 增量），
+    由用户本人批准后才能动代码。
+  - 未经用户明确同意，不提交、不推送、不开 PR、不同步 fork。
+  - 一个变更只做一件事；做完逐项勾 tasks.md，验证通过后再 archive。
+
+  与上游保持可合并（来自上游 AGENTS.md）：
+  - 站点自己的东西放 site/，行业知识放 industry/，只属于本站的功能做成 modules/<名字>/；尽量不改 apps/ 与 packages/。
+  - 必须改引擎时改动要小，并在变更的 files.md 里单独列出“引擎补丁”，便于以后合并上游。
+  - 前端只经 HTTP 读 apps/api；公开出口只从 packages/backend/src/publication/ 读；读者打开页面不触发模型调用。
+  - 付费请求都走回执与预算熔断；安全阀（COLLECT_ENABLED、MODEL_CALLS_ENABLED、FEISHU_*_ENABLED、INDEXNOW_SUBMIT_ENABLED）开发时保持关闭。
+  - 信源默认只展示摘要（site_fulltext 关），来源明确允许才开全文。
+  - 迁移放 database/migrations/（模块表放模块的 migrations/），已发布迁移不改，从 0055 起一文件一条可在线执行语句。
+  - 不提交 .env、密钥、.data/；不使用 AIHOT 的名字和 Logo。
+  - 改完至少跑：npm run typecheck；DATABASE_URL=postgres://127.0.0.1:5432/<名>_test npm test；
+    npm run build -w @aihot/web && node --test apps/web/tests/*.test.ts；站点跑起来后 node scripts/smoke.ts --base http://localhost:3000。
+
+  输入来源：热点标准来自“灵感”bot；信源名单来自“信源官”bot；页面设计来自“前端设计”bot。
+  这些输入到位前，相关部分只做占位，不凭感觉替用户决定。
+
+rules:
+  proposal:
+    - 必须写“不做什么（Out of Scope）”与“需要用户决定的问题”
+    - 标出是否需要改引擎（apps/、packages/）以及原因
+  tasks:
+    - 第一组任务是前置条件与基线验证，最后一组是验证与交付（交付不含提交/推送，除非用户已批准）
+    - 每个任务能在 2 小时内完成
