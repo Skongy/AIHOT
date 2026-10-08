@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated on Wed, 07 Oct 2026 23:25:37 -0700 -->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <atom:link href="https://store.steampowered.com/news/app/2868840/" rel="self" type="application/rss+xml" />
+    <title>2868840 RSS 新闻</title>
+    <link><![CDATA[https://store.steampowered.com/news/app/2868840/]]></link>
+    <description><![CDATA[ 2868840 活动与公告]]></description>
+    <language>en-us</language>
+    <generator>Steam 新闻 RSS</generator>
+    <item>
+      <title>涅奥通讯：2026年9月特报</title>
+      <description>&lt;img src=&quot;https://clan.cdn.queniuqe.com/images/44971832/5f442d5032f604875190e9a24317068d6917abb0.png&quot; /&gt;&lt;br&gt;&lt;br&gt;好嘞。这一期的涅奥通讯来得比平时要晚一些，但我们的开发团队已经结束休息回到工作中了！&lt;br&gt;&lt;br&gt;我们造访了历史悠久的巴塞罗那、吃遍了各种塔帕斯、走遍了所有高迪建筑、并在城市蜿蜒的哥特街区上购买了各种小饰品。&lt;br&gt;&lt;br&gt;&lt;img src=&quot;https…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/2868840/view/698776157349217033]]></link>
+      <pubDate>Fri, 25 Sep 2026 23:35:41 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/2868840/view/698776157349217033</guid>
+      <enclosure url="https://clan.cdn.queniuqe.com/images/44971832/5f442d5032f604875190e9a24317068d6917abb0.png" length="0" type="image/png" />
+    </item><item>
+      <title>涅奥通讯：2026年8月特报</title>
+      <description>&lt;img src=&quot;https://clan.cdn.queniuqe.com/images/44971832/762cfd413a0aaaf88eefeb68a1e24cb00174ec48.png&quot; /&gt;&lt;br&gt;&lt;br&gt;嗨，爬塔人们，8月号的涅奥通讯来了！&lt;br&gt;&lt;br&gt;我们的团队正在努力制作新内容，但这些新内容至少还需要一个月的时间才会在beta版中出现。&lt;br&gt;&lt;br&gt;在8月底，我们将会迎来一年一度的全团队假期，因此8月27日将不会有更新补丁。作为一家以远程工作为主的公司，能够线下见…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/2868840/view/685261553769906927]]></link>
+      <pubDate>Fri, 14 Aug 2026 23:52:17 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/2868840/view/685261553769906927</guid>
+      <enclosure url="https://clan.cdn.queniuqe.com/images/44971832/762cfd413a0aaaf88eefeb68a1e24cb00174ec48.png" length="0" type="image/png" />
+    </item><item>
+      <title>Beta Patch Notes - v0.111.0</title>
+      <description>Time for another beta patch! Heads up that there won't be a patch on the 27th as our team is taking a break in the last week of August. As we'll explain a bit further in the upcoming August Neowsletter, there may be a longer wait in general for the next patch, as we've shifted our focus to some BIG,…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/2868840/view/671751488532383386]]></link>
+      <pubDate>Fri, 14 Aug 2026 01:07:02 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/2868840/view/671751488532383386</guid>
+    </item><item>
+      <title>Beta Patch Notes - v0.110.0</title>
+      <description>Another beta patch just dropped! This one contains a host of balance changes and reworks. Notably, Mirage and Pillar of Creation have been reverted back to their pre-0.109.0 versions and have also been slightly buffed and nerfed, respectively. We've also implemented a brand new feature in this patch…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/2868840/view/694268118771435039]]></link>
+      <pubDate>Fri, 31 Jul 2026 03:26:13 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/2868840/view/694268118771435039</guid>
+    </item><item>
+      <title>Beta Hotfix Patch Notes - v0.109.1</title>
+      <description>Got a tiny patch today with one important hotfix for players playing in Traditional Chinese!&lt;br&gt;&lt;br&gt;&lt;div class=&quot;bb_h3&quot;&gt;BUG FIXES:&lt;/div&gt;&lt;ul class=&quot;bb_ul&quot;&gt;&lt;li&gt; Synced corrected Traditional Chinese translations to fix broken plural evaluation&lt;/…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/2868840/view/680756685198854785]]></link>
+      <pubDate>Sat, 25 Jul 2026 18:42:05 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/2868840/view/680756685198854785</guid>
+    </item>
+  </channel>
+</rss>

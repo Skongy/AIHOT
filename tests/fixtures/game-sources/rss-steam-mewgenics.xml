@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated on Wed, 07 Oct 2026 23:26:27 -0700 -->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <atom:link href="https://store.steampowered.com/news/app/686060/" rel="self" type="application/rss+xml" />
+    <title>686060 RSS 新闻</title>
+    <link><![CDATA[https://store.steampowered.com/news/app/686060/]]></link>
+    <description><![CDATA[ 686060 活动与公告]]></description>
+    <language>en-us</language>
+    <generator>Steam 新闻 RSS</generator>
+    <item>
+      <title>Lets play Mewgenics!</title>
+      <description>&lt;p class=&quot;bb_paragraph&quot;&gt;&lt;/p&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;Well hello fellow horrible humans! &lt;/p&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;Edmund here with a update!&lt;/p&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;&lt;img src=&quot;https://clan.cdn.queniuqe.com/i…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/686060/view/675133527946168084]]></link>
+      <pubDate>Sun, 04 Oct 2026 22:12:24 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/686060/view/675133527946168084</guid>
+      <enclosure url="https://clan.cdn.queniuqe.com/images/43128930/68584d0f40ec0bdec4aff4892c4a6b227588c917.png" length="0" type="image/png" />
+    </item><item>
+      <title>Languages, Console and DLC updates!</title>
+      <description>&lt;p class=&quot;bb_paragraph&quot;&gt;&lt;/p&gt;&lt;div class=&quot;bb_h2&quot;&gt;NEW LANGUAGES&lt;/div&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;Hello! Mewgenics is now available to everyone in Japanese, Korean, Russian, and Simplified Chinese. Thanks you all who provided feedback during the be…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/686060/view/689767689898427732]]></link>
+      <pubDate>Sun, 06 Sep 2026 02:17:15 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/686060/view/689767689898427732</guid>
+      <enclosure url="https://clan.cdn.queniuqe.com/images/43128930/a3396cf15588490025a3b72d62ff399a0e6f854f.png" length="0" type="image/png" />
+    </item><item>
+      <title>Mewgenics Beta Patch Notes 1.1.21234</title>
+      <description>&lt;ul class=&quot;bb_ul&quot;&gt;&lt;li&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;misc localization fixes&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;chinese fonts updated&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;chinese and russian cat name l…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/686060/view/689767689898426689]]></link>
+      <pubDate>Wed, 02 Sep 2026 19:53:43 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/686060/view/689767689898426689</guid>
+    </item><item>
+      <title>  Mewgenics Live!</title>
+      <description>&lt;p class=&quot;bb_paragraph&quot;&gt;&lt;img src=&quot;https://clan.cdn.queniuqe.com/images/43128930/751c49d508656233ff56b7a7171cc9c66e808f77.png&quot; /&gt;&lt;/p&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;Tune into &lt;a class=&quot;bb_link&quot; href=&quot;https://www.youtube.com/watch?v=qwC9E…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/686060/view/717913919982667287]]></link>
+      <pubDate>Mon, 24 Aug 2026 18:45:35 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/686060/view/717913919982667287</guid>
+      <enclosure url="https://clan.cdn.queniuqe.com/images/43128930/a429ed5c60cfc488b0cc57c39a4f5a3fd18d3244.png" length="0" type="image/png" />
+    </item><item>
+      <title>Mewgenics Beta Patch Notes 1.1.21220</title>
+      <description>&lt;ul class=&quot;bb_ul&quot;&gt;&lt;li&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;fixed druid's back facing idle having the body oriented incorrectly (noticeable during turtle form)&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p class=&quot;bb_paragraph&quot;&gt;misc localization fixes&lt;/p&gt;&lt;/li&gt;&l…</description>
+      <link><![CDATA[https://store.steampowered.com/news/app/686060/view/717913919982666494]]></link>
+      <pubDate>Thu, 20 Aug 2026 18:30:06 +0000</pubDate>
+      <guid isPermaLink="true">https://store.steampowered.com/news/app/686060/view/717913919982666494</guid>
+    </item>
+  </channel>
+</rss>

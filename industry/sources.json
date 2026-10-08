@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。名单来自信源官 v1（媒体 16 个）和官方信源 v1（15 个），见 openspec 变更 connect-game-sources。单款游戏官方公告源（王者、英雄联盟、米游社原神/星铁、永劫无间、和平精英）带标题规则：命中保留词的一定保留，否则命中丢弃词的丢掉，其余交给预筛。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}）。仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam 官源不套用该标题规则。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -478,7 +478,8 @@
         "王者荣耀"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "json-lol-news",
@@ -542,7 +543,8 @@
         "英雄联盟"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "json-miyoushe-ys",
@@ -606,7 +608,8 @@
         "原神"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "json-miyoushe-sr",
@@ -670,7 +673,8 @@
         "崩坏：星穹铁道"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "web-yjwujian",
@@ -733,7 +737,8 @@
         "永劫无间"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "web-gp-qq",
@@ -798,7 +803,8 @@
         "和平精英"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "web-lolesports",
@@ -829,7 +835,8 @@
         "英文"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": false
     },
     {
       "id": "rss-steam-cs2",
@@ -1014,6 +1021,98 @@
         "官方",
         "英文",
         "财报"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-isaac-rebirth",
+      "name": "Steam·以撒的结合：重生",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/250900/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "binding-of-isaac-rebirth",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "以撒的结合"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-sts2",
+      "name": "Steam·杀戮尖塔 2",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/2868840/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "slay-the-spire-2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "杀戮尖塔"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-mewgenics",
+      "name": "Steam·喵喵的结合",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/686060/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "mewgenics",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "喵喵的结合"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-steam-bg3",
+      "name": "Steam·博德之门 3",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/1086940/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "baldurs-gate-3",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "博德之门"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false

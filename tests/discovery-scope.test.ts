@@ -17,14 +17,14 @@ test("llms and sitemap build from current topic scope rather than a cached direc
   for (let i = 0; i < 20; i++) {
     const id = `${source}-${i}`;
     await sql`INSERT INTO articles (id,source_id,identity_key,url,title,timeline_at,discovered_at)
-      VALUES (${id},${source},${id},${`https://example.org/${id}`},'明日方舟',now(),now())`;
+      VALUES (${id},${source},${id},${`https://example.org/${id}`},'喵喵的结合',now(),now())`;
     await sql`INSERT INTO publications (article_id,source_id,title,summary,url,timeline_at,discovered_at,sort_at,selected,eligible,visible_after,tags,channel,category)
-      VALUES (${id},${source},'明日方舟 版本更新','Summary',${`https://example.org/${id}`},now(),now(),now(),true,true,now() - interval '1 minute',ARRAY['entity:arknights'],'news','new-games')`;
+      VALUES (${id},${source},'喵喵的结合 版本更新','Summary',${`https://example.org/${id}`},now(),now(),now(),true,true,now() - interval '1 minute',ARRAY['entity:mewgenics'],'news','new-games')`;
   }
-  assert.equal((await topicPageCounts()).find((topic) => topic.slug === "arknights")!.indexable, true);
+  assert.equal((await topicPageCounts()).find((topic) => topic.slug === "mewgenics")!.indexable, true);
   await sql`UPDATE publications SET visibility = 'withdrawn' WHERE source_id = ${source}`;
-  assert.ok(!(await loadLlmsAvailability()).topics.some((topic) => topic.slug === "arknights"));
+  assert.ok(!(await loadLlmsAvailability()).topics.some((topic) => topic.slug === "mewgenics"));
   const sitemap = await app.inject("/sitemap.xml");
   assert.equal(sitemap.statusCode, 200);
-  assert.ok(!sitemap.body.includes("/topics/arknights</loc>"));
+  assert.ok(!sitemap.body.includes("/topics/mewgenics</loc>"));
 });
