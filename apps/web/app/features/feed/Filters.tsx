@@ -47,14 +47,29 @@ export function CategoryTabs({ base, category, channel = "all", layoutId, classN
   return <PillTabs items={filterOptions(base, params, "全部").map(o => ({ ...o, prefetch: 'intent' as const }))} active={filterKey(category, channel)} layoutId={layoutId} label="筛选" className={className} />;
 }
 
+/** The 资讯 column's 精选 | 全部 switch (a filter in use carries over): in the phone bar, and beside the desktop title. */
+export function ScopeTabs({ base, layoutId }: { base: "/" | "/all"; layoutId: string }) {
+  const [params] = useSearchParams();
+  const scope = (to: string) => hrefWith(to, params, { q: null, tab: null, search: null });
+  return (
+    <PillTabs
+      size="sm"
+      layoutId={layoutId}
+      label="看精选或全部"
+      active={base === "/" ? "featured" : "all"}
+      items={[
+        { key: "featured", label: "精选", to: scope("/"), resetScroll: true, prefetch: 'intent' },
+        { key: "all", label: "全部", to: scope("/all"), resetScroll: true, prefetch: 'intent' },
+      ]}
+    />
+  );
+}
+
 /**
- * The phone bar of 精选 and 全部: the brand, the 精选 | 全部 switch (a filter in use carries over), and
- * buttons for the filter sheet and search.
+ * The phone bar of 精选 and 全部: the brand, the 精选 | 全部 switch, and buttons for the filter sheet and search.
  */
 export function FeedBar({ base, category, channel }: { base: "/" | "/all"; category: CategoryKey | null; channel: ChannelKey }) {
-  const [params] = useSearchParams();
   const [sheet, setSheet] = useState(false);
-  const scope = (to: string) => hrefWith(to, params, { q: null, tab: null, search: null });
   const filtered = filterKey(category, channel) !== "all";
   return (
     <>
@@ -64,18 +79,7 @@ export function FeedBar({ base, category, channel }: { base: "/" | "/all"; categ
             <Wordmark size={17} />
           </Link>
         }
-        center={
-          <PillTabs
-            size="sm"
-            layoutId="feed-scope"
-            label="看精选或全部"
-            active={base === "/" ? "featured" : "all"}
-            items={[
-              { key: "featured", label: "精选", to: scope("/"), resetScroll: true, prefetch: 'intent' },
-              { key: "all", label: "全部", to: scope("/all"), resetScroll: true, prefetch: 'intent' },
-            ]}
-          />
-        }
+        center={<ScopeTabs base={base} layoutId="feed-scope" />}
         actions={
           <>
             <BarButton label={filtered ? "筛选（已选）" : "筛选"} on={filtered} onClick={() => setSheet(true)}>
