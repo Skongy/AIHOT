@@ -16,7 +16,7 @@ import type { Screen } from "../components/shell/screens";
 import type { TopicPagePart } from "../modules";
 import { loadParts } from "../site-modules";
 
-export const handle: Screen = { home: "me" };
+export const handle: Screen = { home: "topics" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 

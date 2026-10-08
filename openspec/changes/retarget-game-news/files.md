@@ -9,7 +9,7 @@
 | `site/site.ts` | `SITE.name/subject("游戏")/homeTitle/topicsTitle/description/tagline/keywords/mcpPrefix/crawlerName/organization.name/feedbackExample/footerNote`；`ABOUT.headline/lead/steps/sourcesFallback`；`CARDS` 各页文字；`AGENT.search`；`REPORTS.entry/metricUnits/shareUnit/quiet`。`EDITION_TIMES` 按 Q1-15；`PUBLIC_CATEGORIES` 保持 `{}` |
 | `site/public/openapi-v1.json` | 8 处带 “AI” 的 summary/description（如 “List recent public AI items”）改成中性说法；分类枚举仍用 `{{categories}}` 占位 |
 | `site/public/manifest.webmanifest`、`site/public/robots.txt` | 只核对占位，预计不用改 |
-| `site/changelog.json` | 示例条目的文案、日期、`latestVersion` 改成占位；署名按 Q1-12 |
+| `site/changelog.json` | 不改（Q1-12：保留示例条目和署名） |
 | `site/brand/nameplates/{daily,weekly,monthly,archive}.svg`、`index.json` | 用 `scripts/nameplates.ts` 按新的 `subject` 重新生成 |
 | `site/brand/{logo.svg,icon.png,icon-192.png,apple-icon.png,favicon.ico,Logo.tsx}` | 有素材才换（Q1-11） |
 | `site/models.ts` | 不改（模型用 .env 的默认值，Q1-14） |
@@ -19,9 +19,9 @@
 
 | 文件 | 改什么 |
 |---|---|
-| `industry/taxonomy.ts` | `CATEGORIES`（游戏 7 类草案，保留 `industry`）、`RELEASE`、`PLAIN_TERMS`、`ITEM_TYPES`、`CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`、`TAG_SYNONYMS`、`ENTITIES`（厂商和种子游戏）、`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES`，全部替换 |
+| `industry/taxonomy.ts` | `CATEGORIES`（游戏 3 类：新游、电竞、行业，保留 `industry`；“版本”已于 10-08 去掉）、`RELEASE`、`PLAIN_TERMS`、`ITEM_TYPES`、`CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`、`TAG_SYNONYMS`、`ENTITIES`（厂商和种子游戏）、`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES`，全部替换 |
 | `industry/topics.json` | `groups` 显示名改成“游戏 / 平台与品类 / 内容形态”；38 个 AI 主题换成种子游戏（company 组）和平台、品类、内容形态主题 |
-| `industry/sources.json` | 去掉 18 个 AI 信源（Q1-6） |
+| `industry/sources.json` | 去掉 18 个 AI 信源，留空（Q1-6） |
 | `industry/prompts/prefilter.md` | AI 相关性 → 游戏相关性 |
 | `industry/prompts/structure.md` | “已确认与 AI 相关” → 游戏；“模型发布”等标签规则 → 游戏标签规则；“主体公司” → 主体（游戏或厂商） |
 | `industry/prompts/content-understanding.md` | 写死的 itemType 表（model_release…）、标签和实体白名单、示例 JSON → 游戏版（要和 `ITEM_TYPES`、词表一致） |
@@ -38,11 +38,11 @@
 
 | 文件 | 改什么 |
 |---|---|
-| `apps/web/app/components/shell/nav.ts` | `SECTIONS`“内容”区改成 资讯 / 热点 / AI 日报 / 主题，收藏移到“更多”；`ENGINE_TABS` 改成 资讯 / 热点 / AI 日报 / 主题(`topics`) / 我的；`TabKey` 加 `"topics"` |
-| `apps/web/app/routes/home.tsx` | `handle.name`、页面标题和 jsonLd 名称 “精选” → “资讯”；桌面区（`hidden lg:block`）加“精选 \| 全部”切换 |
-| `apps/web/app/features/feed/Filters.tsx` | 抽出或复用“精选 \| 全部”的 `PillTabs`，给桌面用（手机 `FeedBar` 不变） |
+| `apps/web/app/components/shell/nav.ts` | `SECTIONS`“内容”区改成 资讯 / 热点 / AI 日报 / 主题，收藏移到“更多”；`ENGINE_TABS` 改成 资讯 / 热点 / 日报 / 主题(`topics`) / 我的；`TabKey` 加 `"topics"` |
+| `apps/web/app/routes/home.tsx` | `handle.name`、页面标题 “精选” → “资讯”（jsonLd 列表名仍叫“精选”，它描述的就是精选列表）；桌面区（`hidden lg:block`）加“精选 \| 全部”切换 |
+| `apps/web/app/features/feed/Filters.tsx` | 把“精选 \| 全部”的 `PillTabs` 抽成 `ScopeTabs`，手机 `FeedBar` 和桌面共用（手机外观不变） |
 | `apps/web/app/routes/all.tsx` | 桌面区加同样的切换（`handle` 不变） |
-| `apps/web/app/routes/topics.tsx` | `handle` → `{ tab: "topics", name: "主题" }` |
+| `apps/web/app/routes/topics.tsx` | `handle` → `{ tab: "topics", name: "主题" }`；手机顶栏去掉“‹ 我的”返回键（它已是底栏页） |
 | `apps/web/app/routes/topic.tsx` | `handle` → `{ home: "topics" }` |
 | `apps/web/app/routes/more.tsx` | 去掉“主题”行 |
 
@@ -62,7 +62,17 @@
 - RSS 标题（`packages/backend/src/publication/feeds.ts`）、llms.txt 标题、MCP 工具名都从 `SITE` 读，改 `site.ts` 就会跟着变
 - 数据库迁移、`docker-compose.yml`、`Dockerfile`、`.env.example`
 
-## 〔测试〕要迁移示例的文件（按文件名排序；共 45 个，实施时以 typecheck 和测试失败为准）
+## 〔测试〕实际改动的测试文件（实施结果）
+
+按“以 typecheck 和测试失败为准”的原则，实际改了 34 个测试文件，只换示例数据，测的规则不变：
+- 类别 key 批量替换（`ai-models` → `new-games`、`paper` → `esports`、`ai-products` 和 `tip` → `industry`）：tests/ 下 28 个文件和 apps/web/tests 的 `native-video`、`request-target`
+- 内容类型（`model_release` → `game_launch` 等）和标签（模型发布 → 定档/上线、产品更新 → 版本更新……）：`analyze*`、`default-model`、`processing-recovery`、`category-corrections`
+- 公司和主题示例换成种子游戏和厂商：`topics`、`topic-membership`、`topics-withdrawal`、`topic-cache-deadline`、`discovery-scope`、`reading`、`pool-relevance`、`content-publication`、`analyze`
+- `apps/web/tests/navigation-performance.test.ts`：类别标签“模型 / 产品”→“新游 / 电竞”，页面标题“精选”→“资讯”
+
+其余文件里还留着 OpenAI、Claude 之类字样，只是标题或正文里的随意文本，不影响测试结论，这次没动（保持改动最小）。
+
+### 计划阶段列出的候选文件（共 45 个，供参考）
 
   - `tests/agent-public.test.ts`
   - `tests/analyze-consistency.test.ts`

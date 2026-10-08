@@ -9,7 +9,7 @@
 
 - [x] 2.1 `npm i -g @fission-ai/openspec@latest`（1.14.1，Node ≥ 20.19 即可）
 - [x] 2.2 关闭遥测：`openspec config set telemetry.enabled false` / `OPENSPEC_TELEMETRY=0`
-- [ ] 2.3 安装 Node 24.11+（变更 1 开工前）
+- [x] 2.3 安装 Node 24.11+（v24.21.0，用户级）
 
 ## 3. 初始化（分支 `openspec/adopt-conventions`）
 
@@ -21,4 +21,4 @@
 ## 4. 验证与交付
 
 - [x] 4.1 `git status` 只多出 `openspec/`，没有改任何已有文件
-- [ ] 4.2 用户审阅并合并 PR（合并后 `openspec archive adopt-openspec-conventions`）
+- [x] 4.2 用户审阅并合并 PR #1；随后 `openspec archive adopt-openspec-conventions`
