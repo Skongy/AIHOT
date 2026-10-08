@@ -7,11 +7,11 @@
 ## ADDED Requirements
 
 ### Requirement: 游戏资讯类别
-站点 MUST 只提供用户确认的游戏类别（草案：新游、版本、行业、电竞、评测、攻略、观点）。其中 key 为 `industry` 的类别 MUST 存在，用来收容没归上类的资料。类别 key 上线后 SHALL NOT 再改。
+站点 MUST 正好提供四个游戏类别：新游（`new-games`）、版本（`updates`）、电竞（`esports`）、行业（`industry`）。key 为 `industry` 的类别 MUST 存在，用来收容没归上类的资料，也收厂商、发行、版号、评测和观点类内容。站点 SHALL NOT 另设攻略、评测或观点类别。类别 key 上线后 SHALL NOT 再改。
 
 #### Scenario: 筛选栏
 - **WHEN** 读者打开资讯页或全部动态的筛选
-- **THEN** 选项是游戏类别，没有 模型、产品、论文 这类 AI 类别
+- **THEN** 类别选项正好是 新游、版本、电竞、行业，没有 模型、产品、论文 这类 AI 类别，也没有 攻略
 
 #### Scenario: 分类订阅地址
 - **WHEN** 订阅者请求 /feed/category/ai-models.xml
@@ -29,18 +29,18 @@
 - **THEN** 这个标签不被保存
 
 ### Requirement: 内容类型与提示词一致
-内容理解步骤用的内容类型集合 MUST 与评分和内容理解提示词里的类型表完全一致，并且是游戏资讯的类型（例如首曝、上线、版本更新、行业事件、电竞、评测与数据、攻略、观点讨论）。
+内容理解步骤用的内容类型集合 MUST 与评分和内容理解提示词里的类型表完全一致，并且是游戏资讯的类型：首曝、上线、版本更新、电竞、行业事件、评测与数据、观点讨论（`game_reveal`、`game_launch`、`version_update`、`esports_event`、`industry_event`、`review_or_data`、`opinion_discussion`）。
 
 #### Scenario: 类型校验
 - **WHEN** 模型对一篇版本公告返回 itemType `version_update`
 - **THEN** 校验通过；如果返回的是 `model_release`，校验失败并按现有失败流程处理
 
 ### Requirement: 日报头条发布计数
-日报报头的头条发布计数 SHALL 按游戏口径统计（例如“N 款新游”），或者在用户选择不统计时不显示。SHALL NOT 显示“个新模型”。
+日报报头的头条发布计数 SHALL 按游戏口径统计为“N 款新游”（新游类别里带“定档/上线”标签、首次报道的一手条目）。SHALL NOT 显示“个新模型”。
 
 #### Scenario: 日报报头
 - **WHEN** 读者打开某一期日报，当期有 3 条首次报道的新游上线
-- **THEN** 报头显示“3 款新游”（或按用户选择不显示这一项），不出现“新模型”
+- **THEN** 报头显示“3 款新游”，不出现“新模型”
 
 ### Requirement: 游戏主题目录
 主题目录 MUST 分为“游戏”“平台与品类”“内容形态”三组，SHALL NOT 包含任何 AI 主题。每个游戏主题 MUST 对应一个游戏实体，收录以这款游戏为主体的精选报道。一篇报道有多个主体时，只有标题点了这款游戏的名字才收录。

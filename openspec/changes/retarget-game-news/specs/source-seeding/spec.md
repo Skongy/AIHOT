@@ -7,7 +7,7 @@
 ## ADDED Requirements
 
 ### Requirement: 示范信源不含 AI 行业信源
-种子信源文件 SHALL NOT 包含 AI 行业信源，例如 OpenAI News、Google DeepMind、Hugging Face Blog、TechCrunch · AI。文件只能为空，或者只含明确标注为占位的游戏信源。
+种子信源文件 SHALL NOT 包含 AI 行业信源，例如 OpenAI News、Google DeepMind、Hugging Face Blog、TechCrunch · AI。本变更交付时文件为空；以后只能为空，或者只含明确标注为占位的游戏信源。
 
 #### Scenario: 新库首次启动
 - **WHEN** 在空数据库上运行种子导入
