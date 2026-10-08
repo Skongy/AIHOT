@@ -16,7 +16,7 @@ import { chatJson } from "../providers/llm.ts";
 import { completeReceipt } from "../providers/receipts.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import { emit } from "../modules.ts";
-import { arrangeDaily, candidates, dailyEdition, periodEntries, sectionOf, SECTION_ORDER, type Candidate, type EditionEntry } from "./edition.ts";
+import { arrangeDaily, candidates, dailyEdition, leadSentence, periodEntries, sectionOf, SECTION_ORDER, type Candidate, type EditionEntry } from "./edition.ts";
 
 export const REPORT_VERSION = promptVersion("report-period", "report-period-sections", "report-period-no-sections");
 
@@ -80,6 +80,43 @@ function windowPoint(at: Date): string {
   return `${Number(day.slice(5, 7))} 月 ${Number(day.slice(8, 10))} 日 ${beijingTime(at)}`;
 }
 
+
+/** 明日关注：近 7 天已公开资料里，结构化 upcoming.date 等于次日（北京时间）的事项，去重最多 5 条。 */
+async function dailyWatchlist(date: string, end: Date): Promise<Array<{ date: string; what: string; itemId: string; title: string; sourceName: string; sourceUrl: string }>> {
+  const tomorrow = addDays(date, 1);
+  const since = new Date(end.getTime() - 7 * 86400000);
+  const rows = await sql<{
+    item_id: string; title: string; source_name: string; source_url: string; upcoming: unknown;
+  }[]>`
+    SELECT p.article_id AS item_id, p.title, s.name AS source_name, p.url AS source_url,
+           an.output->'upcoming' AS upcoming
+    FROM publications p
+    JOIN sources s ON s.id = p.source_id
+    JOIN analyses an ON an.id = p.analysis_id
+    WHERE p.visibility = 'public' AND p.selected = true
+      AND p.visible_after < ${end}
+      AND p.timeline_at >= ${since}
+      AND an.output ? 'upcoming'
+    ORDER BY p.timeline_at DESC
+    LIMIT 80`;
+  const seen = new Set<string>();
+  const out: Array<{ date: string; what: string; itemId: string; title: string; sourceName: string; sourceUrl: string }> = [];
+  for (const r of rows) {
+    const items = Array.isArray(r.upcoming) ? r.upcoming as Array<{ date?: string; what?: string }> : [];
+    for (const u of items) {
+      const d = typeof u?.date === "string" ? u.date.slice(0, 10) : "";
+      const what = typeof u?.what === "string" ? u.what.trim().slice(0, 30) : "";
+      if (d !== tomorrow || !what) continue;
+      const key = `${d}|${what}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ date: d, what, itemId: r.item_id, title: r.title, sourceName: r.source_name, sourceUrl: r.source_url });
+      if (out.length >= 5) return out;
+    }
+  }
+  return out;
+}
+
 /**
  * Daily report for Beijing date D covers the 24 hours up to the site's edition time on D (EDITION_TIMES).
  * Its most important entry leads, in its own words, and the next three are today's highlights. A window
@@ -94,12 +131,14 @@ export async function composeDaily(date: string, reason?: string): Promise<{ key
   const edition = await dailyEdition(date, start, end);
   // Nothing judged in the window is a failure upstream, not a quiet day: the run fails and is caught up later.
   if (edition.entries.length === 0 && edition.stats.judgedReports === 0) throw new Error(`daily ${date}: nothing judged in its window`);
-  const issue = arrangeDaily(edition.entries);
+  const quotas = REPORTS.dailyLayout?.sectionQuotas ?? null;
+  const issue = arrangeDaily(edition.entries, quotas);
   const [lead, ...rest] = issue.main;
+  const watchlist = await dailyWatchlist(date, end);
   const content = {
     date,
     lead: lead
-      ? { title: lead.entry.title, leadParagraph: lead.entry.summary }
+      ? { title: lead.entry.title, leadParagraph: leadSentence(lead.entry.summary) }
       : { title: REPORTS.quiet.title, leadParagraph: REPORTS.quiet.paragraph.replace("{start}", windowPoint(start)).replace("{end}", windowPoint(end)) },
     leadItemId: lead?.entry.itemId ?? null,
     highlights: rest.slice(0, 3).map((e) => e.entry.itemId),
@@ -107,6 +146,7 @@ export async function composeDaily(date: string, reason?: string): Promise<{ key
       .map((label) => ({ label, items: issue.main.filter((e) => sectionOf(e.category) === label).map((e) => e.entry) }))
       .filter((s) => s.items.length > 0),
     flashes: issue.flashes.map((e) => e.entry),
+    ...(watchlist.length ? { watchlist } : {}),
     metrics: dailyMetrics(issue.main),
     windowStart: start.toISOString(),
     windowEnd: end.toISOString(),

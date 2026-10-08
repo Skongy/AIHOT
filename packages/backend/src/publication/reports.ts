@@ -377,6 +377,14 @@ export async function loadReport(kind: ReportKind, key: string): Promise<ReportD
     highlights,
     sections,
     flashes: (c.flashes ?? []).map(cite),
+    watchlist: kind === "daily" && Array.isArray(c.watchlist) ? c.watchlist.map((w: any) => ({
+      date: String(w.date ?? ""),
+      what: String(w.what ?? ""),
+      itemId: w.itemId ? String(w.itemId) : null,
+      title: String(w.title ?? w.what ?? ""),
+      sourceName: String(w.sourceName ?? ""),
+      sourceUrl: String(w.sourceUrl ?? ""),
+    })).filter((w: { date: string; what: string }) => w.date && w.what) : undefined,
     cover,
     metrics: {
       ...c.metrics,

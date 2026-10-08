@@ -8,7 +8,7 @@
 - [x] 0.2 停用手游/F2P 官源与 LoL Esports；新增四款 Steam news RSS；试抓 OK
 - [x] 0.3 提示词草稿写入 `/workspace/aihot-plan/prompts-draft/`（含三者任一精选口径）
 - [x] 0.4 相关配置测试更新并通过
-- [ ] 0.5 用户审阅提示词草稿后再写入 `industry/prompts/`
+- [x] 0.5 提示词草稿已写入 `industry/prompts/`（文件名未改）
 
 ## 1. 前置与基线
 
@@ -26,9 +26,9 @@
 
 ## 3. 提示词（配置）
 
-- [ ] 3.1 `selection-score.md`：读者画像加“玩/买/等”与 Steam 焦点；精选口径为三者任一；`reson`/`cred` 与纳入/排除清单（草稿已写，待审后落库）
-- [ ] 3.2 `prefilter.md`：按 Q3-2 加纯广告 BLOCK 一条（不加则跳过）
-- [ ] 3.3 `content-understanding.md`、`summarize-article.md`、`summarize-long-post.md`：传闻标注规则；推荐理由写对玩/买/等的影响
+- [x] 3.1 `selection-score.md`：读者画像加“玩/买/等”与 Steam 焦点；精选口径为三者任一；`reson`/`cred` 与纳入/排除清单（草稿已写，待审后落库）
+- [x] 3.2 `prefilter.md`：按 Q3-2 加纯广告 BLOCK 一条（不加则跳过）
+- [x] 3.3 `content-understanding.md`、`summarize-article.md`、`summarize-long-post.md`：传闻标注规则；推荐理由写对玩/买/等的影响
 - [ ] 3.4 `structure.md`：传闻 fact 的主体与动作；按 Q3-4 增加 `upcoming` 字段说明
 - [ ] 3.5 提示词渲染测试：排除项与传闻规则文本出现在渲染结果里
 
@@ -41,11 +41,11 @@
 
 ## 5. 日报结构（引擎补丁）
 
-- [ ] 5.1 `site/site.ts` 加 `REPORTS.dailyLayout.sectionQuotas`（默认不设时保持上游行为）
-- [ ] 5.2 `reports/edition.ts`：`arrangeDaily` 支持类别下限/上限；单测覆盖“不够不硬凑”“超上限进快讯”
-- [ ] 5.3 `reports/compose.ts`：一句话头条；（Q3-4 选做时）`watchlist` 计算
-- [ ] 5.4 （Q3-4 选做时）`editorial/analyze.ts` 的 `StructureSchema` 加可选 `upcoming`；`.catch` 兜底，旧数据无此字段不报错
-- [ ] 5.5 `packages/contracts/src/site.ts` 日报类型加可选 `watchlist`；`apps/web/app/features/report/ReportPaper.tsx` 渲染明日关注与每条来源名
+- [x] 5.1 `site/site.ts` 加 `REPORTS.dailyLayout.sectionQuotas`（默认不设时保持上游行为）
+- [x] 5.2 `reports/edition.ts`：`arrangeDaily` 支持类别下限/上限；单测覆盖“不够不硬凑”“超上限进快讯”
+- [x] 5.3 `reports/compose.ts`：一句话头条；（Q3-4 选做时）`watchlist` 计算
+- [x] 5.4 `editorial/analyze.ts`（upcoming） 的 `StructureSchema` 加可选 `upcoming`；`.catch` 兜底，旧数据无此字段不报错
+- [x] 5.5 `packages/contracts` + ReportPaper 明日关注 日报类型加可选 `watchlist`；`apps/web/app/features/report/ReportPaper.tsx` 渲染明日关注与每条来源名
 - [ ] 5.6 在开发库重生成最近一期日报，人工检查结构
 
 ## 6. 验证与交付
