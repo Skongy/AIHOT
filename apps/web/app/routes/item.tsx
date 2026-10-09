@@ -10,6 +10,7 @@ import { fullDateTime, relativeTime } from "../lib/format";
 import { markRead } from "../lib/local-state";
 import { SameEventBadge, SelectedBadge } from "../components/ui/Badge";
 import { ScoreLabel, shownScore } from "../components/ui/Score";
+import { SelectionExplainPanel } from "../components/ui/SelectionExplain";
 import { PillTabs } from "../components/ui/Tabs";
 import { ArticleLayout, RailSection } from "../components/ui/Page";
 import { Menu, MenuItem } from "../components/ui/Menu";
@@ -344,10 +345,19 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       {moreMenu}
     </div>
   );
+  const explain = item.selectionExplain ?? null;
+  const hint = explain
+    ? {
+        score: explain.score,
+        threshold: explain.threshold,
+        sourceTier: explain.sourceTier,
+        sourceTierLabel: explain.sourceTierLabel,
+      }
+    : null;
   const verdict = (item.selected || shownScore(item.score) !== null) && (
     <div className="flex items-center gap-2">
       {item.selected && (item.sameEvent ? <SameEventBadge /> : <SelectedBadge />)}
-      <ScoreLabel score={item.score} />
+      <ScoreLabel score={item.score} hint={hint} />
     </div>
   );
 
@@ -392,6 +402,11 @@ function ItemView({ item }: { item: SiteItemDetail }) {
         </RailSection>
       ) : (
         verdict && <RailSection title={shownScore(item.score) !== null ? "AI 评分" : undefined}>{verdict}</RailSection>
+      )}
+      {explain && !summaryOnly && (
+        <RailSection title="为何入选">
+          <SelectionExplainPanel explain={explain} />
+        </RailSection>
       )}
       {item.topics.length > 0 && (
         <RailSection title="主题">

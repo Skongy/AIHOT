@@ -2,6 +2,7 @@
 // items through these columns and views; which rows are public is decided by scope.ts.
 import { CATEGORY_KEYS, toPublicApiCategory, type CategoryKey, type ChannelKey, type PublicApiCategoryKey } from "@aihot/contracts/taxonomy";
 import type { FeedItemSummary, ItemSummary, MediaView, XPostView } from "@aihot/contracts/site";
+import { buildSelectionHint } from "./selection-explain.ts";
 import { POLICY } from "@aihot/site";
 import { sql, type Db } from "../db.ts";
 import { isEmptyOrLinkOnly } from "../content/posts.ts";
@@ -33,6 +34,8 @@ export interface ItemRow {
   source_name: string;
   /** Participation mode of the source now (editorial, hot_signal, isolated). */
   source_mode: string;
+  /** Source tier (T1 / T1_5 / T2 / …) for selection explain hints. */
+  source_tier: string;
   x_post: Record<string, any> | null;
   author: string | null;
   language: string | null;
@@ -47,7 +50,7 @@ export interface ItemRow {
 export const ITEM_COLUMNS = sql`
   p.article_id AS id, p.title, p.original_title, p.summary, p.reason, p.category, p.tags, p.score,
   p.selected, p.seat, p.channel, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
-  p.body_mode, p.indexable, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode,
+  p.body_mode, p.indexable, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode, s.tier AS source_tier,
   a.x_post, a.author, a.language,
   st.public_id::text AS story_public_id, st.title AS story_title,
   CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh`;
@@ -169,6 +172,11 @@ export function toItemSummary(row: ItemRow): ItemSummary {
 export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
   const item = toItemSummary(row);
   const x = showsPost(row) ? xView(row, true) : null;
+  const selectionHint = buildSelectionHint({
+    score: item.score,
+    selected: item.selected,
+    sourceTier: row.source_tier ?? null,
+  });
   return {
     id: item.id, title: item.title, summary: item.summary ?? (x?.text || null), reason: item.reason,
     source: item.source, publishedAt: item.publishedAt, timelineAt: item.timelineAt,
@@ -178,6 +186,7 @@ export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
       ...(x.avatarSrcSet ? { avatarSrcSet: x.avatarSrcSet } : {}), media: x.media,
       quoted: x.quoted ? { authorName: x.quoted.authorName, handle: x.quoted.handle, text: x.quoted.text, translation: x.quoted.translation } : null,
     } : null,
+    ...(selectionHint ? { selectionHint } : {}),
   };
 }
 

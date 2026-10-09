@@ -70,7 +70,39 @@ const scoreCall = (model: string) => SCORE_CALL[model] ?? { temperature: 0.2, ma
 /** The score prompt: the industry's taste (industry/prompts/selection-score.md). */
 export const SCORE_SYSTEM = promptText("selection-score");
 
-export const ScoreSchema = z.object({ attentionScore: z.coerce.number().int().min(0).max(100) });
+export const SCORE_CONTENT_TYPES = [
+  "game_reveal", "game_launch", "version_update", "esports_event",
+  "industry_event", "review_or_data", "opinion_discussion",
+] as const;
+export type ScoreContentType = (typeof SCORE_CONTENT_TYPES)[number];
+
+export const ScoreAxesSchema = z.object({
+  sig: z.coerce.number().int().min(0).max(10),
+  nov: z.coerce.number().int().min(0).max(10),
+  cred: z.coerce.number().int().min(0).max(10),
+  reson: z.coerce.number().int().min(0).max(10),
+  act: z.coerce.number().int().min(0).max(10),
+});
+export type ScoreAxes = z.infer<typeof ScoreAxesSchema>;
+
+/** attentionScore is required; axes/contentType are optional so older receipts still parse. */
+export const ScoreSchema = z.object({
+  attentionScore: z.coerce.number().int().min(0).max(100),
+  // Optional explain fields: drop invalid extras rather than failing the whole score call.
+  contentType: z.enum(SCORE_CONTENT_TYPES).optional().catch(undefined),
+  axes: ScoreAxesSchema.optional().catch(undefined),
+});
+
+/** Floor-mean of independent score-call axes (null when none provided). */
+export function averageScoreAxes(list: ScoreAxes[]): ScoreAxes | null {
+  if (!list.length) return null;
+  const keys = ["sig", "nov", "cred", "reson", "act"] as const;
+  const out = {} as ScoreAxes;
+  for (const k of keys) {
+    out[k] = Math.floor(list.reduce((sum, a) => sum + a[k], 0) / list.length);
+  }
+  return out;
+}
 
 const SCORE_TIME = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
@@ -97,7 +129,7 @@ export function buildScoreInput(a: AnalyzeInputArticle): string {
   if (!body) body = a.title;
   const at = a.publishedAt;
   return [
-    "请按系统规则评估以下单篇材料所代表的事件。只输出 attentionScore。",
+    "请按系统规则评估以下单篇材料所代表的事件。必须输出 attentionScore；可附带 contentType 与 axes。",
     `【发布时间（北京时间）】\n${at ? scoreInputTime(at) : "未知（收录时间不代表发布时间）"}`,
     `【标题】\n${a.title.trim()}`,
     `【完整正文】\n${body.length > MAX_BODY_CHARS ? body.slice(0, MAX_BODY_CHARS) : body}`,
@@ -203,7 +235,7 @@ export interface AnalysisRun {
    * The independent score calls and the tier threshold they are held against; absent when the material
    * is not scored. `refused`: the model's content filter declined it, so it is not selected.
    */
-  scores: { model: string; threshold: number; values: number[]; receiptIds: number[]; reused: boolean; refused?: boolean } | null;
+  scores: { model: string; threshold: number; values: number[]; receiptIds: number[]; reused: boolean; refused?: boolean; axes?: ScoreAxes | null; contentType?: ScoreContentType | null } | null;
   /** The reader-facing copy: `understand` (selected, near-selected), `summarize`, `verbatim` (a Chinese short post), `none`. */
   writing: {
     kind: "understand" | "summarize" | "verbatim" | "none";
@@ -289,6 +321,8 @@ async function runScores(
   const input = buildScoreInput(a);
   const values: number[] = [];
   const receiptIds: number[] = [];
+  const axesList: ScoreAxes[] = [];
+  let contentType: ScoreContentType | null = null;
   let reused = true;
   // One after the other: the second call reuses the provider's cached prompt.
   for (let i = 0; i < SCORE_CALLS; i++) {
@@ -303,16 +337,18 @@ async function runScores(
       onReceipt?.(res.receiptId);
       values.push(res.data.attentionScore);
       receiptIds.push(res.receiptId);
+      if (res.data.axes) axesList.push(res.data.axes);
+      if (!contentType && res.data.contentType) contentType = res.data.contentType;
       reused &&= res.reused;
     } catch (error) {
       const receiptId = observableReceiptId(error);
       if (receiptId !== null) onReceipt?.(receiptId);
       // The model's content filter declines the material (Zhipu 1301): not scored, so not selected.
-      if (isContentFilter(error)) return { model, threshold, values, receiptIds, reused: false, refused: true };
+      if (isContentFilter(error)) return { model, threshold, values, receiptIds, reused: false, refused: true, axes: null, contentType: null };
       throw error;
     }
   }
-  return { model, threshold, values, receiptIds, reused };
+  return { model, threshold, values, receiptIds, reused, axes: averageScoreAxes(axesList), contentType };
 }
 
 /** The production score step; its threshold stays case-specific even when an evaluator shares model output. */
@@ -535,6 +571,9 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
   const detail = {
     prefilter: { label: run.prefilter.label, reason: run.prefilter.reason },
     scores: out.scores, scoreModel: out.scoreModel, threshold: out.threshold, ...(out.scoreRefused ? { scoreRefused: true } : {}),
+    sourceTier: input.source.tier,
+    ...(run.scores?.axes ? { scoreAxes: run.scores.axes } : {}),
+    ...(run.scores?.contentType ? { contentType: run.scores.contentType } : {}),
     ...(w ? { writer: w.kind, writerModel: w.model, itemType: w.itemType ?? null, authorRole: w.authorRole ?? null } : {}),
     ...(w?.identityGuard?.outcome === "fallback" ? { identityGuard: w.identityGuard } : {}),
     scope: out.scope, fact: out.fact,

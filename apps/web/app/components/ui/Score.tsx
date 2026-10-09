@@ -1,4 +1,5 @@
 import { ITEM_COPY } from "@aihot/site";
+import type { SelectionHint } from "@aihot/contracts/site";
 
 /**
  * The AI score as a small pill, tinted by tier instead of drawn as a bar: strong picks (85+) in a wash of
@@ -15,16 +16,32 @@ export function shownScore(score: number | null): number | null {
   return ITEM_COPY.showScore ? score : null;
 }
 
+function hintTitle(value: number, hint?: SelectionHint | null): string {
+  const parts = [`AI 评分 ${value}/100`];
+  if (hint?.threshold != null) parts.push(`门槛 ${hint.threshold}`);
+  if (hint?.sourceTierLabel) parts.push(hint.sourceTierLabel);
+  return parts.join(" · ");
+}
+
 /** "AI 评分 · 88" on desktop cards; `compact` keeps only the number (phones). */
-export function ScoreLabel({ score, compact = false }: { score: number | null; compact?: boolean }) {
+export function ScoreLabel({
+  score,
+  compact = false,
+  hint = null,
+}: {
+  score: number | null;
+  compact?: boolean;
+  hint?: SelectionHint | null;
+}) {
   const shown = shownScore(score);
   if (shown === null) return null;
   const value = Math.round(shown);
   const tier = TIERS.find((t) => value >= t.min)!;
+  const title = hintTitle(value, hint);
   return (
     <span
-      title={`AI 评分 ${value}/100`}
-      aria-label={`AI 评分 ${value} 分`}
+      title={title}
+      aria-label={title}
       className={`inline-flex h-[20px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 ring-1 ring-inset ${tier.className}`}
     >
       {!compact && (

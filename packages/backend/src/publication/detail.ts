@@ -11,6 +11,7 @@ import { evidenceCondition, listedCondition } from "./scope.ts";
 import { itemUrl, siteUrl } from "./links.ts";
 import { hasItemPage, publicSourceName } from "./rules.ts";
 import { topicLinks, topicMembership } from "./topics.ts";
+import { buildSelectionExplain, countWirePeers } from "./selection-explain.ts";
 
 interface DetailRow extends ItemRow {
   body_html: string | null;
@@ -19,6 +20,9 @@ interface DetailRow extends ItemRow {
   tr_html: string | null;
   tr_complete: boolean | null;
   topics: string[];
+  wire_fingerprint: string | null;
+  story_id: number | null;
+  analysis_output: Record<string, unknown> | null;
 }
 
 export type DetailResult =
@@ -42,8 +46,11 @@ function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
 async function loadRow(id: string): Promise<DetailRow | null> {
   const [row] = await sql<DetailRow[]>`
     SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete,
-      ${topicMembership()} AS topics
+      ${topicMembership()} AS topics,
+      a.wire_fingerprint, p.story_id,
+      an.output AS analysis_output
     ${ITEM_FROM}
+    LEFT JOIN analyses an ON an.id = p.analysis_id
     WHERE p.article_id = ${id}`;
   return row ?? null;
 }
@@ -148,6 +155,17 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
 
   // The reason goes with the seat; a report yielding it points to the one holding it.
   const sameEvent = (await seatHolders([row], now)).get(row.id) ?? null;
+  const out = row.analysis_output ?? {};
+  const peers = await countWirePeers(id, row.story_id, row.wire_fingerprint);
+  const selectionExplain = buildSelectionExplain({
+    score: row.score === null ? null : Number(row.score),
+    selected: row.selected,
+    threshold: typeof out.threshold === "number" ? out.threshold : null,
+    sourceTier: (typeof out.sourceTier === "string" ? out.sourceTier : null) ?? row.source_tier,
+    axes: out.scoreAxes ?? null,
+    contentType: typeof out.contentType === "string" ? out.contentType : null,
+    wirePeerCount: peers,
+  });
   const item: SiteItemDetail = {
     ...summary,
     x,
@@ -163,6 +181,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     group,
     hasTranslation: reading.hasTranslation,
     bodyLanguage: reading.bodyLanguage,
+    selectionExplain,
   };
   return { kind: "found", item, row };
 }

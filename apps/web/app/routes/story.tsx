@@ -404,6 +404,9 @@ export default function StoryPage() {
                   </>
                 )}
               </p>
+              {story.whyHot.wireDedupeNote && (
+                <p className="mt-2 text-[12px] leading-relaxed text-ink-4">{story.whyHot.wireDedupeNote}</p>
+              )}
             </RailCard>
           )}
           {story.officialReports.length > 0 && (
