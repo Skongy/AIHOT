@@ -3,6 +3,7 @@
 import { sql, type Db, type Tx } from "../db.ts";
 import { newArticleId, sha256 } from "../lib/ids.ts";
 import { identityKeyForUrl } from "../lib/url.ts";
+import { wireFingerprint } from "./wire.ts";
 import { collapseWhitespace } from "../lib/text.ts";
 import { publishArticleTx } from "../publication/publish.ts";
 import { groupingReset, reconcileMaterialSource } from "./provenance.ts";
@@ -181,12 +182,13 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
     const [inserted] = await db<{ id: string }[]>`
       INSERT INTO articles (id, source_id, identity_key, url, title, author, language, published_at, published_at_claim,
         discovered_at, source_updated_at, timeline_at, backfill, backfill_reason, revision, content_hash, excerpt,
-        body_text, body_html, body_status, media, x_post, raw)
+        body_text, body_html, body_status, media, x_post, raw, wire_fingerprint)
       VALUES (${newId}, ${m.sourceId}, ${identityKey}, ${m.url}, ${title}, ${m.author ?? null}, ${m.language ?? null},
         ${t.publishedAt}, ${m.publishedAt ?? null}, ${discoveredAt}, ${m.sourceUpdatedAt ?? null}, ${t.timelineAt},
         ${t.backfill}, ${t.backfillReason}, 1, ${hash}, ${m.excerpt ?? null}, ${m.bodyText ?? null}, ${m.bodyHtml ?? null},
         ${m.bodyStatus ?? (m.bodyText ? "ok" : "pending")}, ${db.json((m.media ?? []) as never)},
-        ${m.xPost ? db.json(m.xPost as never) : null}, ${m.raw === undefined ? null : db.json(m.raw as never)})
+        ${m.xPost ? db.json(m.xPost as never) : null}, ${m.raw === undefined ? null : db.json(m.raw as never)},
+        ${wireFingerprint(title, m.bodyText ?? null)})
       ON CONFLICT (identity_key) DO NOTHING RETURNING id`;
     if (inserted) {
       await db`INSERT INTO article_revisions (article_id, revision, content_hash, title, body_text)
@@ -262,8 +264,9 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
  * grouping, the "adds value" check). The caller holds the row lock and has found the content changed.
  */
 export async function reviseMaterial(db: Db, articleId: string, revision: { set: ReturnType<typeof sql>; hash: string; title: string; bodyText: string | null }): Promise<void> {
+  const fingerprint = wireFingerprint(revision.title, revision.bodyText);
   const [row] = await db<{ revision: number }[]>`
-    UPDATE articles SET ${revision.set}, revision = revision + 1, content_hash = ${revision.hash}, ${groupingReset()},
+    UPDATE articles SET ${revision.set}, revision = revision + 1, content_hash = ${revision.hash}, wire_fingerprint = ${fingerprint}, ${groupingReset()},
       processing_state = 'new', processing_attempts = 0, processing_retry_at = NULL, processing_error = NULL, processing_queued_at = NULL,
       updated_at = now()
     WHERE id = ${articleId}

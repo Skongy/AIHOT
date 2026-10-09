@@ -10,6 +10,7 @@ import { addDays } from "@aihot/contracts/time";
 import { CATEGORIES } from "@aihot/industry/taxonomy";
 import { sql } from "../db.ts";
 import { currentSignals } from "../events/hot.ts";
+import { independentEvidenceKey } from "../content/wire.ts";
 import { pickRepresentative, representativePriority, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "../publication/representative.ts";
 import { factSources } from "../publication/coverage.ts";
 import { evidenceCondition, listedCondition, ownFactEvidenceCondition } from "../publication/scope.ts";
@@ -86,12 +87,12 @@ export interface EditionEntry {
 type ReportRow = RepresentativeIdentity & {
   id: string; title: string; summary: string | null; url: string; category: string | null; tags: string[]; score: number | null;
   first_party: boolean; body_mode: "full" | "summary"; timeline_at: Date;
-  source_id: string; source_name: string; source_kind: string;
+  source_id: string; source_name: string; source_kind: string; wire_fingerprint: string | null;
   fact_id: number | null; fact_public_id: string | null; story_id: number | null; story_public_id: string | null;
 };
 
 const REPORT_FIELDS = sql`p.article_id AS id, p.title, p.summary, p.url, p.category, p.tags, p.score, (s.tier = 'T1') AS first_party, p.body_mode, p.timeline_at,
-  ${REPRESENTATIVE_COLUMNS}, s.id AS source_id, s.name AS source_name, s.kind AS source_kind,
+  ${REPRESENTATIVE_COLUMNS}, s.id AS source_id, s.name AS source_name, s.kind AS source_kind, a.wire_fingerprint,
   f.id AS fact_id, f.public_id AS fact_public_id, st.id AS story_id, st.public_id::text AS story_public_id`;
 
 /**
@@ -107,7 +108,7 @@ export async function periodReports(start: Date, end: Date): Promise<ReportRow[]
     await tx`SELECT pg_advisory_xact_lock(hashtext('report_candidates'))`;
     return tx<ReportRow[]>`
       SELECT ${REPORT_FIELDS}
-      FROM publications p JOIN sources s ON s.id = p.source_id
+      FROM publications p JOIN articles a ON a.id = p.article_id JOIN sources s ON s.id = p.source_id
       LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
       LEFT JOIN stories st ON st.id = f.story_id
       -- Attribute each item by the later of arrival and release; either range can use its index.
@@ -177,7 +178,7 @@ export async function periodEntries(startDate: string, endDate: string): Promise
   if (carried.length === 0) return { entries: [], issues: issues.length };
   const rows = await sql<ReportRow[]>`
     SELECT ${REPORT_FIELDS}
-    FROM publications p JOIN sources s ON s.id = p.source_id
+    FROM publications p JOIN articles a ON a.id = p.article_id JOIN sources s ON s.id = p.source_id
     LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
     LEFT JOIN stories st ON st.id = f.story_id
     WHERE p.article_id = ANY(${[...new Set(carried.map((c) => c.id))]}::text[]) AND p.visibility = 'public' AND p.eligible`;
@@ -263,7 +264,7 @@ async function missedFacts(start: Date, end: Date): Promise<Array<{ key: string;
   if (found.length === 0) return [];
   const rows = await sql<ReportRow[]>`
     SELECT ${REPORT_FIELDS}
-    FROM fact_articles fa JOIN publications p ON p.article_id = fa.article_id JOIN sources s ON s.id = p.source_id
+    FROM fact_articles fa JOIN publications p ON p.article_id = fa.article_id JOIN articles a ON a.id = p.article_id JOIN sources s ON s.id = p.source_id
     JOIN facts f ON f.id = fa.fact_id LEFT JOIN stories st ON st.id = f.story_id
     WHERE fa.fact_id = ANY(${found.map((f) => f.fact_id)}::bigint[]) AND ${evidenceCondition()} AND ${listedCondition(end)}
       AND s.participation_mode = 'editorial' AND s.tier <> 'EXCLUDE_MP' AND NOT p.backfill AND p.timeline_at < ${end}`;
@@ -309,7 +310,10 @@ export async function dailyEdition(date: string, start: Date, end: Date): Promis
     const id = f.rows[0]!.fact_id;
     return {
       ...f,
-      sources: [...new Set([...(id === null ? [] : sourcesOf.get(id) ?? []), ...f.rows.map((r) => r.source_id)])],
+      sources: [...new Set([
+        ...(id === null ? [] : sourcesOf.get(id) ?? []),
+        ...f.rows.map((r) => independentEvidenceKey(r.source_id, r.wire_fingerprint)),
+      ])],
       at: Math.min(...f.rows.map((r) => r.timeline_at.getTime())),
     };
   });

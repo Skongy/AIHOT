@@ -1,3 +1,4 @@
+import { wireFingerprint } from "./wire.ts";
 // Article body extraction: readable text from the article page, or "unconfirmed" — never a wrong body.
 // Jina Reader is the budgeted fallback for pages that only render in a browser.
 import { Readability } from "@mozilla/readability";
@@ -135,7 +136,7 @@ export async function extractArticleBody(articleId: string): Promise<"ok" | "unc
     const time = a.config.detail?.publishedAtAuthoritative === true ? null : await fillPublicationTime(tx, articleId, got.publishedAt);
     const hash = contentHash({ title: row.title, bodyText: got.text, excerpt: row.excerpt });
     if (!time && hash === row.content_hash) {
-      await tx`UPDATE articles SET body_status = 'ok', updated_at = now() WHERE id = ${articleId}`;
+      await tx`UPDATE articles SET body_status = 'ok', wire_fingerprint = coalesce(wire_fingerprint, ${wireFingerprint(row.title, got.text)}), updated_at = now() WHERE id = ${articleId}`;
       return "ok";
     }
     await reviseMaterial(tx, articleId, {
