@@ -7,6 +7,37 @@ export interface SourceRef {
   name: string;
 }
 
+/** Five axes from selection-score (0–10 each); optional on older analyses. */
+export interface ScoreAxesView {
+  sig: number;
+  nov: number;
+  cred: number;
+  reson: number;
+  act: number;
+}
+
+/** Compact card hint: score vs tier threshold (no axes dashboard). */
+export interface SelectionHint {
+  score: number | null;
+  threshold: number | null;
+  sourceTier: string | null;
+  sourceTierLabel: string | null;
+}
+
+/** Reader-facing “why selected” — curated, not an admin dump. */
+export interface SelectionExplain {
+  score: number | null;
+  threshold: number | null;
+  /** null when score or threshold missing. */
+  metThreshold: boolean | null;
+  sourceTier: string | null;
+  sourceTierLabel: string | null;
+  axes: ScoreAxesView | null;
+  contentType: string | null;
+  contentTypeLabel: string | null;
+  wireDedupe: { peerCount: number; note: string } | null;
+}
+
 export interface MediaView {
   kind: "image" | "video";
   url: string;
@@ -66,6 +97,8 @@ export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "sum
    * so the card can say "同一新闻，精选展示《…》" instead of claiming a seat of its own.
    */
   sameEvent?: { id: string; title: string } | null;
+  /** Compact score-vs-threshold hint for card tooltips; omit axes. */
+  selectionHint?: SelectionHint | null;
 }
 
 export interface GroupInfo {
@@ -146,6 +179,8 @@ export interface SiteItemDetail extends ItemSummary {
   group: GroupInfo | null;
   hasTranslation: boolean;
   bodyLanguage: "zh" | "original";
+  /** Why this item cleared (or missed) selection — detail primary surface. */
+  selectionExplain?: SelectionExplain | null;
 }
 
 /** A fact's public reports under the list's filters: what "另有 N 家信源报道" opens. */
@@ -249,6 +284,8 @@ export interface StoryDetail {
     recentReports24h: number;
     observationComplete: boolean;
     rank: number | null;
+    /** Present when wire-copy merging reduced independent coverage vs raw reports. */
+    wireDedupeNote: string | null;
   };
   developments: StoryFactView[];
   officialReports: StoryReportView[];

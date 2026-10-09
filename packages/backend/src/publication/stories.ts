@@ -13,6 +13,7 @@ import { latestHotRanking, rankingExtras } from "./hot.ts";
 import { storyTexts } from "./story-text.ts";
 import { topicsOfStory } from "./topics.ts";
 import { itemUrl, storyUrl, v1StoryApiUrl, v1StoryUrl } from "./links.ts";
+import { independentSourceCount, wireDedupeNoteForStory } from "./selection-explain.ts";
 
 export type StoryLookup = { kind: "found"; storyId: number; publicId: string } | { kind: "merged"; target: string } | { kind: "not_found" };
 
@@ -62,6 +63,7 @@ interface ReportRow extends RepresentativeIdentity {
   source_name: string;
   first_party: boolean;
   fact_id: number;
+  wire_fingerprint: string | null;
 }
 
 /**
@@ -74,10 +76,10 @@ async function storyReports(storyId: number, now: Date): Promise<ReportRow[]> {
   return sql<ReportRow[]>`
     SELECT DISTINCT ON (p.article_id) p.article_id AS id, p.title, p.summary, p.url, p.selected,
       coalesce(p.published_at, p.discovered_at) AS at, s.id AS source_id, s.name AS source_name,
-      (s.tier = 'T1') AS first_party, f.id AS fact_id,
+      (s.tier = 'T1') AS first_party, f.id AS fact_id, a.wire_fingerprint,
       CASE WHEN ${compositeCondition()} THEN 'mention' ELSE fa.role END AS role, p.body_mode, p.score, p.timeline_at, ${REPRESENTATIVE_COLUMNS}
     FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
-    JOIN sources s ON s.id = p.source_id
+    JOIN sources s ON s.id = p.source_id JOIN articles a ON a.id = p.article_id
     WHERE f.story_id = ${storyId} AND ${storyReportCondition(now)}
     ORDER BY p.article_id, (fa.role = 'primary') DESC, (fa.role <> 'mention') DESC, f.id`;
 }
@@ -161,12 +163,13 @@ export async function loadStoryDetail(storyId: number, now = new Date()): Promis
   const latestAt = latest.at;
   // Without a digest or a summary of its own, the story opens with its first development's representative report.
   const origin = developments[developments.length - 1]?.representative;
+  const coverage = independentSourceCount(reports);
   return {
     publicId: s.public_id,
     title: s.title,
     status: storyStatusFor(latestAt, now.getTime()),
     reportCount: reports.length,
-    sourceCount: new Set(reports.map((r) => r.source_id)).size,
+    sourceCount: coverage.sourceCount,
     firstReportAt: firstReportAt.toISOString(),
     latestAt: latestAt.toISOString(),
     digest: text.digest,
@@ -181,6 +184,7 @@ export async function loadStoryDetail(storyId: number, now = new Date()): Promis
       recentReports24h: Number(why?.r24 ?? 0),
       observationComplete: !partial?.n,
       rank: entry?.rank ?? null,
+      wireDedupeNote: wireDedupeNoteForStory(coverage.collapsedExtra, coverage.reportCount, coverage.sourceCount),
     },
     developments: developments.map((d) => ({ ...d, representative: reportView(d.representative) })),
     officialReports: reports.filter((r) => r.role !== "mention" && r.first_party).slice(0, 12).map(reportView),
