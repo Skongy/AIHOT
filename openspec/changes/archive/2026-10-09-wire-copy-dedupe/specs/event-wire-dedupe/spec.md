@@ -1,7 +1,7 @@
 # event-wire-dedupe Specification（增量）
 
 ## Purpose
-规定事件热度与多源证据计数时，通稿近重复报道合并为同一独立参与方，避免转载虚高覆盖面。
+规定 GAMEHOT 事件热度与多源证据计数时，通稿近重复报道合并为同一独立参与方，避免多家转载把覆盖面虚高。
 
 ## ADDED Requirements
 
