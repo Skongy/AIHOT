@@ -15,6 +15,7 @@ import { PhoneBar } from "../components/shell/PhoneBar";
 import type { Screen } from "../components/shell/screens";
 import type { TopicPagePart } from "../modules";
 import { loadParts } from "../site-modules";
+import { SteamPanel } from "../features/topic/SteamPanel";
 
 export const handle: Screen = { home: "topics" };
 export { pageHeaders as headers } from "../lib/api.server";
@@ -84,7 +85,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 
 export default function TopicRoute() {
   const { data } = useLoaderData<typeof loader>();
-  const { topic, items, page, pageCount, pageSize } = data;
+  const { topic, items, page, pageCount, pageSize, steam } = data;
   const parts = partsOf(data);
   const href = (p: number) => (p <= 1 ? `/topics/${topic.slug}` : `/topics/${topic.slug}/page/${p}`);
   const first = (page - 1) * pageSize + 1;
@@ -127,16 +128,21 @@ export default function TopicRoute() {
         </div>
       </header>
 
+      {page === 1 && steam && <SteamPanel steam={steam} />}
+
       {parts.map((p) => (
         <div key={`${p.key}:${topic.slug}`} className="mb-8">
           <p.Block data={p.data} topic={topic} />
         </div>
       ))}
 
-      <h2 className="sr-only">{page === 1 ? `${topic.name}的精选` : `精选归档 · 第 ${page} 页`}</h2>
+      {page === 1 && steam && (
+        <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-ink">更新与新闻</h2>
+      )}
+      <h2 className="sr-only">{page === 1 ? (steam ? `${topic.name}的更新与新闻` : `${topic.name}的精选`) : `精选归档 · 第 ${page} 页`}</h2>
       {items.length === 0 ? (
         <div className="lg:card">
-          <EmptyState title="这个主题暂时还没有精选内容" />
+          <EmptyState title={steam ? "这个主题暂时还没有收录新闻" : "这个主题暂时还没有精选内容"} />
         </div>
       ) : (
         <DayList items={items} headerAside={<span className="num whitespace-nowrap">第 {first}–{last} 条<span className="hidden sm:inline"> · 共 {topic.total.toLocaleString("zh-CN")} 条</span></span>} />

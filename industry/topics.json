@@ -22,202 +22,260 @@
       "name": "以撒的结合：重生",
       "group": "company",
       "entityId": "binding-of-isaac-rebirth",
-      "definition": "《以撒的结合：重生》（The Binding of Isaac: Rebirth）及其 DLC（Afterbirth / Afterbirth+ / Repentance）在 Steam 上的更新、补丁、主机移植与相关新闻。"
+      "definition": "《以撒的结合：重生》（The Binding of Isaac: Rebirth）及其 DLC（Afterbirth / Afterbirth+ / Repentance）在 Steam 上的更新、补丁、主机移植与相关新闻。",
+      "steamAppId": 250900
     },
     {
       "slug": "slay-the-spire-2",
       "name": "杀戮尖塔 2",
       "group": "company",
       "entityId": "slay-the-spire-2",
-      "definition": "《杀戮尖塔 2》（Slay the Spire 2）的抢先体验更新、补丁、平衡与相关新闻。"
+      "definition": "《杀戮尖塔 2》（Slay the Spire 2）的抢先体验更新、补丁、平衡与相关新闻。",
+      "steamAppId": 2868840
     },
     {
       "slug": "mewgenics",
       "name": "喵喵的结合",
       "group": "company",
       "entityId": "mewgenics",
-      "definition": "《喵喵的结合》（Mewgenics）的更新、本地化、主机版与相关新闻。"
+      "definition": "《喵喵的结合》（Mewgenics）的更新、本地化、主机版与相关新闻。",
+      "steamAppId": 686060
     },
     {
       "slug": "baldurs-gate-3",
       "name": "博德之门 3",
       "group": "company",
       "entityId": "baldurs-gate-3",
-      "definition": "《博德之门 3》（Baldur's Gate 3）的补丁、模组与社区、跨平台与相关新闻。"
+      "definition": "《博德之门 3》（Baldur's Gate 3）的补丁、模组与社区、跨平台与相关新闻。",
+      "steamAppId": 1086940
     },
     {
       "slug": "mobile",
       "name": "手游",
       "group": "field",
-      "tags": ["手游"],
+      "tags": [
+        "手游"
+      ],
       "definition": "手机游戏的新游、版本与市场动态（本站焦点在 Steam，此类条目通常不进精选）。"
     },
     {
       "slug": "pc-steam",
       "name": "PC 与 Steam",
       "group": "field",
-      "tags": ["PC/Steam"],
+      "tags": [
+        "PC/Steam"
+      ],
       "definition": "PC 平台与 Steam 上的新游、更新、平台政策与重要动态（本站主战场）。"
     },
     {
       "slug": "console",
       "name": "主机",
       "group": "field",
-      "tags": ["主机", "PlayStation", "Xbox", "Switch"],
+      "tags": [
+        "主机",
+        "PlayStation",
+        "Xbox",
+        "Switch"
+      ],
       "definition": "PlayStation、Xbox、Switch 等主机平台的游戏与平台动态（含 Steam 游戏的主机版）。"
     },
     {
       "slug": "anime-style",
       "name": "二次元",
       "group": "field",
-      "tags": ["二次元"],
+      "tags": [
+        "二次元"
+      ],
       "definition": "二次元风格游戏的新游、版本与运营动态。"
     },
     {
       "slug": "moba",
       "name": "MOBA",
       "group": "field",
-      "tags": ["MOBA"],
+      "tags": [
+        "MOBA"
+      ],
       "definition": "MOBA 品类的游戏与赛事动态。"
     },
     {
       "slug": "shooter",
       "name": "射击",
       "group": "field",
-      "tags": ["射击"],
+      "tags": [
+        "射击"
+      ],
       "definition": "射击游戏（FPS、TPS、战术竞技）的新游、版本与赛事动态。"
     },
     {
       "slug": "open-world",
       "name": "开放世界",
       "group": "field",
-      "tags": ["开放世界"],
+      "tags": [
+        "开放世界"
+      ],
       "definition": "开放世界游戏的新作与更新动态。"
     },
     {
       "slug": "mmo",
       "name": "MMO",
       "group": "field",
-      "tags": ["MMO"],
+      "tags": [
+        "MMO"
+      ],
       "definition": "大型多人在线游戏的新游、资料片与运营动态。"
     },
     {
       "slug": "indie",
       "name": "独立游戏",
       "group": "field",
-      "tags": ["独立游戏"],
+      "tags": [
+        "独立游戏"
+      ],
       "definition": "独立游戏的新作、上线与口碑动态。"
     },
     {
       "slug": "domestic",
       "name": "国产游戏",
       "group": "field",
-      "tags": ["国产游戏"],
+      "tags": [
+        "国产游戏"
+      ],
       "definition": "国产游戏的新作、上线、出海与口碑动态。"
     },
     {
       "slug": "overseas",
       "name": "出海",
       "group": "field",
-      "tags": ["出海"],
+      "tags": [
+        "出海"
+      ],
       "definition": "国产游戏出海发行、海外成绩与市场动态。"
     },
     {
       "slug": "cloud-gaming",
       "name": "云游戏",
       "group": "field",
-      "tags": ["云游戏"],
+      "tags": [
+        "云游戏"
+      ],
       "definition": "云游戏平台、技术与服务动态。"
     },
     {
       "slug": "ai-games",
       "name": "AI 与游戏",
       "group": "field",
-      "tags": ["AI与游戏"],
+      "tags": [
+        "AI与游戏"
+      ],
       "definition": "AI 在游戏研发、玩法和运营中的应用与争议。"
     },
     {
       "slug": "reveals",
       "name": "新游曝光",
       "group": "genre",
-      "tags": ["新游曝光"],
+      "tags": [
+        "新游曝光"
+      ],
       "definition": "新游戏首次公布、首曝预告与新作消息。"
     },
     {
       "slug": "launches",
       "name": "定档与上线",
       "group": "genre",
-      "tags": ["定档/上线"],
+      "tags": [
+        "定档/上线"
+      ],
       "definition": "游戏定档、正式上线、发售与公测。"
     },
     {
       "slug": "tests",
       "name": "测试与预约",
       "group": "genre",
-      "tags": ["测试/预约"],
+      "tags": [
+        "测试/预约"
+      ],
       "definition": "测试招募、开测、预约开启与测试结果。"
     },
     {
       "slug": "version-updates",
       "name": "版本更新",
       "group": "genre",
-      "tags": ["版本更新"],
+      "tags": [
+        "版本更新"
+      ],
       "definition": "已上线游戏的大版本、补丁与平衡调整。"
     },
     {
       "slug": "seasons-events",
       "name": "赛季与活动",
       "group": "genre",
-      "tags": ["赛季/活动"],
+      "tags": [
+        "赛季/活动"
+      ],
       "definition": "新赛季、大型活动与联动。"
     },
     {
       "slug": "dlc",
       "name": "DLC 与资料片",
       "group": "genre",
-      "tags": ["DLC/资料片"],
+      "tags": [
+        "DLC/资料片"
+      ],
       "definition": "DLC、资料片与扩展内容。"
     },
     {
       "slug": "esports",
       "name": "电竞赛事",
       "group": "genre",
-      "tags": ["电竞赛事", "战队/选手"],
+      "tags": [
+        "电竞赛事",
+        "战队/选手"
+      ],
       "definition": "电竞赛事的赛程与结果、战队与选手、转会动态。"
     },
     {
       "slug": "licensing-policy",
       "name": "版号与政策",
       "group": "genre",
-      "tags": ["版号/政策"],
+      "tags": [
+        "版号/政策"
+      ],
       "definition": "版号审批、防沉迷与游戏行业政策监管。"
     },
     {
       "slug": "companies",
       "name": "厂商动态",
       "group": "genre",
-      "tags": ["厂商动态"],
+      "tags": [
+        "厂商动态"
+      ],
       "definition": "游戏厂商的经营、发行、人事、融资与并购。"
     },
     {
       "slug": "market-data",
       "name": "财报与数据",
       "group": "genre",
-      "tags": ["财报/数据"],
+      "tags": [
+        "财报/数据"
+      ],
       "definition": "财报、流水、销量、在线人数等市场数据。"
     },
     {
       "slug": "reviews",
       "name": "评测与口碑",
       "group": "genre",
-      "tags": ["评测/口碑"],
+      "tags": [
+        "评测/口碑"
+      ],
       "definition": "媒体评测、评分与玩家口碑。"
     },
     {
       "slug": "community",
       "name": "玩家话题",
       "group": "genre",
-      "tags": ["玩家话题"],
+      "tags": [
+        "玩家话题"
+      ],
       "definition": "玩家热议的话题、争议与观点。"
     }
   ]
