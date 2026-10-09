@@ -156,3 +156,39 @@ test("an hour taken again updates the cohort after a source changes role", async
   assert.ok(rows.length > 0);
   assert.ok(rows.every(r => r.participants === 1 && r.cohort === 0));
 });
+
+test("wire copies of one story count as one participant", async () => {
+  const s = await story();
+  const body = "索尼互动娱乐今日宣布《战神》新作将于明年登陆PC，预购现已开启，支持中文。官方同时公布了配置需求与预购奖励细则。";
+  const title = "《战神》新作明年登陆PC，预购开启";
+  const a = await source("wire-a");
+  const b = await source("wire-b");
+  const c = await source("wire-c");
+  const unique = await source("unique-take");
+  async function wireSignal(sourceId: string, hoursBefore: number, t: string, bodyText: string, fp: string | null) {
+    n += 1;
+    const id = `${T}-a${n}`;
+    const at = new Date(AT.getTime() - hoursBefore * H);
+    await sql`INSERT INTO articles (id, source_id, identity_key, url, title, body_text, body_status, discovered_at, timeline_at, wire_fingerprint)
+              VALUES (${id}, ${sourceId}, ${id}, ${`https://example.org/${id}`}, ${t}, ${bodyText}, 'ok', ${at}, ${at}, ${fp})`;
+    const [analysis] = await sql`INSERT INTO analyses (article_id,input_revision,origin,output)
+      VALUES (${id},1,'rule',${sql.json({scope:'single'})}) RETURNING id`;
+    await sql`INSERT INTO publications (article_id, analysis_id, revision, visibility, eligible, selected, title, source_id, channel, first_party, url, discovered_at, timeline_at, body_mode, sort_at)
+      VALUES (${id}, ${analysis!.id}, 1, 'public', true, false, ${t}, ${sourceId}, 'news', false, ${`https://example.org/${id}`}, ${at}, ${at}, 'summary', ${at})`;
+    const [f] = await sql`INSERT INTO facts (public_id,story_id,title) VALUES (${id},${s},${t}) RETURNING id`;
+    await sql`INSERT INTO fact_articles (fact_id,article_id,role) VALUES (${f!.id},${id},'report')`;
+    await sql`INSERT INTO story_signals (story_id, article_id, participant_key, source_id, kind, observed_at)
+              VALUES (${s}, ${id}, ${`source:${sourceId}`}, ${sourceId}, 'editorial', ${at})`;
+    return id;
+  }
+  const { wireFingerprint } = await import("@aihot/backend/content/wire");
+  const fp = wireFingerprint(title, body);
+  assert.ok(fp);
+  await wireSignal(a, 1, title, body, fp);
+  await wireSignal(b, 1, `【转载】${title}`, body, fp);
+  await wireSignal(c, 1, title, body, fp);
+  await wireSignal(unique, 1, "《战神》PC版预购开启，配置需求偏高", "编辑评测认为中端显卡即可流畅运行，并对比了主机版画面模式。", wireFingerprint("《战神》PC版预购开启，配置需求偏高", "编辑评测认为中端显卡即可流畅运行，并对比了主机版画面模式。"));
+  const r = await rowOf(s);
+  assert.equal(Number(r?.participants), 2, "three wire copies collapse to one; unique take is second");
+  assert.equal(Number(r?.editorial_participants), 2);
+});

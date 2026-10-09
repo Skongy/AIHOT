@@ -54,7 +54,7 @@ export async function storedHotRanking(db: Db = sql): Promise<HotRanking | null>
   return { id: row.id, computedAt: row.computed_at.toISOString(), ruleVersion: row.rule_version, entries: row.entries, coverage: row.evidence };
 }
 
-export const HOT_RULE_VERSION = "heat-v1-48h-halflife24h";
+export const HOT_RULE_VERSION = "heat-v2-wire-dedupe";
 const WINDOW_HOURS = 48;
 const HALF_LIFE_HOURS = 24;
 const MIN_PARTICIPANTS = 2;
@@ -118,6 +118,7 @@ export const currentSignals = () => sql`(
       WHEN s.id = ANY(${COMMUNITY_FEEDS.hn}::text[]) THEN coalesce('hn:account:' || substring(a.author from '^[A-Za-z0-9_-]{1,64}$'), 'unresolved:' || s.id)
       WHEN s.signal_group_id IS NOT NULL THEN 'group:' || s.signal_group_id
       WHEN s.owner_entity_id IS NOT NULL THEN 'owner:' || s.owner_entity_id
+      WHEN a.wire_fingerprint IS NOT NULL THEN 'wire:' || a.wire_fingerprint
       ELSE 'source:' || s.id
     END AS participant_key
   FROM story_signals ss JOIN articles a ON a.id = ss.article_id JOIN sources s ON s.id = a.source_id

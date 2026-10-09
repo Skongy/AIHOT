@@ -28,6 +28,7 @@ import { publishArticle, publishArticleTx } from "../publication/publish.ts";
 import { latestCompositeCondition } from "../publication/scope.ts";
 import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { mergeStoryInto } from "./merge.ts";
+import { areWireCopies, wireFingerprint } from "../content/wire.ts";
 import { candidateViews, cosine32, recallFacts, recallSelectedBackground, relatedPosts, vectorsFor } from "./recall.ts";
 import {
   BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, SIGNAL_SYSTEM, SignalSchema, TIE_MIN_CONFIDENCE,
@@ -68,6 +69,33 @@ interface ArticleRow {
  */
 function participantKey(source: { id: string; signal_group_id: string | null }): string {
   return source.signal_group_id ? `group:${source.signal_group_id}` : `source:${source.id}`;
+}
+
+/**
+ * Near-duplicate wire copies on the same story share one fingerprint so heat counts them once.
+ * Exact post-normalize hashes catch verbatim reprints; similarity catches lightly edited titles/leads.
+ */
+export async function alignStoryWireFingerprints(db: Tx, storyId: number, articleId: string): Promise<void> {
+  const [mine] = await db<{ id: string; title: string; body_text: string | null; wire_fingerprint: string | null }[]>`
+    SELECT id, title, body_text, wire_fingerprint FROM articles WHERE id = ${articleId}`;
+  if (!mine) return;
+  const peers = await db<{ id: string; title: string; body_text: string | null; wire_fingerprint: string | null }[]>`
+    SELECT a.id, a.title, a.body_text, a.wire_fingerprint
+    FROM story_signals ss JOIN articles a ON a.id = ss.article_id
+    WHERE ss.story_id = ${storyId} AND a.id <> ${articleId}`;
+  let key = mine.wire_fingerprint ?? wireFingerprint(mine.title, mine.body_text);
+  const members = [mine.id];
+  for (const p of peers) {
+    if (!areWireCopies(mine.title, mine.body_text, p.title, p.body_text)) continue;
+    members.push(p.id);
+    key = key ?? p.wire_fingerprint ?? wireFingerprint(p.title, p.body_text);
+  }
+  if (!key) return;
+  if (members.length === 1) {
+    if (!mine.wire_fingerprint) await db`UPDATE articles SET wire_fingerprint = ${key} WHERE id = ${mine.id}`;
+    return;
+  }
+  await db`UPDATE articles SET wire_fingerprint = ${key} WHERE id = ANY(${members}::text[])`;
 }
 
 // Judgement
@@ -130,6 +158,7 @@ export async function recordSignal(db: Tx, storyId: number, articleId: string, s
     INSERT INTO story_signals (story_id, article_id, participant_key, source_id, kind, observed_at)
     VALUES (${storyId}, ${articleId}, ${participantKey(source)}, ${source.id}, ${kind}, ${observedAt})
     ON CONFLICT (story_id, article_id) DO NOTHING`;
+  if (kind === "editorial") await alignStoryWireFingerprints(db, storyId, articleId);
 }
 
 type DecisionCandidate = { id: number; score: number; relation?: Relation; confidence?: number };
