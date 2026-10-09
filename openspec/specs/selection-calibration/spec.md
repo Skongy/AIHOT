@@ -1,9 +1,9 @@
-# selection-calibration Specification（增量）
+# selection-calibration Specification
 
 ## Purpose
-规定精选门槛校准管线：金标格式、评测判定、指标与门槛扫描的行为，以及不得自动写回门槛的约束。
+规定 GAMEHOT 精选门槛校准管线：金标 JSONL 格式、评分-only 评测判定、overall/按分级指标与门槛扫描的行为，以及不得自动写回门槛的约束。
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: 金标样本格式
 系统 MUST 使用换行分隔的 JSONL 金标文件（默认 `.data/gold.jsonl`，不进版本库）。每条 MUST 含唯一 `caseId`、`material`（标题与至少一端正文优先）、`sourceFacts`（含决定门槛的 `sourceTier`）、`gold.decision`（`select` | `reject` | `either`）。可选 `samplingContext.benchmarkSplit` 与 `samplingStratum` 用于切分与错例分析。
