@@ -454,6 +454,23 @@ export interface SearchSuggestions {
   hot: Array<{ rank: number; title: string; to: string }>;
 }
 
+/** Reader-facing Steam store card on a seed game topic deep page (public appdetails; no API key). */
+export interface SteamTopicPanel {
+  appId: number;
+  name: string;
+  shortDescription: string | null;
+  headerImage: string | null;
+  developers: string[];
+  publishers: string[];
+  genres: string[];
+  releaseDate: string | null;
+  comingSoon: boolean;
+  price: { free: boolean; label: string; discountPercent: number } | null;
+  platforms: string[];
+  metacriticScore: number | null;
+  storeUrl: string;
+}
+
 export interface TopicPage {
   topic: TopicSummary & { groupName: string; /** Every listed report, selected or not. */ poolTotal: number };
   /** The site's modules' parts of the page, under their names; each module's web part draws its own. */
@@ -462,4 +479,6 @@ export interface TopicPage {
   page: number;
   pageCount: number;
   pageSize: number;
+  /** Present on Steam seed topics when public store metadata is available. */
+  steam: SteamTopicPanel | null;
 }

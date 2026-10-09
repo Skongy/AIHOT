@@ -8,6 +8,7 @@ import type { CategoryKey } from "@aihot/contracts/taxonomy";
 import type {
   Brand, TopicGroup, TopicGroupKey, TopicLink, TopicPage, TopicSummary, TopicsResponse,
 } from "@aihot/contracts/site";
+import { loadSteamTopicPanel } from "./steam.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { REPO_ROOT } from "../config.ts";
@@ -25,6 +26,8 @@ export interface Topic {
   definition: string;
   /** Companies: the subject id (industry/taxonomy.ts ENTITIES). */
   entityId: string | null;
+  /** Steam store app id for seed game deep pages; null when not a Steam-bound topic. */
+  steamAppId: number | null;
   /** Tags that put a report in the topic: a company's subject tag, a direction's or a form's tags. */
   tags: string[];
   /** Companies: a title naming the company by any of its names (a PostgreSQL regular expression). */
@@ -36,7 +39,7 @@ export interface Topic {
 interface TopicFile {
   groups: TopicGroup[];
   topics: Array<{
-    slug: string; name: string; group: TopicGroupKey; entityId?: string; aliases?: string[]; tags?: string[]; definition: string;
+    slug: string; name: string; group: TopicGroupKey; entityId?: string; steamAppId?: number; aliases?: string[]; tags?: string[]; definition: string;
   }>;
 }
 
@@ -60,6 +63,7 @@ export const TOPICS: Topic[] = file.topics.map((t) => ({
   group: t.group,
   definition: t.definition,
   entityId: t.entityId ?? null,
+  steamAppId: typeof t.steamAppId === "number" && Number.isInteger(t.steamAppId) && t.steamAppId > 0 ? t.steamAppId : null,
   tags: t.entityId ? [`entity:${t.entityId}`] : (t.tags ?? []),
   pattern: t.entityId ? titlePattern(t.name, t.entityId) : null,
   aliases: t.entityId ? [t.slug, t.name, ...nameParts(t.name), ...(t.aliases ?? [])] : [],
@@ -319,7 +323,7 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     return part ? [{ name: m.name, ...part }] : [];
   });
   for (const part of parts) recheck.push(...part.recheck);
-  const [rows, pool, brands, live] = await Promise.all([
+  const [rows, pool, brands, live, steam] = await Promise.all([
     ids.length
       ? sql<ItemRow[]>`SELECT ${ITEM_COLUMNS} ${ITEM_FROM} WHERE p.article_id = ANY(${ids}::text[]) AND ${seatedCondition(at)} AND ${inTopic(topic)}
           ORDER BY p.timeline_at DESC, p.article_id DESC`
@@ -327,6 +331,8 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     poolTotal(topic, now),
     companyBrands(),
     currentSeats(recheck, at, [topic]),
+    // Store card only on page 1. Explicit `now` is the test clock — skip outbound Steam for hermetic tests.
+    page === 1 && !now ? loadSteamTopicPanel(topic.steamAppId) : Promise.resolve(null),
   ]);
   const groupName = TOPIC_GROUPS.find((g) => g.key === topic.group)?.name ?? "";
   return {
@@ -336,6 +342,7 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     page,
     pageCount,
     pageSize: TOPIC_PAGE_SIZE,
+    steam,
   };
 }
 

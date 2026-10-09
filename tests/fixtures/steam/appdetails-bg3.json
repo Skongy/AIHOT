@@ -1,0 +1,44 @@
+{
+  "1086940": {
+    "success": true,
+    "data": {
+      "type": "game",
+      "name": "博德之门3",
+      "steam_appid": 1086940,
+      "short_description": "召集你的队伍，重返被遗忘的国度。",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1086940/header.jpg",
+      "developers": [
+        "Larian Studios"
+      ],
+      "publishers": [
+        "Larian Studios"
+      ],
+      "genres": [
+        {
+          "id": "3",
+          "description": "角色扮演"
+        }
+      ],
+      "release_date": {
+        "coming_soon": false,
+        "date": "2023 年 8 月 3 日"
+      },
+      "price_overview": {
+        "currency": "CNY",
+        "initial": 29800,
+        "final": 29800,
+        "discount_percent": 0,
+        "final_formatted": "¥ 298.00"
+      },
+      "is_free": false,
+      "platforms": {
+        "windows": true,
+        "mac": true,
+        "linux": false
+      },
+      "metacritic": {
+        "score": 96
+      }
+    }
+  }
+}

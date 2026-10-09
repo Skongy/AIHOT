@@ -56,6 +56,7 @@
 - `ITEM_TYPES`：内容类型，和评分提示词里的权重表对应，改了要一起改提示词。
 - `topics.json`：主题目录（`/topics`）。站点启动时读取，改完重新构建（`docker compose up -d --build`）才生效。分三组：`company`（公司与机构）、`field`（方向）、`genre`（内容形态）。`slug` 上线后不要改。
   - `company` 主题用 `entityId`（`ENTITIES` 的 id）收以这家公司为主体的报道；一篇报道的主体有几家公司时，标题里点了它的名才算。可选：`aliases`（搜索框里只搜这个词，也能找出这家公司的报道）。
+  - Steam 种子游戏主题可加整数 `steamAppId`：主题第 1 页会尝试拉取公开商店 `appdetails`（无需 API key）展示封面与发售等信息；失败则只显示时间线。
   - `field` 和 `genre` 主题用 `tags` 收打了这些标签的报道。
 
 ## 3. 信源：`industry/sources.json`
