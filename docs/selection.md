@@ -34,56 +34,81 @@ export const SELECTION = {
 
 ## 校准
 
-### 1. 准备样本集
+门槛数字（`industry/selection.ts`）换行业后要按标注样本重测。**评测脚本只会打印建议，绝不会自动改写门槛文件**；改数字须你本人确认。
 
-从你自己的信源里挑 100–200 条资料，一条一条标“该选 / 不该选”，存成 `.data/gold.jsonl`（`.data/` 不进 Git）。每行一条：
+### 1. 准备样本集（金标）
+
+从你自己的信源里挑 100–200 条资料，存成 `.data/gold.jsonl`（`.data/` 不进 Git）。每行一条，格式与 `scripts/eval-selection.ts` 的 `GoldRow` 一致：
 
 ```json
-{"caseId":"law-001","material":{"title":"原文标题","originalTitle":null,"publishedAt":"2026-10-01T09:00:00+08:00","sourceName":"信源名称","bodyZh":null,"bodyOriginal":"正文……"},"sourceFacts":{"sourceKind":"rss","sourceTier":"T1","firstParty":true,"language":"zh"},"samplingContext":{"benchmarkSplit":"development","samplingStratum":"regulation"},"gold":{"decision":"select"}}
+{"caseId":"gh-001","material":{"title":"原文标题","originalTitle":null,"publishedAt":"2026-10-01T09:00:00+08:00","sourceName":"信源名称","bodyZh":"正文……","bodyOriginal":null,"sourceUrl":"https://…"},"sourceFacts":{"sourceKind":"rss","sourceTier":"T2","firstParty":false,"language":"zh"},"samplingContext":{"benchmarkSplit":"development","samplingStratum":"sts2"},"gold":{"decision":"select","note":"可选标注理由"}}
 ```
 
 | 字段 | 说明 |
 |---|---|
 | `caseId` | 唯一编号 |
-| `material` | 标题、原标题、发布时间、信源名、正文（中文正文放 `bodyZh`，原文放 `bodyOriginal`，有一个就行） |
-| `sourceFacts` | 信源类型、分级、是否一手（线上只有 `T1` 算一手，标注时保持一致）、语言。分级决定用哪个门槛 |
-| `samplingContext` | 可选。`benchmarkSplit` 分开发集和留出集，`samplingStratum` 是你自己的分组（比如“新规”“判决”“营销”），看错在哪一类 |
-| `gold.decision` | `select` 该选，`reject` 不该选，`either` 两可（不计入准确率） |
+| `material` | 标题、原标题、发布时间、信源名、正文（`bodyZh` / `bodyOriginal` 有一个即可）；可选 `sourceUrl` 供补正文 |
+| `sourceFacts` | 信源类型、分级、是否一手（线上只有 `T1` 算一手）、语言。**分级决定用哪个门槛** |
+| `samplingContext` | 可选。`benchmarkSplit`：`development` / `holdout`；`samplingStratum`：分层（见下） |
+| `gold.decision` | `select` 应选，`reject` 应排除，`either` 两可（不计入准确率） |
 
-`industry/gold.example.jsonl` 有两条示例。
+`industry/gold.example.jsonl` 有游戏向示例。
+
+#### 标注口径（灵感 / GAMEHOT）
+
+围绕「会不会改变国内玩家**玩不买、买不买、等不等**」；「一手出处 / 有新信息 / 国内相关」**三者任一**即可应选。种子主题：以撒重生、杀戮尖塔 2、喵喵的结合、博德之门 3。
+
+| 标签 | 何时用 |
+|---|---|
+| **应选** `select` | 发售日/预购、大版本/DLC、影响玩法的改动、国服相关、版号与监管、有分量的深度等 |
+| **应排除** `reject` | 攻略配队、抽卡、软文、无源爆料、搬运、标题党、八卦、折扣史低、账号交易；**小热修 / 只修 bug 的补丁默认应排除** |
+| **两可** `either` | 拿不准、或通稿重复信息量难判时（不进 decisive 指标） |
+
+`samplingStratum` 建议用主题 slug（`isaac` / `sts2` / `mewgenics` / `bg3`）或排除类（`guide` / `rumor` / `noise` / `hotfix` / `industry`…）。
 
 几条建议：
 
-- 多放**难例**：差一点就该选、差一点就不该选的。一眼就能判断的放太多，准确率会虚高。
-- 分出一部分做**留出集**（`benchmarkSplit: "holdout"`），调提示词只看开发集，最后再用留出集检查一遍，免得把提示词调成只会做这几道题。
-- 标注的人最好就是以后读这个站的人，或者和他们口味一致的人。
-- 评测只跑预筛和两次评分，不含第 6 步的去重：按这条资料本身该不该选来标，不要因为同一件事已经选过另一篇就标“不该选”。
+- 正式校准必须有**正文**（不要只用标题）。可用 `scripts/gold-enrich-bodies.ts` 按 `sourceUrl` 补取（先 Readability，可选 Jina）。
+- 多放**难例**；约 **7:3** 分开发集 / 留出集。
+- 评测只跑预筛 + 两次评分（**不跑写作、不含归组去重**）：按本条本身该不该选来标。
+- 评测判定用「分数 + 分级门槛」，**不依赖写作步骤**；线上发布仍保留「写完文案才算 relevance=pass」的门闩，二者不同。
+
+补正文示例：
+
+```bash
+node --env-file=.env scripts/gold-enrich-bodies.ts --in .data/gold.jsonl --out .data/gold.jsonl
+# 或从校准草稿（含 url + draftLabel）生成金标草稿：
+node --env-file=.env scripts/gold-enrich-bodies.ts --from-sample /path/to/calibration-sample.json --out .data/gold.jsonl
+```
 
 ### 2. 跑评测
 
 ```bash
-node --env-file=.env scripts/eval-selection.ts --gold .data/gold.jsonl --split development --label "第一版评分标准"
+# 评测会调模型：临时打开安全阀
+MODEL_CALLS_ENABLED=true node --env-file=.env scripts/eval-selection.ts \
+  --gold .data/gold.jsonl --split development --label "gamehot-cal-v1"
 ```
 
-对每条样本跑一遍预筛和两次评分，输出：
+对每条样本跑预筛和两次评分，输出：
 
-- 准确率、查准率（选出来的有多少是对的）、查全率（该选的有多少选上了）；
-- 门槛从 40 到 90 每隔 2 分（范围可以在下面说的 `DEPLOYMENT.selectionGold` 里改），各自会得到什么结果；
-- 判错的条目，完整报告写到 `.data/eval/`，同时导入后台 SelectBench（加 `--no-import` 不导入）。
+- **overall** 准确率、查准率、查全率、F1、入选比例；
+- **按信源分级（T1 / T1_5 / T2）** 的同一套指标；
+- **门槛扫描**：统一平均分 t 从 40 到 90 每隔 2 分（可用 `DEPLOYMENT.selectionGold.sweep` 改）；并打印**只读建议**（不会写 `industry/selection.ts`）；
+- 判错条目；完整报告写入 `.data/eval/`，并导入后台 SelectBench（`--no-import` 可跳过）。SelectBench 运行页可看 by-tier 与扫描表。
 
-不传 `--models` 时，评测用“精选评分”这一步线上正在用的模型：后台“模型与评测”页切换过的优先，其次是环境变量 `SCORE_MODEL`，再其次是 `site/models.ts` 的 `DEFAULTS.score`，都没有就用默认模型（`.env` 里的 `LLM_*`）。`--models default,deepseek-flash` 可以在同一批样本上比较几个模型。其他常用参数：`--n 200` 最多抽多少条，`--split holdout` 只跑留出集，`--no-import` 不导入 SelectBench。在 `site/site.ts` 的 `DEPLOYMENT.selectionGold` 里写好样本文件、抽样条数、只抽哪一份和门槛扫描范围，以后不带参数运行就用这一套。
+不传 `--models` 时，用线上「精选评分」模型（后台切换 > `SCORE_MODEL` > `site/models.ts` > `.env` 的 `LLM_*`）。常用参数：`--n 200`、`--split holdout`、`--no-import`。在 `site/site.ts` 的 `DEPLOYMENT.selectionGold` 写好默认金标路径与扫描范围后，可不带参数运行。
 
-同一次评测里，不同样本渲染出完全相同的评分输入时，只共享模型的评分结果，各样本仍按自己的预筛结果、信源分级门槛和标注独立计分；失败的结果也在这次运行里共享，这样第一次跑和用已有结果重跑覆盖的样本一样。重复运行会复用已有回执。报告里的 token 用量和平均耗时，按相关回执的全部请求尝试汇总，解析失败后的重试也算在内；用已有结果重跑时，显示的是这些回执累计的用量，不代表这次新增的费用。
+同一次评测里，相同评分输入共享模型结果；各样本仍按自己的预筛、分级门槛和标注计分。重复运行会复用回执。
 
 ### 3. 看错例，改标准，再跑
 
-在后台 SelectBench 里逐条看判错的资料和模型给的理由：
+在后台 SelectBench 里逐条看 FP/FN：
 
-- 该选没选上，多半是评分标准里没说清它为什么重要：在 `selection-score.md` 里把这类价值写进“必须正常评价”的部分，给出例子。
-- 不该选却选上了，多半是噪声没压住：写进“必须压住”的部分。
-- 整体偏松或偏紧，而判错的条目分数都贴着门槛，再调 `industry/selection.ts` 的门槛。
+- 该选没选上 → 多半是 `selection-score.md` 没写清价值；
+- 不该选却选上 → 噪声上限不够；
+- 整体松紧、分数贴门槛 → **你确认后**再改 `industry/selection.ts`（先改标准，再动门槛）。
 
-先改标准，再动门槛：门槛只能整体移动，解决不了“哪一类判错了”。每改一次跑一遍，SelectBench 里能看到每一版的对比。
+先改标准，再动门槛。每改一次跑一遍；拍板前用留出集确认。**禁止**让脚本或 CI 自动写回门槛文件。
 
 ## 换模型
 

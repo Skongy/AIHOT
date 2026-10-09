@@ -69,7 +69,7 @@ export async function importSelectBenchRun(report: unknown, label: string, actor
 export async function listSelectBenchRuns(): Promise<BeforeJson<AdminSelectBenchRuns["runs"]>> {
   return sql<BeforeJson<AdminSelectBenchRuns["runs"][number]>[]>`
     SELECT r.id, r.label, r.split, r.sample_size, r.prompt_version, r.models,
-           (SELECT coalesce(jsonb_object_agg(key, value - 'sweep'), '{}'::jsonb) FROM jsonb_each(r.summary)) AS summary,
+           (SELECT coalesce(jsonb_object_agg(key, (value - 'sweep') - 'suggested'), '{}'::jsonb) FROM jsonb_each(r.summary)) AS summary,
            r.created_at, r.imported_by,
            (SELECT count(*)::int FROM selectbench_results x WHERE x.run_id = r.id) AS cases
     FROM selectbench_runs r ORDER BY r.created_at DESC LIMIT 100`;
