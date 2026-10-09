@@ -3,7 +3,7 @@ import { Fragment, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { CATEGORY_LABELS } from "@aihot/contracts/taxonomy";
 import type { Route } from "./+types/selectbench-run";
-import type { AdminSelectBenchCases, AdminSelectBenchDecision } from "@aihot/contracts/admin";
+import type { AdminSelectBenchCases, AdminSelectBenchDecision, AdminSelectBenchModelSummary } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { bj, num, pct } from "../../features/admin/format";
 import { AdminPage, Badge, Card, Empty, FilterChips, Select } from "../../features/admin/ui";
@@ -16,6 +16,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 export const meta: Route.MetaFunction = ({ loaderData }) => [{ title: `${loaderData?.run.label ?? "SelectBench"} · ${SITE.name} 后台` }];
 
 const GOLD: Record<string, [string, "accent" | "muted" | "info"]> = { select: ["应入选", "accent"], reject: ["不选", "muted"], either: ["两可", "info"] };
+
+function asSummary(raw: AdminSelectBenchModelSummary | undefined): AdminSelectBenchModelSummary {
+  return raw ?? {};
+}
 
 function verdict(d: AdminSelectBenchDecision | undefined, gold: string) {
   if (!d) return <span className="text-ink-4">—</span>;
@@ -40,6 +44,12 @@ export default function SelectBenchRun({ loaderData: d }: Route.ComponentProps) 
     else next.delete(k);
     navigate(`?${next}`, { preventScrollReset: true });
   };
+  const summary = asSummary(d.run.summary[model]);
+  const byTier = summary.byTier ?? {};
+  const tierKeys = Object.keys(byTier).sort();
+  const sweep = Array.isArray(summary.sweep) ? summary.sweep : [];
+  const suggested = summary.suggested && typeof summary.suggested === "object" ? summary.suggested as Record<string, unknown> : null;
+
   return (
     <AdminPage
       title={d.run.label}
@@ -47,7 +57,7 @@ export default function SelectBenchRun({ loaderData: d }: Route.ComponentProps) 
     >
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {d.run.models.map((m) => {
-          const s = d.run.summary[m] ?? {};
+          const s = asSummary(d.run.summary[m]);
           return (
             <button key={m} onClick={() => set("model", m)} className={`rounded-panel p-4 text-left ring-1 transition-colors ${m === model ? "bg-accent-softer ring-accent/40" : "bg-surface ring-line hover:bg-bg-sunk/60"}`}>
               <div className="text-[13.5px] font-semibold text-ink">{m}</div>
@@ -58,6 +68,60 @@ export default function SelectBenchRun({ loaderData: d }: Route.ComponentProps) 
           );
         })}
       </div>
+
+      {tierKeys.length > 0 && (
+        <Card title={`按信源分级（${model}）`} className="mb-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {tierKeys.map((tier) => {
+              const t = byTier[tier] ?? {};
+              return (
+                <div key={tier} className="rounded-control bg-bg-sunk/40 p-3 ring-1 ring-line">
+                  <div className="text-[13px] font-semibold text-ink">{tier}</div>
+                  <div className="num mt-1 text-[18px] font-semibold text-ink">F1 {pct(t.f1)}</div>
+                  <div className="num mt-0.5 text-[12px] text-ink-3">精确 {pct(t.precision)} · 召回 {pct(t.recall)} · 准确 {pct(t.accuracy)}</div>
+                  <div className="num mt-0.5 text-[12px] text-ink-4">decisive {t.decisive ?? "—"} · 入选率 {pct(t.selectedRate)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {sweep.length > 0 && (
+        <Card
+          title={`门槛扫描（统一平均分 t，${model}）`}
+          right={suggested ? <span className="text-[12px] text-ink-3">建议 t={String(suggested.uniformMean ?? "—")}（只读，不写回 selection.ts）</span> : undefined}
+          className="mb-5"
+          pad={false}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-[13px]">
+              <thead>
+                <tr className="border-b border-line text-left text-[12px] text-ink-3">
+                  {["t", "准确率", "精确率", "召回率", "F1", "入选比例"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {sweep.map((row) => {
+                  const highlight = suggested && row.t === suggested.uniformMean;
+                  return (
+                    <tr key={String(row.t)} className={`border-b border-line/70 last:border-0 ${highlight ? "bg-accent-softer/60" : ""}`}>
+                      <td className="num px-3 py-1.5 font-medium text-ink">{row.t}{highlight ? " · 建议" : ""}</td>
+                      <td className="num px-3 py-1.5">{pct(row.acc)}</td>
+                      <td className="num px-3 py-1.5">{pct(row.P)}</td>
+                      <td className="num px-3 py-1.5">{pct(row.R)}</td>
+                      <td className="num px-3 py-1.5 font-semibold text-ink">{pct(row.F1)}</td>
+                      <td className="num px-3 py-1.5">{pct(row.sel)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {suggested?.note ? <p className="border-t border-line px-4 py-2 text-[12.5px] text-ink-3">{String(suggested.note)}</p> : null}
+        </Card>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterChips
           param="outcome"

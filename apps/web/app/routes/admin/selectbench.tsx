@@ -2,7 +2,7 @@ import { SITE } from "@aihot/site";
 import { useRef } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/selectbench";
-import type { AdminSelectBenchRuns } from "@aihot/contracts/admin";
+import type { AdminSelectBenchModelSummary, AdminSelectBenchRuns } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, num, pct } from "../../features/admin/format";
@@ -49,7 +49,7 @@ export default function SelectBench({ loaderData }: Route.ComponentProps) {
       {loaderData.runs.length ? (
         <div className="space-y-4">
           {loaderData.runs.map((r) => {
-            const best = [...r.models].sort((a, b) => (r.summary[b]?.f1 ?? 0) - (r.summary[a]?.f1 ?? 0))[0];
+            const best = [...r.models].sort((a, b) => Number(r.summary[b]?.f1 ?? 0) - Number(r.summary[a]?.f1 ?? 0))[0];
             return (
               <Card
                 key={r.id}
@@ -66,7 +66,7 @@ export default function SelectBench({ loaderData }: Route.ComponentProps) {
                     </thead>
                     <tbody>
                       {r.models.map((m) => {
-                        const s = r.summary[m] ?? {};
+                        const s = (r.summary[m] ?? {}) as AdminSelectBenchModelSummary;
                         return (
                           <tr key={m} className="border-b border-line/70 last:border-0">
                             <td className="px-3 py-2 font-medium text-ink">{m} {m === best && r.models.length > 1 && <Badge tone="accent">F1 最高</Badge>}</td>

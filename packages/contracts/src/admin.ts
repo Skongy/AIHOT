@@ -338,6 +338,25 @@ export interface AdminModels {
   benches: Array<{ id: string; label: string; sample_size: number; prompt_version: string | null; models: string[]; created_at: Timestamp }>;
 }
 
+/** Per-model SelectBench summary: scalar metrics plus optional byTier / sweep / suggested. */
+export type AdminSelectBenchModelSummary = Record<string, unknown> & {
+  accuracy?: number;
+  precision?: number;
+  recall?: number;
+  f1?: number;
+  fp?: number;
+  fn?: number;
+  errors?: number;
+  selectedRate?: number;
+  goldSelectRate?: number;
+  avgLatencyMs?: number;
+  tokensIn?: number;
+  tokensOut?: number;
+  byTier?: Record<string, Record<string, number>>;
+  sweep?: Array<Record<string, number>>;
+  suggested?: Record<string, unknown>;
+};
+
 export interface AdminSelectBenchRun {
   id: string;
   label: string;
@@ -345,7 +364,7 @@ export interface AdminSelectBenchRun {
   sample_size: number;
   prompt_version: string | null;
   models: string[];
-  summary: Record<string, Record<string, number>>;
+  summary: Record<string, AdminSelectBenchModelSummary>;
   created_at: Timestamp;
 }
 

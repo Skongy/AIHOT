@@ -442,6 +442,31 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   }
 }
 
+/**
+ * Score-only selection decision (SelectBench / eval-selection): ignores the production writing
+ * gate (`relevance === "pass"`). BLOCK → not selected; otherwise sum of two scores vs tier threshold.
+ * Production still uses normalizeAnalysis, which keeps the writing gate unchanged.
+ */
+export function selectedByScoreThreshold(
+  prefilterLabel: "PASS" | "BLOCK" | "UNKNOWN",
+  scores: { threshold: number; values: number[]; refused?: boolean } | null,
+): { selected: boolean; score: number | null } {
+  if (prefilterLabel === "BLOCK") return { selected: false, score: null };
+  if (!scores || scores.refused || scores.values.length !== SCORE_CALLS) return { selected: false, score: null };
+  const sum = scores.values.reduce((total, v) => total + v, 0);
+  const score = Math.floor(sum / SCORE_CALLS);
+  return { selected: sum >= scores.threshold * SCORE_CALLS, score };
+}
+
+/** Uniform mean-score cutoff for threshold sweeps (prefilter BLOCK never selects). */
+export function selectedAtMeanCutoff(
+  prefilterLabel: "PASS" | "BLOCK" | "UNKNOWN",
+  score: number | null,
+  meanThreshold: number,
+): boolean {
+  return prefilterLabel !== "BLOCK" && score !== null && score >= meanThreshold;
+}
+
 /** One judgement from the steps: the selection rule, the reader-facing copy and the structure. */
 export function normalizeAnalysis(run: AnalysisRun) {
   const label = run.prefilter.label;
