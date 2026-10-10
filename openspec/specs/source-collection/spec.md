@@ -50,7 +50,7 @@ RSS 信源 MUST 使用 `kind: rss`；HTML 列表页信源 MUST 使用 `kind: web
 - **THEN** 页面展示摘要和“阅读原文”链接，不展示全文 HTML
 
 ### Requirement: Steam 种子游戏一手覆盖
-四款 Steam 种子游戏（以撒的结合：重生、杀戮尖塔 2、喵喵的结合、博德之门 3）MUST 各有一条启用的 Steam 商店新闻 RSS（`store.steampowered.com/feeds/news/app/{appid}/?l=schinese`），且 MUST 配置 `publisherUrlPrefixes` 指向对应 `store.steampowered.com/news/app/{appid}/`，以便媒体转载的官方链接可改记到一手源。若开发商/发行商站点可用现有 `rss` 或 `web_list` 采集，SHALL 另接一手源：Mega Crit 新闻（`megacrit.com/feed.xml`，只收 `/news/`）、Larian Studios 新闻（`larian.com/news` 网页列表）。SHALL NOT 新增采集器类型；SHALL NOT 接入手游官源或 B 站热榜。
+四款 Steam 种子游戏（以撒的结合：重生、杀戮尖塔 2、喵喵的结合、博德之门 3）MUST 各有一条启用的 Steam 商店新闻 RSS（`store.steampowered.com/feeds/news/app/{appid}/?l=schinese`），且 MUST 配置 `publisherUrlPrefixes` 指向对应 `store.steampowered.com/news/app/{appid}/`，以便媒体转载的官方链接可改记到一手源。若开发商/发行商站点可用现有 `rss` 或 `web_list` 采集，SHALL 另接一手源：Mega Crit 新闻（`megacrit.com/feed.xml`，只收 `/news/`）、Larian Studios 新闻（`larian.com/news` 网页列表）。SHALL NOT 新增采集器类型；SHALL NOT 接入手游官源。B 站/贴吧热榜以独立 `hot_signal` 信源接入（见 hot-list-matching），不在本需求的 Steam 官源条款内。
 
 #### Scenario: 种子游戏 Steam 新闻可归因
 - **WHEN** 管理员查看四款种子游戏的 Steam 商店新闻信源

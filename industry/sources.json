@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}），并补上可抓的开发商/发行商一手源（Mega Crit 新闻 RSS、Larian 新闻列表）；仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam/厂商官源不套用该标题规则。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}），并补上可抓的开发商/发行商一手源（Mega Crit 新闻 RSS、Larian 新闻列表）；仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam/厂商官源不套用该标题规则。 热榜（B站热搜、贴吧热议）以 hot_signal 接入，只给已有事件加分。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -1185,6 +1185,77 @@
         "官方",
         "英文",
         "博德之门"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-bilibili-hotword",
+      "name": "B站热搜",
+      "kind": "json_list",
+      "config": {
+        "url": "https://s.search.bilibili.com/main/hotword",
+        "mode": "json_api",
+        "itemsPath": "list",
+        "titlePaths": [
+          "show_name",
+          "keyword"
+        ],
+        "summaryPaths": [
+          "show_name",
+          "keyword"
+        ],
+        "summaryIsBody": true,
+        "publishedAtPath": "stat_datas.stime",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "hot_id",
+        "urlTemplate": "https://search.bilibili.com/all?keyword={keyword}",
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "tags": [
+        "热榜",
+        "B站"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-tieba-hottopic",
+      "name": "贴吧热议",
+      "kind": "json_list",
+      "config": {
+        "url": "https://tieba.baidu.com/hottopic/browse/topicList",
+        "mode": "json_api",
+        "itemsPath": "data.bang_topic.topic_list",
+        "titlePaths": [
+          "topic_name"
+        ],
+        "summaryPaths": [
+          "topic_desc",
+          "abstract"
+        ],
+        "summaryIsBody": true,
+        "publishedAtPath": "create_time",
+        "publishedAtUnit": "epoch_s",
+        "externalIdPath": "topic_id",
+        "urlTemplate": "https://tieba.baidu.com/hottopic/browse/hottopic?topic_id={topic_id}",
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "hot_signal",
+      "interval_minutes": 30,
+      "tags": [
+        "热榜",
+        "贴吧"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false
