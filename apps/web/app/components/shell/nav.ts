@@ -24,13 +24,13 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { to: "/hot", label: "热点", icon: IconFlame },
       { to: "/daily", label: "AI 日报", icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
+      { to: "/starred", label: "收藏", icon: IconBookmark },
     ],
   },
   {
     title: "更多",
     items: [
-      { to: "/starred", label: "收藏", icon: IconBookmark },
-      { to: "/agent", label: "Agent 接入", icon: IconPlug },
+      { to: "/agent", label: "Agent", icon: IconPlug },
       { to: "/about", label: "关于", icon: IconHeart },
       { to: "/changelog", label: "更新日志", icon: IconHistory, changelog: true },
       { to: "/feedback", label: "反馈", icon: IconMessage },
