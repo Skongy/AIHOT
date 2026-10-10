@@ -33,8 +33,9 @@ const OFFICIAL = [
   // disabled (Steam-focus): mobile/F2P single-game + LoL Esports
   "json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports",
   "rss-steam-cs2", "rss-steam-dota2", "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-netease-ir",
-  // Steam seed-game news
+  // Steam seed-game news + developer/publisher first-party
   "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3",
+  "rss-megacrit-news", "web-larian-news",
 ];
 /** Disabled mobile/F2P announcement feeds still carry the old title rule in config (kept for re-enable). Steam seed feeds do not. */
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
@@ -69,7 +70,18 @@ test("every game source has a config its kind implements and the agreed defaults
   for (const id of ["rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
     assert.notEqual(byId.get(id)!.enabled, false, id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
+    const prefixes = byId.get(id)!.config.publisherUrlPrefixes as string[];
+    assert.ok(Array.isArray(prefixes) && prefixes.length === 1, id);
+    assert.match(prefixes[0]!, /^https:\/\/store\.steampowered\.com\/news\/app\/\d+\/$/, id);
   }
+  for (const id of ["rss-megacrit-news", "web-larian-news"]) {
+    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
+    assert.equal(byId.get(id)!.tier, "T1", id);
+  }
+  assert.deepEqual(byId.get("rss-megacrit-news")!.config.allowUrlPrefixes, ["https://megacrit.com/news/"]);
+  assert.equal(byId.get("rss-megacrit-news")!.owner_entity_id, "mega-crit");
+  assert.equal(byId.get("web-larian-news")!.owner_entity_id, "larian");
 });
 
 test("the title rule sits on the single-game announcement sources only", () => {
@@ -77,7 +89,7 @@ test("the title rule sits on the single-game announcement sources only", () => {
   assert.deepEqual(withRule.sort(), [...SINGLE_GAME].sort());
   const rules = SINGLE_GAME.map((id) => JSON.stringify(byId.get(id)!.config.ingestNoiseFilter));
   assert.equal(new Set(rules).size, 1, "one shared rule");
-  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
+  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3", "rss-megacrit-news", "web-larian-news"]) {
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
   }
 });
@@ -189,4 +201,22 @@ test("detail pages date the listings that print relative or no dates", async () 
   assert.equal((await detail("web-17173", { date: true, title: false })).publishedAt?.toISOString(), "2026-10-08T05:33:18.000Z");
   // 游戏陀螺: the listing link starts with its column label; the article page has the bare headline.
   assert.equal((await detail("web-youxituoluo", { date: false, title: true })).title, "《英雄不再》开发商草蜢工作室宣布脱离网易游戏，重新独立运营");
+});
+
+test("Mega Crit feed keeps /news/ posts and drops policy/twitch pages", async () => {
+  const { raw, kept } = await readSnapshot(byId.get("rss-megacrit-news")!);
+  assert.ok(raw.some((c) => c.url.includes("/twitch/") || c.url.includes("privacy")), "snapshot has a non-news page");
+  assert.ok(kept.length >= 3, `only ${kept.length} news posts`);
+  for (const c of kept) assert.ok(c.url.startsWith("https://megacrit.com/news/"), c.url);
+  assert.ok(kept.some((c) => /Neowsletter|Slay the Spire/i.test(c.title)), kept.map((c) => c.title).join(" / "));
+});
+
+test("Larian news list parses dated posts under /news/", async () => {
+  const { kept } = await readSnapshot(byId.get("web-larian-news")!);
+  assert.ok(kept.length >= 3, `only ${kept.length} posts`);
+  for (const c of kept) {
+    assert.ok(c.url.startsWith("https://larian.com/news/"), c.url);
+    assert.ok(c.publishedAt && Number.isFinite(c.publishedAt.getTime()), c.title);
+  }
+  assert.ok(kept.some((c) => /Hotfix #36/i.test(c.title)), kept.map((c) => c.title).join(" / "));
 });

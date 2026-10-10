@@ -6,7 +6,7 @@
 ## Requirements
 
 ### Requirement: 编辑信源覆盖信源官 v1 媒体名单和官方名单
-站点 MUST 配置信源官 v1 实测可抓的编辑信源，以及官方信源 v1 中本次接入的官方信源：媒体（机核、IGN中国、巴哈姆特GNN、游研社、触乐、游茶、游民星空、3DM、A9VG、17173、新浪电竞、玩加电竞、游戏陀螺、indienova、国家新闻出版署国产网络游戏审批、HLTV）和官方（王者荣耀官网、英雄联盟官网、原神米游社、星穹铁道米游社、永劫无间官网、和平精英官网、LoL Esports、Steam CS2、Steam Dota 2、PlayStation 中文博客、Xbox Wire、任天堂日本、任天堂香港、Steam 商店新闻、网易投资者关系）。每个信源的 `participation_mode` MUST 为 `editorial`。indienova 在找到带发布时间的入口之前 MAY 默认停用。
+站点 MUST 配置信源官 v1 实测可抓的编辑信源，以及官方信源 v1 中本次接入的官方信源：媒体（机核、IGN中国、巴哈姆特GNN、游研社、触乐、游茶、游民星空、3DM、A9VG、17173、新浪电竞、玩加电竞、游戏陀螺、indienova、国家新闻出版署国产网络游戏审批、HLTV）和官方（王者荣耀官网、英雄联盟官网、原神米游社、星穹铁道米游社、永劫无间官网、和平精英官网、LoL Esports、Steam CS2、Steam Dota 2、PlayStation 中文博客、Xbox Wire、任天堂日本、任天堂香港、Steam 商店新闻、网易投资者关系、四款 Steam 种子游戏商店新闻、Mega Crit 新闻、Larian Studios 新闻）。每个信源的 `participation_mode` MUST 为 `editorial`。indienova 在找到带发布时间的入口之前 MAY 默认停用。
 
 #### Scenario: 种子导入后的编辑源
 - **WHEN** 管理员打开后台“信源”页并筛选参与方式为 editorial
@@ -20,7 +20,7 @@ RSS 信源 MUST 使用 `kind: rss`；HTML 列表页信源 MUST 使用 `kind: web
 - **THEN** 系统不报“不支持的配置项”
 
 ### Requirement: 采集端去掉明显非游戏内容和官方噪音
-机核信源 MUST 丢弃电台地址（`/radios/`）。巴哈姆特 GNN 信源 MUST 丢弃标题明确属于动画、电影试片或轻小说的条目。17173 信源 MUST 只收新闻正文地址，不收礼包页和游戏库页。单款游戏官方公告信源（王者荣耀、英雄联盟官网、米游社原神、米游社星穹铁道、永劫无间、和平精英）MUST 在采集阶段：标题命中版本更新、赛季、停服、定档、公测、DLC、新角色、平衡、联动、回归等保留词的一定保留；否则命中封禁、活动、皮肤及其同类词的丢掉；两边都不命中的条目照常进入预筛。PlayStation、Xbox、任天堂、Steam 信源 SHALL NOT 套用这条标题规则。
+机核信源 MUST 丢弃电台地址（`/radios/`）。巴哈姆特 GNN 信源 MUST 丢弃标题明确属于动画、电影试片或轻小说的条目。17173 信源 MUST 只收新闻正文地址，不收礼包页和游戏库页。单款游戏官方公告信源（王者荣耀、英雄联盟官网、米游社原神、米游社星穹铁道、永劫无间、和平精英）MUST 在采集阶段：标题命中版本更新、赛季、停服、定档、公测、DLC、新角色、平衡、联动、回归等保留词的一定保留；否则命中封禁、活动、皮肤及其同类词的丢掉；两边都不命中的条目照常进入预筛。PlayStation、Xbox、任天堂、Steam、Mega Crit、Larian 信源 SHALL NOT 套用这条标题规则。
 
 #### Scenario: 机核电台
 - **WHEN** 机核 RSS 里出现 `/radios/` 地址的条目
@@ -48,3 +48,18 @@ RSS 信源 MUST 使用 `kind: rss`；HTML 列表页信源 MUST 使用 `kind: web
 #### Scenario: 打开一篇报道
 - **WHEN** 读者打开一篇来自游民星空的报道详情
 - **THEN** 页面展示摘要和“阅读原文”链接，不展示全文 HTML
+
+### Requirement: Steam 种子游戏一手覆盖
+四款 Steam 种子游戏（以撒的结合：重生、杀戮尖塔 2、喵喵的结合、博德之门 3）MUST 各有一条启用的 Steam 商店新闻 RSS（`store.steampowered.com/feeds/news/app/{appid}/?l=schinese`），且 MUST 配置 `publisherUrlPrefixes` 指向对应 `store.steampowered.com/news/app/{appid}/`，以便媒体转载的官方链接可改记到一手源。若开发商/发行商站点可用现有 `rss` 或 `web_list` 采集，SHALL 另接一手源：Mega Crit 新闻（`megacrit.com/feed.xml`，只收 `/news/`）、Larian Studios 新闻（`larian.com/news` 网页列表）。SHALL NOT 新增采集器类型；SHALL NOT 接入手游官源或 B 站热榜。
+
+#### Scenario: 种子游戏 Steam 新闻可归因
+- **WHEN** 管理员查看四款种子游戏的 Steam 商店新闻信源
+- **THEN** 每条均为启用的 T1 editorial RSS，且带有对应 app 新闻路径的 `publisherUrlPrefixes`
+
+#### Scenario: Mega Crit 只收新闻正文
+- **WHEN** Mega Crit 全站 feed 里出现 `/twitch/` 或隐私政策等非 `/news/` 地址
+- **THEN** 该条目在采集阶段被地址前缀过滤丢掉
+
+#### Scenario: Larian 新闻列表可解析
+- **WHEN** 采集器按现有 `web_list` 选择器读取 Larian 新闻页快照
+- **THEN** 能解析出带日期的新闻条目，且链接落在 `larian.com/news/`
