@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}）。仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam 官源不套用该标题规则。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}），并补上可抓的开发商/发行商一手源（Mega Crit 新闻 RSS、Larian 新闻列表）；仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam/厂商官源不套用该标题规则。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -1034,7 +1034,10 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/250900/"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "binding-of-isaac-rebirth",
@@ -1057,7 +1060,10 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/2868840/"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "slay-the-spire-2",
@@ -1080,7 +1086,10 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/686060/"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "mewgenics",
@@ -1103,7 +1112,10 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/1086940/"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "baldurs-gate-3",
@@ -1112,6 +1124,66 @@
       "tags": [
         "官方",
         "Steam",
+        "博德之门"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-megacrit-news",
+      "name": "Mega Crit·新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://megacrit.com/feed.xml",
+        "allowUrlPrefixes": [
+          "https://megacrit.com/news/"
+        ],
+        "publisherUrlPrefixes": [
+          "https://megacrit.com/news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "mega-crit",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英文",
+        "杀戮尖塔"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-larian-news",
+      "name": "Larian Studios·新闻",
+      "kind": "web_list",
+      "config": {
+        "url": "https://larian.com/news",
+        "baseUrl": "https://larian.com",
+        "itemSelector": "a.blog-item",
+        "titleSelector": "h3.blog-content__title",
+        "publishedAtSelector": "span.blog-content__date",
+        "publishedAtUtcOffset": "+00:00",
+        "allowUrlPrefixes": [
+          "https://larian.com/news/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "larian",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英文",
         "博德之门"
       ],
       "site_fulltext": false,
