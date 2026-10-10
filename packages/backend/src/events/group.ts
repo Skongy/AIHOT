@@ -26,13 +26,15 @@ import { isHistorical, STALE_ON_DISCOVERY_MS } from "../content/materials.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { publishArticle, publishArticleTx } from "../publication/publish.ts";
 import { latestCompositeCondition } from "../publication/scope.ts";
+import { HOT_SEED_ENTITY_IDS } from "@aihot/industry/selection";
+import { IDENTITY_LEXICON } from "@aihot/industry/taxonomy";
 import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { mergeStoryInto } from "./merge.ts";
 import { areWireCopies, wireFingerprint } from "../content/wire.ts";
-import { candidateViews, cosine32, recallFacts, recallSelectedBackground, relatedPosts, vectorsFor } from "./recall.ts";
+import { candidateViews, cosine32, recallFacts, recallSelectedBackground, relatedPosts, vectorsFor, type Recalled } from "./recall.ts";
 import {
   BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, SIGNAL_SYSTEM, SignalSchema, TIE_MIN_CONFIDENCE,
-  batchUser, completeDecisions, firmlyTied, pairUser, reportText, sameOccurrence, signalTarget, storyForDevelopment, verdictsByFact,
+  batchUser, completeDecisions, firmlyTied, lexicalSimilarity, pairUser, reportText, sameOccurrence, signalTarget, storyForDevelopment, verdictsByFact,
   type CandidateView, type ReadingContext, type Relation, type ReportView, type SelectionValue, type Verdict,
 } from "./relate.ts";
 
@@ -43,7 +45,49 @@ const CONFIRM_BELOW_COSINE = 0.85;
 /** Discussion posts are judged only against clear candidates, and attach without a call when nearly identical. */
 const SIGNAL_MIN_COSINE = 0.72;
 const SIGNAL_AUTO_COSINE = 0.92;
+/** Lexical bigrams are not on the cosine scale; prefer miss over a false attach when embeddings are off. */
+const SIGNAL_AUTO_LEXICAL = 0.4;
+const SIGNAL_SEED_FLOOR = 0.35;
 const SIGNAL_TOP_FACTS = 4;
+
+const SEED_PATTERNS = IDENTITY_LEXICON.filter((e) => (HOT_SEED_ENTITY_IDS as readonly string[]).includes(e.id));
+
+/** Which Steam seed patterns fire in a hot-word or fact title (宁漏勿误报：只用 IDENTITY_LEXICON，不用过短别名）。 */
+function seedIdsIn(text: string): string[] {
+  return SEED_PATTERNS.filter((e) => e.patterns.some((p) => p.test(text))).map((e) => e.id);
+}
+
+/**
+ * Hot words often name a seed game in a short title that shares few bigrams with a long report.
+ * When the query and a recent fact share a seed pattern, offer that fact as a candidate.
+ */
+async function recallSeedFacts(queryText: string, top: number): Promise<Recalled[]> {
+  const seeds = seedIdsIn(queryText);
+  if (!seeds.length) return [];
+  const rows = await sql<{ fact_id: number; story_id: number; fact_title: string }[]>`
+    SELECT f.id AS fact_id, f.story_id, f.title AS fact_title
+    FROM facts f JOIN stories st ON st.id = f.story_id AND st.merged_into IS NULL
+    WHERE f.created_at > now() - make_interval(days => 14)
+    ORDER BY f.id DESC LIMIT 400`;
+  const best = new Map<number, Recalled>();
+  for (const r of rows) {
+    const shared = seedIdsIn(r.fact_title).some((id) => seeds.includes(id));
+    if (!shared) continue;
+    const score = Math.max(lexicalSimilarity(queryText, r.fact_title), SIGNAL_SEED_FLOOR);
+    const prev = best.get(r.fact_id);
+    if (!prev || score > prev.score) best.set(r.fact_id, { factId: r.fact_id, storyId: r.story_id, factTitle: r.fact_title, score });
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, top);
+}
+
+function mergeRecalled(a: Recalled[], b: Recalled[], top: number): Recalled[] {
+  const best = new Map<number, Recalled>();
+  for (const r of [...a, ...b]) {
+    const prev = best.get(r.factId);
+    if (!prev || r.score > prev.score) best.set(r.factId, r);
+  }
+  return [...best.values()].sort((x, y) => y.score - x.score).slice(0, top);
+}
 
 interface ArticleRow {
   id: string;
@@ -559,14 +603,26 @@ const signalText = (a: { title: string; body_text: string | null }) => reportTex
  * grouped again; each is judged the usual way, against all candidates.
  */
 async function rematchSignals(articleId: string, queryText: string): Promise<number> {
-  if (!embeddingsAvailable()) return 0;
-  const mine = (await vectorsFor([{ id: articleId, text: queryText }])).get(articleId);
-  if (!mine) return 0;
   const posts = await sql<{ id: string; title: string; body_text: string | null }[]>`
     SELECT a.id, a.title, a.body_text FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.discovered_at > now() - make_interval(hours => ${REMATCH_HOURS}) AND ${unattachedSignal}`;
-  const vectors = await vectorsFor(posts.map((p) => ({ id: p.id, text: signalText(p) })));
+  if (!posts.length) return 0;
+  const querySeeds = seedIdsIn(queryText);
   let close = 0;
+  if (!embeddingsAvailable()) {
+    for (const p of posts) {
+      const text = signalText(p);
+      const lex = lexicalSimilarity(queryText, text);
+      const seedHit = querySeeds.length > 0 && seedIdsIn(text).some((id) => querySeeds.includes(id));
+      if (lex < SIGNAL_AUTO_LEXICAL && !seedHit) continue;
+      await enqueue(QUEUES.group, { articleId: p.id, signalOnly: true }, { singletonKey: p.id, priority: -1 });
+      close += 1;
+    }
+    return close;
+  }
+  const mine = (await vectorsFor([{ id: articleId, text: queryText }])).get(articleId);
+  if (!mine) return 0;
+  const vectors = await vectorsFor(posts.map((p) => ({ id: p.id, text: signalText(p) })));
   for (const p of posts) {
     const v = vectors.get(p.id);
     if (!v || cosine32(mine, v) < SIGNAL_MIN_COSINE) continue;
@@ -601,18 +657,27 @@ async function groupSignal(a: ArticleRow, source: { id: string; signal_group_id:
     const target = referenced[0]!;
     return write({ factId: target.fact_id, storyId: target.story_id }, "signal-native", [{ id: target.fact_id, score: 1, relation: "SAME_STORY", confidence: 1 }]);
   }
-  if (!embeddingsAvailable()) return { verdict: "signal-unmatched" };
-  const recalled = await recallFacts(a.id, signalText(a), SIGNAL_MIN_COSINE, SIGNAL_TOP_FACTS);
+  const queryText = signalText(a);
+  // Embeddings when available; otherwise the same lexical recall reports already use, plus seed co-mention.
+  const recalled = mergeRecalled(
+    await recallFacts(a.id, queryText, SIGNAL_MIN_COSINE, SIGNAL_TOP_FACTS),
+    await recallSeedFacts(queryText, SIGNAL_TOP_FACTS),
+    SIGNAL_TOP_FACTS,
+  );
   if (recalled.length === 0) {
-    // Recorded, so a post that found nothing is told apart from one never decided.
+    // Recorded, so a post that found nothing is told apart from one never decided. Never create a story.
     return write(null, "signal-unmatched", []);
   }
   const top = recalled[0]!;
   const asCandidates = (verdicts?: Map<number, Verdict>): DecisionCandidate[] =>
     recalled.map((r) => ({ id: r.factId, score: Math.round(r.score * 1000) / 1000, relation: verdicts?.get(r.factId)?.relation, confidence: verdicts?.get(r.factId)?.confidence }));
-  if (top.score >= SIGNAL_AUTO_COSINE) {
+  const autoBar = embeddingsAvailable() ? SIGNAL_AUTO_COSINE : SIGNAL_AUTO_LEXICAL;
+  const seedAuto = !embeddingsAvailable() && seedIdsIn(queryText).length > 0 && top.score >= SIGNAL_SEED_FLOOR;
+  if (top.score >= autoBar || seedAuto) {
     return write(top, "signal", asCandidates());
   }
+  // Without embeddings, skip the LLM judge (宁漏勿误报 / no vector key): leave unmatched rather than guess.
+  if (!embeddingsAvailable()) return write(null, "signal-unmatched", asCandidates());
   const cands = await candidateViews(recalled);
   if (cands.length === 0) return { verdict: "signal-unmatched" };
   const query: ReportView = { title: a.title, source: a.source_name, firstParty: false, at: observedAt, summary: a.body_text?.slice(0, 300) ?? null };

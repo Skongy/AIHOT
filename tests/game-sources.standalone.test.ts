@@ -37,6 +37,8 @@ const OFFICIAL = [
   "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3",
   "rss-megacrit-news", "web-larian-news",
 ];
+/** Community hot lists: heat evidence only (Bilibili / Tieba). */
+const HOT = ["json-bilibili-hotword", "json-tieba-hottopic"];
 /** Disabled mobile/F2P announcement feeds still carry the old title rule in config (kept for re-enable). Steam seed feeds do not. */
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
 const DISABLED_OFFICIAL = new Set(["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports"]);
@@ -44,7 +46,7 @@ const DISABLED_OFFICIAL = new Set(["json-pvp-news", "json-lol-news", "json-miyou
 const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-gp-qq"]);
 
 test("the seed holds the media list and the official list, nothing else", () => {
-  assert.deepEqual(sources.map((s) => s.id).sort(), [...MEDIA, ...OFFICIAL].sort());
+  assert.deepEqual(sources.map((s) => s.id).sort(), [...MEDIA, ...OFFICIAL, ...HOT].sort());
   assert.equal(new Set(sources.map((s) => s.id)).size, sources.length);
 });
 
@@ -53,11 +55,16 @@ test("every game source has a config its kind implements and the agreed defaults
   for (const s of sources) {
     assert.deepEqual(unsupportedConfig(s.kind, s.config), [], s.id);
     assert.ok(["rss", "web_list", "json_list"].includes(s.kind), `${s.id}: only the existing collectors`);
-    assert.equal(s.participation_mode, "editorial", s.id);
+    const hot = HOT.includes(s.id);
+    assert.equal(s.participation_mode, hot ? "hot_signal" : "editorial", s.id);
     assert.equal(s.site_fulltext, false, s.id);
     assert.equal(s.syndicate_fulltext, false, s.id);
     assert.ok(s.interval_minutes >= 30 && s.interval_minutes <= 1440, s.id);
-    assert.deepEqual(s.config._aihot, { initialBackfillLimit: 8, initialBackfillMonths: 1 }, s.id);
+    assert.deepEqual(
+      s.config._aihot,
+      hot ? { initialBackfillLimit: 10, initialBackfillMonths: 1 } : { initialBackfillLimit: 8, initialBackfillMonths: 1 },
+      s.id,
+    );
     if (s.owner_entity_id) assert.ok(s.owner_entity_id in ENTITIES, `${s.id}: owner ${s.owner_entity_id}`);
     const identity = sourceIdentity(s.kind, s.config)!;
     assert.ok(!identities.has(identity), `${s.id}: duplicate address`);
@@ -67,6 +74,12 @@ test("every game source has a config its kind implements and the agreed defaults
   for (const id of MEDIA) assert.equal(byId.get(id)!.tier, id === "web-nppa-games" ? "T1" : "T2", id);
   for (const id of OFFICIAL) assert.equal(byId.get(id)!.tier, id === "rss-steam-news" ? "T1_5" : "T1", id);
   for (const id of DISABLED_OFFICIAL) assert.equal(byId.get(id)!.enabled, false, id);
+  for (const id of HOT) {
+    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.tier, "T2", id);
+    assert.equal(byId.get(id)!.participation_mode, "hot_signal", id);
+    assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
+  }
   for (const id of ["rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
     assert.notEqual(byId.get(id)!.enabled, false, id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
@@ -219,4 +232,19 @@ test("Larian news list parses dated posts under /news/", async () => {
     assert.ok(c.publishedAt && Number.isFinite(c.publishedAt.getTime()), c.title);
   }
   assert.ok(kept.some((c) => /Hotfix #36/i.test(c.title)), kept.map((c) => c.title).join(" / "));
+});
+
+test("B站/贴吧热榜解析为带日期的热信号条目", async () => {
+  const bili = await readSnapshot(byId.get("json-bilibili-hotword")!);
+  assert.ok(bili.kept.length >= 3, `bili ${bili.kept.length}`);
+  for (const c of bili.kept) {
+    assert.match(c.url, /^https:\/\/search\.bilibili\.com\/all\?keyword=/, c.url);
+    assert.ok(c.publishedAt && Number.isFinite(c.publishedAt.getTime()), c.title);
+  }
+  const tieba = await readSnapshot(byId.get("json-tieba-hottopic")!);
+  assert.ok(tieba.kept.length >= 3, `tieba ${tieba.kept.length}`);
+  for (const c of tieba.kept) {
+    assert.match(c.url, /^https:\/\/tieba\.baidu\.com\/hottopic\/browse\/hottopic\?topic_id=\d+/, c.url);
+    assert.ok(c.publishedAt && Number.isFinite(c.publishedAt.getTime()), c.title);
+  }
 });
