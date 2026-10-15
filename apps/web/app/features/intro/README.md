@@ -9,7 +9,7 @@
 - **Counter-rotate**: each photo runs `Main_imgRotate` (opposite direction/duration of its ring) so images stay upright.
 - **8 slots/ring** at fixed `%` positions (`image--1…8`); square slots + `object-fit: contain`; default **opacity 0.2**.
 - **Photo hover**: hovered cover stays sharp/bright; other covers blur (smooth transition).
-- Center **ENTER**: hover/focus brightens all covers on both rings (CSS `:has`); click dismisses into the site.
+- Center **「进入」**: hover/focus brightens all covers on both rings (CSS `:has`); click dismisses into the site.
 - **Cursor**: system pointer hidden on the splash; a small solid bright-red circular dot follows the pointer (fine pointer only).
 
 Extraction notes: `/workspace/darc-motion-extract/FINDINGS.md`.
@@ -17,7 +17,8 @@ Extraction notes: `/workspace/darc-motion-extract/FINDINGS.md`.
 ## Behavior
 
 - Only home `/` first session (`sessionStorage` `gamehot-intro-seen-v1`).
-- Primary UX: click **ENTER** to dismiss. `Esc` remains as a hidden keyboard hatch (no visible Skip / Esc UI).
+- Primary UX: click **「进入」** to dismiss. `Esc` remains as a hidden keyboard hatch (no visible Skip / Esc UI).
+- Footer tagline: **游戏热点 · 精选资讯** (subtle, bottom-center; clear of GAME|HOT corners).
 - Force replay: `/?intro=1`
 - `prefers-reduced-motion`: settled marks + static rings.
 

@@ -1056,7 +1056,7 @@
 
 /* Main_image — square slots, opacity .2, counter-spin.
    Per-photo hover: hovered stays sharp/bright; siblings blur.
-   Hovering center ENTER brightens the whole wall (:has below). */
+   Hovering center 「进入」 brightens the whole wall (:has below). */
 .intro-splash__photo {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -1116,8 +1116,8 @@
   font-family: inherit;
   font-size: clamp(2.4rem, 6vw, 3.6rem);
   font-weight: 700;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
   color: #ebe9db;
   line-height: 1;
   text-transform: none;
@@ -1132,7 +1132,7 @@
   text-shadow: 0 0 28px rgba(235, 233, 219, 0.42);
   outline: none;
 }
-/* Hovering ENTER lifts every cover on both rings (darc-room wall glow).
+/* Hovering 「进入」 lifts every cover on both rings (darc-room wall glow).
    Wins over photo-sibling blur while the CTA itself is hovered. */
 @media (hover: hover) and (pointer: fine) {
   .intro-splash__stage:has(.intro-splash__cta:hover) .intro-splash__photo,
@@ -1191,8 +1191,8 @@
     height: 90px;
   }
   .intro-splash__cta {
-    letter-spacing: 0.28em;
-    text-indent: 0.28em;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
   }
 }
 
@@ -1209,6 +1209,29 @@
     width: 60px;
     height: 60px;
   }
+}
+
+
+/* Bottom tagline — centered, subtle; stays clear of GAME|HOT corner marks */
+.intro-splash__footer {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 3;
+  margin: 0;
+  transform: translateX(-50%);
+  max-width: min(52vw, 18rem);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: clamp(0.65rem, 1.1vw, 0.75rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  line-height: 1.2;
+  color: rgba(235, 233, 219, 0.42);
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
 }
 
 .intro-splash.is-reduced .intro-splash__mark--left,

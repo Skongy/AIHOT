@@ -8,7 +8,7 @@
  * - 8 fixed %-slots per ring; each image counter-rotates so it stays upright
  * - Square slots + object-fit:contain; default opacity 0.2
  * - Photo hover: hovered cover stays sharp/bright; others blur
- * - Center ENTER hover brightens both rings; click ENTER dismisses
+ * - Center 「进入」 hover brightens both rings; click 「进入」 dismisses
  *
  * Escape dismisses as a hidden keyboard hatch (no visible Skip UI).
  * Seen once per session. Force: ?intro=1
@@ -242,10 +242,14 @@ export function IntroSplash() {
 
         <div className="intro-splash__center">
           <button type="button" className="intro-splash__cta" onClick={dismiss}>
-            ENTER
+            「进入」
           </button>
         </div>
       </div>
+
+      <p className="intro-splash__footer" aria-hidden="true">
+        游戏热点 · 精选资讯
+      </p>
     </div>
   );
 }
