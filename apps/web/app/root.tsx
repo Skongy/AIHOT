@@ -21,6 +21,7 @@ import { apiGet } from "./lib/api.server";
 import { useHydratedFlag } from "./lib/hydration";
 import { titled } from "./lib/seo";
 import { webModules } from "./site-modules";
+import { IntroGate } from "./features/intro/IntroGate";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -136,6 +137,7 @@ export default function App() {
         <Outlet />
       </SiteShell>
       {webModules().map((m) => m.root?.Bottom && <m.root.Bottom key={m.name} />)}
+      <IntroGate />
     </>
   );
 }
