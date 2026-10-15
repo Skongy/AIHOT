@@ -895,16 +895,16 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Intro splash (darc-room–inspired GAME | HOT + elliptical Steam wall)
-   Dark cinematic gate; tokens align with 墨铜 (#0A0A0B / cream ink).
-   Motion cues from dembrandt/designlang on darc-room: ~0.8–1.2s settle, 40s orbit.
+   Intro splash — 1:1 post-beach darc-room Main_* motion
+   Dual rings: big 80vw/40s reverse + small 45vw/30s; img counter-rotate;
+   8 %-slots/ring; opacity .2; GAME|HOT scale(3)→corners. Skip beach.
    --------------------------------------------------------------------------- */
 .intro-splash {
   position: fixed;
   inset: 0;
   z-index: 80;
   overflow: hidden;
-  color: #f3efe7;
+  color: #ebe9db;
   font-family: var(--font-display);
   pointer-events: auto;
   opacity: 1;
@@ -917,58 +917,56 @@
 .intro-splash__bg {
   position: absolute;
   inset: 0;
-  background: #0a0a0b;
+  background: #131414;
 }
+
+/* Wordmarks — InitialLoader: mid-height scale(3) → bottom:6 scale(1) */
 .intro-splash__mark {
   position: absolute;
-  top: 50%;
+  bottom: 50%;
   z-index: 3;
   margin: 0;
-  font-size: clamp(4.5rem, 14vw, 9.5rem);
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 0.9;
   color: #ebe9db;
-  transform: translateY(-50%);
+  transform: translateY(50%) scale(3);
+  transform-origin: left center;
   transition:
-    top 1.2s var(--ease-out-quart),
-    bottom 1.2s var(--ease-out-quart),
-    left 1.2s var(--ease-out-quart),
-    right 1.2s var(--ease-out-quart),
-    font-size 1.2s var(--ease-out-quart),
-    transform 1.2s var(--ease-out-quart);
-  will-change: transform, font-size, top, left, right;
+    bottom 0.8s cubic-bezier(0.19, 1, 0.22, 1),
+    transform 0.8s cubic-bezier(0.19, 1, 0.22, 1),
+    font-size 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: transform, bottom;
   user-select: none;
+  pointer-events: none;
 }
 .intro-splash__mark--left {
-  left: 2.5vw;
+  left: 10px;
+  transform-origin: left center;
   animation: intro-mark-in-left 900ms var(--ease-out-quart) both;
 }
 .intro-splash__mark--right {
-  right: 2.5vw;
+  right: 10px;
+  left: auto;
+  transform-origin: right center;
+  transform: translateY(50%) scale(3);
   animation: intro-mark-in-right 900ms var(--ease-out-quart) both;
 }
-.intro-splash__mark--left.is-settled {
-  top: calc(100% - max(2.6rem, calc(env(safe-area-inset-bottom) + 1.5rem)));
-  left: max(1.25rem, env(safe-area-inset-left));
-  font-size: clamp(1.65rem, 3.2vw, 2.35rem);
-  transform: translateY(-50%);
-  animation: none;
-}
+.intro-splash__mark--left.is-settled,
 .intro-splash__mark--right.is-settled {
-  top: calc(100% - max(2.6rem, calc(env(safe-area-inset-bottom) + 1.5rem)));
-  right: max(1.25rem, env(safe-area-inset-right));
-  font-size: clamp(1.65rem, 3.2vw, 2.35rem);
-  transform: translateY(-50%);
+  bottom: 6px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  transform: translateY(0) scale(1);
   animation: none;
 }
 @keyframes intro-mark-in-left {
-  from { opacity: 0; transform: translate(-18vw, -50%); }
-  to { opacity: 1; transform: translate(0, -50%); }
+  from { opacity: 0; transform: translate(-18vw, 50%) scale(3); }
+  to { opacity: 1; transform: translateY(50%) scale(3); }
 }
 @keyframes intro-mark-in-right {
-  from { opacity: 0; transform: translate(18vw, -50%); }
-  to { opacity: 1; transform: translate(0, -50%); }
+  from { opacity: 0; transform: translate(18vw, 50%) scale(3); }
+  to { opacity: 1; transform: translateY(50%) scale(3); }
 }
 
 .intro-splash__stage {
@@ -979,72 +977,97 @@
   transition: opacity 900ms ease;
   pointer-events: none;
 }
-.intro-splash__stage.is-on { opacity: 1; }
+.intro-splash__stage.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
 
-.intro-splash__orbit {
-  --rx: min(38vw, 520px);
-  --ry: min(32vh, 280px);
+/* Full-viewport clip wrappers (Main_imagesCircleWrapper) */
+.intro-splash__ring-wrap {
   position: absolute;
+  top: 50%;
   left: 50%;
-  top: 48%;
-  width: 0;
-  height: 0;
-  animation: intro-orbit var(--intro-orbit, 40s) linear infinite;
-}
-.intro-splash__slot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  /* Ellipse from unit coords (--ux/--uy in −1…1), then keep cards upright via reverse spin on .card */
-  transform: translate(calc(var(--ux) * var(--rx)), calc(var(--uy) * var(--ry)));
-}
-.intro-splash__card {
-  width: calc(132px * var(--s));
-  aspect-ratio: 16 / 9;
-  margin-left: calc(-66px * var(--s));
-  margin-top: calc(-37px * var(--s));
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  border: 1px solid rgba(243, 239, 231, 0.08);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  background: #121214;
-  animation: intro-orbit-rev var(--intro-orbit, 40s) linear infinite;
+  transform: translate(-50%, -50%);
+  margin-top: -20px;
+  pointer-events: none;
 }
-.intro-splash__card img {
+
+.intro-splash__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Main_imagesCircleBig — 80vw, 40s reverse */
+.intro-splash__ring--big {
+  width: 80vw;
+  height: 80vw;
+  animation: intro-circle-rotate 40s linear infinite reverse;
+}
+/* Main_imagesCircleSmall — 45vw, 30s */
+.intro-splash__ring--small {
+  width: 45vw;
+  height: 45vw;
+  animation: intro-circle-rotate 30s linear infinite;
+}
+
+@keyframes intro-circle-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(1turn); }
+}
+@keyframes intro-img-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(-1turn); }
+}
+
+/* Main_image — square slots, opacity .2, counter-spin */
+.intro-splash__photo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  opacity: 0.2;
+  filter: blur(0);
+  transition: opacity 0.3s, filter 0.8s;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: default;
+}
+.intro-splash__photo:hover {
+  opacity: 1;
+  filter: blur(0);
+}
+.intro-splash__photo--big {
+  width: 160px;
+  height: 160px;
+  animation: intro-img-rotate 40s linear infinite reverse;
+}
+.intro-splash__photo--small {
+  width: 120px;
+  height: 120px;
+  animation: intro-img-rotate 30s linear infinite;
+}
+.intro-splash__photo img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  filter: saturate(0.78) brightness(0.72) contrast(1.05);
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
   user-select: none;
-}
-
-@keyframes intro-orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes intro-orbit-rev {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
 }
 
 .intro-splash__center {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: 50%;
   z-index: 4;
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
-}
-.intro-splash__kicker {
-  margin: 0 0 0.55rem;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: rgba(200, 194, 182, 0.72);
+  margin-top: -20px;
 }
 .intro-splash__cta {
   margin: 0;
@@ -1052,8 +1075,9 @@
   font-weight: 700;
   letter-spacing: 0.35em;
   text-indent: 0.35em;
-  color: #f3efe7;
+  color: #ebe9db;
   line-height: 1;
+  text-transform: none;
 }
 
 .intro-splash__skip {
@@ -1065,17 +1089,17 @@
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.7rem;
-  border: 1px solid rgba(243, 239, 231, 0.18);
-  background: rgba(10, 10, 11, 0.55);
-  color: rgba(243, 239, 231, 0.78);
+  border: 1px solid rgba(235, 233, 219, 0.18);
+  background: rgba(19, 20, 20, 0.55);
+  color: rgba(235, 233, 219, 0.78);
   font-family: var(--font-sans);
   font-size: 12px;
   letter-spacing: 0.06em;
   cursor: pointer;
 }
 .intro-splash__skip:hover {
-  color: #f3efe7;
-  border-color: rgba(243, 239, 231, 0.35);
+  color: #ebe9db;
+  border-color: rgba(235, 233, 219, 0.35);
 }
 .intro-splash__skip:focus-visible {
   outline: 2px solid rgba(196, 164, 132, 0.7);
@@ -1087,15 +1111,53 @@
   letter-spacing: 0.04em;
 }
 
-@media (max-width: 960px) {
-  .intro-splash__orbit {
-    --rx: min(42vw, 200px);
-    --ry: min(28vh, 160px);
+/* Breakpoints mirror darc-room: base = desktop (>1140); smaller viewports enlarge rings */
+@media (min-width: 1920px) {
+  .intro-splash__photo--big {
+    width: 8.333vw;
+    height: 8.333vw;
   }
-  .intro-splash__card {
-    width: calc(96px * var(--s));
-    margin-left: calc(-48px * var(--s));
-    margin-top: calc(-27px * var(--s));
+  .intro-splash__photo--small {
+    width: 6.25vw;
+    height: 6.25vw;
+  }
+}
+
+@media (max-width: 1140px) {
+  .intro-splash__ring--big {
+    width: 95vw;
+    height: 95vw;
+  }
+  .intro-splash__ring--small {
+    width: 50vw;
+    height: 50vw;
+  }
+  .intro-splash__photo--big {
+    width: 145px;
+    height: 145px;
+  }
+  .intro-splash__photo--small {
+    width: 110px;
+    height: 110px;
+  }
+}
+
+@media (max-width: 800px) {
+  .intro-splash__ring--big {
+    width: 135vw;
+    height: 135vw;
+  }
+  .intro-splash__ring--small {
+    width: 70vw;
+    height: 70vw;
+  }
+  .intro-splash__photo--big {
+    width: 120px;
+    height: 120px;
+  }
+  .intro-splash__photo--small {
+    width: 90px;
+    height: 90px;
   }
   .intro-splash__cta {
     letter-spacing: 0.28em;
@@ -1103,17 +1165,30 @@
   }
 }
 
+@media (max-width: 480px) {
+  .intro-splash__ring--big {
+    width: 150vw;
+    height: 150vw;
+  }
+  .intro-splash__photo--big {
+    width: 80px;
+    height: 80px;
+  }
+  .intro-splash__photo--small {
+    width: 60px;
+    height: 60px;
+  }
+}
+
 .intro-splash.is-reduced .intro-splash__mark--left,
 .intro-splash.is-reduced .intro-splash__mark--right {
   animation: none;
-  top: calc(100% - max(2.6rem, calc(env(safe-area-inset-bottom) + 1.5rem)));
-  font-size: clamp(1.65rem, 3.2vw, 2.35rem);
-  transform: translateY(-50%);
+  bottom: 6px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  transform: translateY(0) scale(1);
 }
-.intro-splash.is-reduced .intro-splash__mark--left { left: max(1.25rem, env(safe-area-inset-left)); }
-.intro-splash.is-reduced .intro-splash__mark--right { right: max(1.25rem, env(safe-area-inset-right)); }
-.intro-splash.is-reduced .intro-splash__orbit,
-.intro-splash.is-reduced .intro-splash__card {
+.intro-splash.is-reduced .intro-splash__ring,
+.intro-splash.is-reduced .intro-splash__photo {
   animation: none !important;
 }
 .intro-splash.is-reduced .intro-splash__stage {

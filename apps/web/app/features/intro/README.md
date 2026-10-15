@@ -1,22 +1,32 @@
 # Intro splash（开场）
 
-Darc-room 风格的全屏开场：`GAME` / `HOT` 从左右滑入并缩到底角字标，随后椭圆 Steam 缩略图墙缓慢环绕，中心显示「探索」。
+1:1 post-beach recreation of [darc-room.com](https://www.darc-room.com/) Main photo wall for GAMEHOT.
 
-## 行为（当前）
+## Motion (matched to original CSS)
 
-- 仅首页 `/`（精选）首次会话展示（`sessionStorage` 键 `gamehot-intro-seen-v1`）。
-- **未接线「点击探索进入」**；临时用右上角「跳过」或 `Esc` 关闭，便于开发与浏览站内其他内容。
-- 强制重放：`/?intro=1`
-- 尊重 `prefers-reduced-motion`：直接落到落位字标 + 静态图墙。
+- **GAME | HOT**: slide in large at mid-height (`scale(3)`), settle to bottom corners (`scale(1)`, `bottom: 6px`) — same model as InitialLoader DARC|ROOM (beach skipped).
+- **Dual rings**: outer `80vw` / `40s linear infinite reverse`; inner `45vw` / `30s linear infinite` (`Main_circleRotate`).
+- **Counter-rotate**: each photo runs `Main_imgRotate` (opposite direction/duration of its ring) so images stay upright.
+- **8 slots/ring** at fixed `%` positions (`image--1…8`); square slots + `object-fit: contain`; default **opacity 0.2**, hover → 1.
+- Center **「探索」**.
 
-## 资源
+Extraction notes: `/workspace/darc-motion-extract/FINDINGS.md`.
 
-- 缩略图：`apps/web/public/intro/*.jpg`（约 480×270，从 Steam header 居中裁切）。
-- 清单：`images.ts`（墙面约用 20 张）。
+## Behavior
 
-## 预览
+- Only home `/` first session (`sessionStorage` `gamehot-intro-seen-v1`).
+- Enter on 「探索」 not wired yet; 「跳过」 / `Esc` dismisses.
+- Force replay: `/?intro=1`
+- `prefers-reduced-motion`: settled marks + static rings.
+
+## Assets
+
+- `apps/web/public/intro/*.jpg` (~480×270 Steam headers)
+- `images.ts` — first 16 of `INTRO_WALL` (8 big + 8 small)
+
+## Preview
 
 ```bash
 npm run dev:web
-# 打开 http://127.0.0.1:3000/?intro=1
+# http://127.0.0.1:3000/?intro=1
 ```

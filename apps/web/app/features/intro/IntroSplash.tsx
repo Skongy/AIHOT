@@ -1,42 +1,53 @@
 /**
  * Darc-room–inspired opening splash for GAMEHOT.
- * Choreography: GAME | HOT slide in → shrink to bottom corners → elliptical Steam thumb wall + 「探索」.
- * Enter is not wired yet; Escape / 「跳过」 dismisses for now. Seen once per session (sessionStorage).
- * Force replay: ?intro=1
+ *
+ * Motion model matched to https://www.darc-room.com/ Main_* CSS (post-beach):
+ * - GAME | HOT slide in large at mid-height, then shrink to bottom corners
+ *   (InitialLoader: scale(3) @ bottom:50% → scale(1) @ bottom:6)
+ * - Dual concentric rings: outer 80vw / 40s reverse, inner 45vw / 30s
+ * - 8 fixed %-slots per ring; each image counter-rotates so it stays upright
+ * - Square slots + object-fit:contain; default opacity 0.2; hover → 1
+ * - Center 「探索」; skip beach loader
+ *
+ * Escape / 「跳过」 dismisses. Seen once per session. Force: ?intro=1
  */
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { INTRO_WALL } from "./images";
 
 const STORAGE_KEY = "gamehot-intro-seen-v1";
 const ENTER_MS = 900;
 const SETTLE_MS = 1300;
 const EXIT_MS = 480;
-/** Ambient orbit period — matches darc-room Main_imgRotate (~40s). */
-const ORBIT_S = 40;
+
+/** Exact slot percentages from Main_image--1…8 on darc-room. */
+const SLOT_POS = [
+  { left: "50%", top: "0%" },
+  { left: "15%", top: "15%" },
+  { left: "0%", top: "50%" },
+  { left: "15%", top: "85%" },
+  { left: "50%", top: "100%" },
+  { left: "85%", top: "85%" },
+  { left: "100%", top: "50%" },
+  { left: "85%", top: "15%" },
+] as const;
 
 type Phase = "enter" | "settle" | "ambient" | "exit";
 
-type Slot = {
+type RingSlot = {
   src: string;
   alt: string;
-  /** Unit circle coords before ellipse scale (−1…1). */
-  ux: number;
-  uy: number;
-  scale: number;
+  left: string;
+  top: string;
 };
 
-function buildSlots(): Slot[] {
-  const n = INTRO_WALL.length;
-  return INTRO_WALL.map((thumb, i) => {
-    const t = (Math.PI * 2 * i) / n + Math.sin(i * 1.7) * 0.06;
-    const radial = 0.9 + ((i * 13) % 11) / 80;
-    return {
-      ...thumb,
-      ux: Math.cos(t) * radial,
-      uy: Math.sin(t) * radial,
-      scale: 0.78 + ((i * 37) % 17) / 50,
-    };
-  });
+function buildRings(): { big: RingSlot[]; small: RingSlot[] } {
+  const thumbs = INTRO_WALL.slice(0, 16);
+  while (thumbs.length < 16) {
+    thumbs.push(INTRO_WALL[thumbs.length % INTRO_WALL.length]!);
+  }
+  const big = SLOT_POS.map((pos, i) => ({ ...thumbs[i]!, ...pos }));
+  const small = SLOT_POS.map((pos, i) => ({ ...thumbs[i + 8]!, ...pos }));
+  return { big, small };
 }
 
 function forceIntro(): boolean {
@@ -75,7 +86,7 @@ export function IntroSplash() {
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<Phase>("enter");
   const [reduce, setReduce] = useState(false);
-  const slots = useMemo(buildSlots, []);
+  const rings = useMemo(buildRings, []);
 
   useEffect(() => {
     if (alreadySeen()) return;
@@ -142,36 +153,51 @@ export function IntroSplash() {
     >
       <div className="intro-splash__bg" aria-hidden="true" />
 
-      <div className={`intro-splash__mark intro-splash__mark--left${settled ? " is-settled" : ""}`} aria-hidden="true">
+      <div
+        className={`intro-splash__mark intro-splash__mark--left${settled ? " is-settled" : ""}`}
+        aria-hidden="true"
+      >
         GAME
       </div>
-      <div className={`intro-splash__mark intro-splash__mark--right${settled ? " is-settled" : ""}`} aria-hidden="true">
+      <div
+        className={`intro-splash__mark intro-splash__mark--right${settled ? " is-settled" : ""}`}
+        aria-hidden="true"
+      >
         HOT
       </div>
 
       <div className={`intro-splash__stage${showWall ? " is-on" : ""}`} aria-hidden={showWall ? undefined : true}>
-        <div className="intro-splash__orbit" style={{ "--intro-orbit": `${ORBIT_S}s` } as CSSProperties}>
-          {slots.map((slot) => (
-            <div
-              key={slot.src}
-              className="intro-splash__slot"
-              style={
-                {
-                  "--ux": String(slot.ux),
-                  "--uy": String(slot.uy),
-                  "--s": String(slot.scale),
-                } as CSSProperties
-              }
-            >
-              <div className="intro-splash__card">
-                <img src={slot.src} alt="" width={480} height={270} loading="eager" decoding="async" draggable={false} />
+        {/* Outer ring — Main_imagesCircleBig: 80vw, 40s reverse */}
+        <div className="intro-splash__ring-wrap">
+          <div className="intro-splash__ring intro-splash__ring--big">
+            {rings.big.map((slot, i) => (
+              <div
+                key={`big-${slot.src}-${i}`}
+                className="intro-splash__photo intro-splash__photo--big"
+                style={{ left: slot.left, top: slot.top }}
+              >
+                <img src={slot.src} alt="" width={160} height={160} loading="eager" decoding="async" draggable={false} />
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        {/* Inner ring — Main_imagesCircleSmall: 45vw, 30s */}
+        <div className="intro-splash__ring-wrap">
+          <div className="intro-splash__ring intro-splash__ring--small">
+            {rings.small.map((slot, i) => (
+              <div
+                key={`small-${slot.src}-${i}`}
+                className="intro-splash__photo intro-splash__photo--small"
+                style={{ left: slot.left, top: slot.top }}
+              >
+                <img src={slot.src} alt="" width={120} height={120} loading="eager" decoding="async" draggable={false} />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="intro-splash__center">
-          <p className="intro-splash__kicker">GAMEHOT</p>
           <p className="intro-splash__cta">探索</p>
         </div>
       </div>
