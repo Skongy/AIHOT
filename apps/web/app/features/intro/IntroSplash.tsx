@@ -6,12 +6,14 @@
  *   (InitialLoader: scale(3) @ bottom:50% → scale(1) @ bottom:6)
  * - Dual concentric rings: outer 80vw / 40s reverse, inner 45vw / 30s
  * - 8 fixed %-slots per ring; each image counter-rotates so it stays upright
- * - Square slots + object-fit:contain; default opacity 0.2; photo hover → 1
- * - Center 「探索」 hover brightens both rings; skip beach loader
+ * - Square slots + object-fit:contain; default opacity 0.2
+ * - Photo hover: hovered cover stays sharp/bright; others blur
+ * - Center ENTER hover brightens both rings; click ENTER dismisses
  *
- * Escape / 「跳过」 dismisses. Seen once per session. Force: ?intro=1
+ * Escape dismisses as a hidden keyboard hatch (no visible Skip UI).
+ * Seen once per session. Force: ?intro=1
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { INTRO_WALL } from "./images";
 
 const STORAGE_KEY = "gamehot-intro-seen-v1";
@@ -82,10 +84,17 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function finePointer(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 export function IntroSplash() {
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<Phase>("enter");
   const [reduce, setReduce] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   const rings = useMemo(buildRings, []);
 
   useEffect(() => {
@@ -137,6 +146,33 @@ export function IntroSplash() {
     };
   }, [active, dismiss]);
 
+  /* Custom period-sized solid red cursor on the splash only (fine pointer). */
+  useEffect(() => {
+    if (!active || !finePointer()) return;
+    const el = cursorRef.current;
+    const root = rootRef.current;
+    if (!el || !root) return;
+
+    const move = (e: PointerEvent) => {
+      el.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
+      if (!el.classList.contains("is-on")) {
+        el.classList.add("is-on");
+        root.classList.add("has-cursor");
+      }
+    };
+    const leave = () => {
+      el.classList.remove("is-on");
+      root.classList.remove("has-cursor");
+    };
+
+    window.addEventListener("pointermove", move, { passive: true });
+    document.documentElement.addEventListener("mouseleave", leave);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      document.documentElement.removeEventListener("mouseleave", leave);
+    };
+  }, [active]);
+
   if (!active) return null;
 
   const settled = phase === "settle" || phase === "ambient" || phase === "exit";
@@ -145,6 +181,7 @@ export function IntroSplash() {
 
   return (
     <div
+      ref={rootRef}
       className={`intro-splash${exiting ? " is-exit" : ""}${reduce ? " is-reduced" : ""}`}
       role="dialog"
       aria-modal="true"
@@ -152,6 +189,12 @@ export function IntroSplash() {
       data-phase={phase}
     >
       <div className="intro-splash__bg" aria-hidden="true" />
+
+      <div
+        ref={cursorRef}
+        className="intro-splash__cursor"
+        aria-hidden="true"
+      />
 
       <div
         className={`intro-splash__mark intro-splash__mark--left${settled ? " is-settled" : ""}`}
@@ -198,16 +241,11 @@ export function IntroSplash() {
         </div>
 
         <div className="intro-splash__center">
-          <p className="intro-splash__cta" tabIndex={0}>
-            探索
-          </p>
+          <button type="button" className="intro-splash__cta" onClick={dismiss}>
+            ENTER
+          </button>
         </div>
       </div>
-
-      <button type="button" className="intro-splash__skip" onClick={dismiss}>
-        跳过
-        <span className="intro-splash__skip-hint">Esc</span>
-      </button>
     </div>
   );
 }
