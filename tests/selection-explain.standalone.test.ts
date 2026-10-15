@@ -2,6 +2,7 @@ import "./setup.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ScoreSchema, averageScoreAxes } from "@aihot/backend/editorial/analyze";
+import { SELECTION } from "@aihot/industry/selection";
 import {
   buildSelectionExplain,
   buildSelectionHint,
@@ -75,7 +76,7 @@ test("buildSelectionHint is compact for cards", () => {
   const h = buildSelectionHint({ score: 80, selected: true, sourceTier: "T2" });
   assert.deepEqual(h, {
     score: 80,
-    threshold: 60,
+    threshold: SELECTION.thresholds.T2,
     sourceTier: "T2",
     sourceTierLabel: "媒体与个人",
   });
