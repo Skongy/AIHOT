@@ -6,8 +6,8 @@
  *   (InitialLoader: scale(3) @ bottom:50% → scale(1) @ bottom:6)
  * - Dual concentric rings: outer 80vw / 40s reverse, inner 45vw / 30s
  * - 8 fixed %-slots per ring; each image counter-rotates so it stays upright
- * - Square slots + object-fit:contain; default opacity 0.2; hover → 1
- * - Center 「探索」; skip beach loader
+ * - Square slots + object-fit:contain; default opacity 0.2; photo hover → 1
+ * - Center 「探索」 hover brightens both rings; skip beach loader
  *
  * Escape / 「跳过」 dismisses. Seen once per session. Force: ?intro=1
  */
@@ -198,7 +198,9 @@ export function IntroSplash() {
         </div>
 
         <div className="intro-splash__center">
-          <p className="intro-splash__cta">探索</p>
+          <p className="intro-splash__cta" tabIndex={0}>
+            探索
+          </p>
         </div>
       </div>
 

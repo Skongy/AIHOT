@@ -897,7 +897,7 @@
 /* ---------------------------------------------------------------------------
    Intro splash — 1:1 post-beach darc-room Main_* motion
    Dual rings: big 80vw/40s reverse + small 45vw/30s; img counter-rotate;
-   8 %-slots/ring; opacity .2; GAME|HOT scale(3)→corners. Skip beach.
+   8 %-slots/ring; opacity .2; CTA hover brightens wall; GAME|HOT scale(3)→corners. Skip beach.
    --------------------------------------------------------------------------- */
 .intro-splash {
   position: fixed;
@@ -1024,20 +1024,23 @@
   to { transform: translate(-50%, -50%) rotate(-1turn); }
 }
 
-/* Main_image — square slots, opacity .2, counter-spin */
+/* Main_image — square slots, opacity .2, counter-spin.
+   Per-photo hover → 1; hovering center 「探索」 brightens the whole wall. */
 .intro-splash__photo {
   position: absolute;
   transform: translate(-50%, -50%);
   opacity: 0.2;
-  filter: blur(0);
-  transition: opacity 0.3s, filter 0.8s;
+  filter: brightness(1);
+  transition:
+    opacity 0.55s cubic-bezier(0.19, 1, 0.22, 1),
+    filter 0.8s cubic-bezier(0.19, 1, 0.22, 1);
   overflow: hidden;
   pointer-events: auto;
   cursor: default;
 }
 .intro-splash__photo:hover {
   opacity: 1;
-  filter: blur(0);
+  filter: brightness(1.05);
 }
 .intro-splash__photo--big {
   width: 160px;
@@ -1078,6 +1081,25 @@
   color: #ebe9db;
   line-height: 1;
   text-transform: none;
+  pointer-events: auto;
+  cursor: default;
+  transition:
+    color 0.4s cubic-bezier(0.19, 1, 0.22, 1),
+    text-shadow 0.55s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.intro-splash__cta:hover,
+.intro-splash__cta:focus-visible {
+  color: #fff;
+  text-shadow: 0 0 28px rgba(235, 233, 219, 0.42);
+  outline: none;
+}
+/* Hovering 「探索」 lifts every cover on both rings (darc-room wall glow). */
+@media (hover: hover) and (pointer: fine) {
+  .intro-splash__stage:has(.intro-splash__cta:hover) .intro-splash__photo,
+  .intro-splash__stage:has(.intro-splash__cta:focus-visible) .intro-splash__photo {
+    opacity: 0.88;
+    filter: brightness(1.12);
+  }
 }
 
 .intro-splash__skip {
