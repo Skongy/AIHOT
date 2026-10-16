@@ -19,6 +19,23 @@
 
 ## 先预览，再创建
 
+GAMEHOT 的种子信源包含六家海外媒体（2026-10-16 核验）：
+
+| 信源 | 语言 | 免费订阅入口 | 列表过滤 |
+|---|---|---|---|
+| PC Gamer | 英文 | `https://www.pcgamer.com/rss/` | 限本站链接 |
+| Rock Paper Shotgun | 英文 | `https://www.rockpapershotgun.com/feed` | 限本站链接 |
+| Gematsu | 英文 | `https://www.gematsu.com/feed` | 限本站链接 |
+| AUTOMATON | 日文 | `https://automaton-media.com/feed/` | 限 `/articles/`，排除标为 `PR` 的推广稿 |
+| 4Gamer | 日文 | `https://www.4gamer.net/rss/index.xml` | 限本站链接，沿用现有 RDF 解析 |
+| VGC | 英文 | `https://www.videogameschronicle.com/feed/` | 限本站链接，排除 `/guide/` 攻略页，保留新闻与采访 |
+
+六家均使用现有 `rss` 采集器、`T2` 媒体分级和 `editorial` 参与方式，每 60 分钟抓取；首次最多回灌近一个月的 8 条。AUTOMATON 仅接日文版，避免同时接英文版带来同站重复。其他导购、硬件与手游内容继续由现有预筛和精选规则判断，不额外改评分门槛。
+
+合入并部署后，现有 setup 中的 `scripts/seed.ts` 会按新 ID 补入这些源，保留已存在源的后台配置；仅推送功能分支不会触发 main 的自动部署。订阅不需要 API key，不启用 Jina、X 等付费采集服务，也不修改 `COLLECT_ENABLED` 或 `MODEL_CALLS_ENABLED`。新增源的 `site_fulltext`、`syndicate_fulltext` 均为 `false`，仍只公开摘要与原文链接。
+
+离线测试快照位于 `tests/fixtures/game-sources/rss-{pcgamer,rockpapershotgun,gematsu,automaton-jp,4gamer,vgc}.xml`，保留真实标题、链接、时间和分类，省略正文；测试只读取本地快照，不请求媒体网站。
+
 进入 `/admin/sources/new`，填写 ID、名称，选择类型，再把[下一节](#每种信源怎么配置)对应的 JSON 填入“采集配置（JSON）”。这里填的是配置对象，不要包上 `kind` 或 `config`。切换类型会重置配置，先选类型再粘贴。
 
 名称里全角括号中的备注（比如“某媒体（热点 RSS）”）只给后台看，读者在网页、RSS、Agent Markdown、MCP 和搜索里看到的是去掉备注的名字；X 账号写成 `X：显示名 (@handle)` 的，读者只看到显示名。公开 API 的 JSON 里仍是完整的名字。
