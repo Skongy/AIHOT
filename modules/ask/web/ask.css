@@ -1,3 +1,33 @@
+/* Include the surrounding shell while Ask is mounted; client navigation restores the site palette. */
+:root:not([data-theme="dark"]):has(.ask-page) {
+ --bg:#F3F4F6;
+ --bg-elevated:#FAFBFC;
+ --bg-sunk:#E8EBEF;
+ --bg-muted:#E8EBEF;
+ --surface:#FFFFFF;
+ --surface-hover:#E8EBEF;
+ --surface-2:#FAFBFC;
+ --raised:#FAFBFC;
+ --sidebar:#FAFBFC;
+ --daybar:#E8EBEF;
+ --field:#E8EBEF;
+ --ink:#20242B;
+ --ink-2:#37414C;
+ --ink-3:#53606E;
+ --ink-4:#626B76;
+ --text:#20242B;
+ --text-secondary:#37414C;
+ --muted:#626B76;
+ --note:#626B76;
+ --line:#D8DDE3;
+ --line-strong:#CBD2DB;
+ --line-soft:#E2E6EB;
+ --border:#D8DDE3;
+ --border-strong:#CBD2DB;
+ --accent-contrast:#FFFFFF;
+}
+:root:not([data-theme="dark"]) .ask-send:not(:disabled) { background:var(--accent); color:var(--accent-contrast); }
+:root:not([data-theme="dark"]) .ask-send:hover:not(:disabled) { background:var(--accent-ink); }
 .ask-page { max-width:1040px; margin:0 auto; min-height:calc(100dvh - 72px); padding-bottom:32px; font-family:var(--font-sans); }
 .ask-page button { cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .ask-page button:disabled { cursor:default; }
