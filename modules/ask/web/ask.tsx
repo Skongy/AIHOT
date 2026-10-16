@@ -49,6 +49,10 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
   </article>;
 }
 const contextSuffix = /\n\n关于这篇站内资讯：(\/items\/[a-zA-Z0-9_-]+)$/;
+// Finish instead of cancel: moving focus away must not start the entrance again.
+function finishEntrance(element: HTMLElement) {
+  for (const animation of element.getAnimations()) animation.finish();
+}
 export default function AskPage() {
   const chat = useAsk(); const [params, setParams] = useSearchParams(); const articleId = params.get("article");
   const [context, setContext] = useState<{ id: string; title: string; sourceName: string } | null>(null);
@@ -85,13 +89,13 @@ export default function AskPage() {
   return <div className={`ask-page${empty ? " is-empty" : ""}`}>
     <header className="ask-page-header"><Link to="/ask" className="ask-page-name">AI 问答</Link><button type="button" className="ask-new-chat" disabled={chat.busy || chat.restoring} onClick={() => { chat.reset(); setInput(""); follow.current = false; }}><Glyph name="plus" size={16}/>新对话</button></header>
     {empty && !chat.restoring && <section className="ask-intro" aria-labelledby="ask-heading"><div className="ask-intro-mark" aria-hidden="true"><span/><span/><span/></div>
-      <h1 id="ask-heading">游戏圈的消息，<br/>帮你理清楚。</h1><p>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</p></section>}
+      <h1 id="ask-heading"><span className="ask-title-line">游戏圈的消息，</span><span className="ask-title-line">帮你理清楚。</span></h1><p>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</p></section>}
     {chat.restoring && <p className="ask-restore" role="status">正在恢复对话…</p>}
     {!empty && <div className="ask-conversation" aria-label="问答记录"><h1 className="sr-only">AI 问答记录</h1>{chat.messages.map((m, i) => m.role === "user"
       ? <div className="ask-user" key={m.key}><span className="ask-user-label">你</span><p>{m.text.replace(contextSuffix, "")}{m.text.match(contextSuffix)?.[1] && <Link className="ask-user-context" to={m.text.match(contextSuffix)![1]!}>附带资讯</Link>}</p></div>
       : <div key={m.key}><AssistantMessage message={m} busy={chat.busy} onPick={pick}/>{m.status === "send_failed" && <button className="ask-retry" type="button" disabled={chat.busy} onClick={() => { const user = chat.messages[i - 1]; if (user?.requestId) { follow.current = true; void chat.send(user.text, user); } }}>重试发送</button>}</div>)}</div>}
     <div ref={bottom} className="ask-bottom-anchor"/>
-    <div className="ask-composer-area">
+    {!chat.restoring && <div className="ask-composer-area" onFocusCapture={(event) => finishEntrance(event.currentTarget)}>
       {showLatest && <button type="button" className="ask-latest" onClick={() => { follow.current = true; bottom.current?.scrollIntoView({ behavior: "instant", block: "end" }); }}>回到最新回答 ↓</button>}
       {chat.disconnected && <p className="ask-notice" role="status">连接中断，正在恢复。已提交的任务仍会继续，请勿重复发送。</p>}
       {chat.error && <p className="ask-error" role="alert">{chat.error}</p>}
@@ -105,7 +109,7 @@ export default function AskPage() {
         <div className="ask-composer-toolbar"><span id="ask-input-note">{tooLong ? "问题与附带资讯合计不能超过2000字" : chat.busy ? "可以先写下一个问题" : "Enter 发送，Shift + Enter 换行"}</span>{chat.busy ? <button type="button" className="ask-send is-stop" onClick={() => void chat.stop()} aria-label="停止生成"><span/>停止</button> : <button type="submit" className="ask-send" disabled={!canSend} aria-label="发送问题"><Glyph name="send" size={20}/></button>}</div>
       </form>
       <p className="ask-footnote">依据站内公开报道回答，附来源供核对。<span>不搜全网，不提供游戏攻略。</span></p>
-    </div>
-    {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
+    </div>}
+    {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
   </div>;
 }
