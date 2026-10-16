@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { getTask, listEventsAfter, redactEventPayload, type TaskRow } from "../db/store.ts";
+import { currentEvidence } from "../agent/evidence.ts";
 
 const TERMINAL = new Set(["completed", "completed_degraded", "failed", "cancelled", "limit_reached"]);
 
@@ -25,12 +26,17 @@ export async function attachAskSse(req: FastifyRequest, reply: FastifyReply, tas
   };
 
   let closed = false;
+  let terminalChecked = false;
   req.raw.on("close", () => { closed = true; });
 
   // Replay then poll for new events. Opening SSE does not call the model or cancel the task.
   while (!closed) {
     const cur = await getTask(task.id);
     if (!cur) break;
+    if (TERMINAL.has(cur.status) && !terminalChecked) {
+      if ((await currentEvidence(cur)).invalidated) cur.content_invalidated = true;
+      terminalChecked = true;
+    }
     const batch = await listEventsAfter(task.id, cursor, 100);
     for (const ev of batch) {
       if (ev.seq <= cursor) continue;

@@ -556,6 +556,11 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             </div>
           )}
 
+          <div className="mt-6">
+            <Link to={`/ask?article=${encodeURIComponent(item.id)}`} className="inline-flex min-h-11 items-center gap-2 rounded-control border border-line px-3.5 text-[13px] text-accent transition-colors hover:bg-bg-sunk">
+              问问这篇资讯 <span aria-hidden="true">↗</span>
+            </Link>
+          </div>
           {item.story && <StoryFollowups story={item.story} currentId={item.id} />}
 
           {related.length > 0 && (

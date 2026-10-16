@@ -1,11 +1,14 @@
-// In-site Agent whitelist: seven tools. Adapts publication/agent + explain tools; no HTTP round-trip.
+// In-site Agent tools. All article reads use the shared publication layer.
 import { z } from "zod";
 import { PUBLIC_API_CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { mcpToolName } from "@aihot/contracts/mcp";
 import {
-  latestAnswer, searchAnswer, searchItems, hotAnswer, storyAnswer, dailyAnswer, type AgentWindow,
+  hotAnswer, storyAnswer, dailyAnswer,
 } from "@aihot/backend/publication/agent";
-import { v1Items } from "@aihot/backend/publication/v1";
+import { askItems } from "@aihot/backend/publication/ask";
+import { loadItemDetail } from "@aihot/backend/publication/detail";
+import { InvalidCursorError } from "@aihot/backend/lib/cursor";
+import { askAliases, askRange, type AskRangeInput } from "./search-query.ts";
 import { resolveStory, v1HotTopics, v1Story } from "@aihot/backend/publication/stories";
 import { dailyWithNotes } from "@aihot/backend/publication/reports";
 import { isValidDate } from "@aihot/contracts/time";
@@ -20,6 +23,7 @@ export const ASK_TOOL_NAMES = [
   "explain_selection",
   "explain_hot",
   "get_daily",
+  "get_article",
 ] as const;
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
@@ -32,20 +36,28 @@ export const ASK_TOOL_LABELS_ZH: Record<AskToolName, string> = {
   explain_selection: "解释入选",
   explain_hot: "解释上榜",
   get_daily: "查日报",
+  get_article: "读这篇资讯",
 };
 
 const categorySchema = z.enum(PUBLIC_API_CATEGORY_KEYS as unknown as [string, ...string[]]).optional();
+const rangeSchema = {
+  window: z.enum(["1h", "24h", "7d", "30d", "all"]).optional().describe("滚动时间；all=全部历史。指定 from/until 时优先使用日期范围。"),
+  from: z.string().max(40).optional().describe("开始（含）：YYYY-MM-DD 按北京时间，或带时区 ISO 时间。"),
+  until: z.string().max(40).optional().describe("结束：日期包含当天；ISO 时间不含该时刻。今天用北京时间当日日期作为 from。"),
+  cursor: z.string().max(4096).optional().describe("下一页游标，保持其余查询参数和 mode 不变，不要编造。"),
+};
 
 const SCHEMAS: Record<AskToolName, z.ZodType> = {
   get_latest: z.object({
-    window: z.enum(["24h", "7d"]).optional().describe("时间窗口：24h=过去24小时（默认），7d=最近7天。没有1小时参数；短窗口请取24h结果后按「站内时间」自行过滤。"),
+    ...rangeSchema,
     mode: z.enum(["selected", "all"]).optional().describe("selected=精选（默认，与精选页一致）；all=全部公开动态。问精选时务必用 selected。"),
     category: categorySchema,
-    limit: z.number().int().min(1).max(30).optional().describe("最多返回条数，1–30，默认10。查「最近一小时」时可提到30以便过滤。"),
+    limit: z.number().int().min(1).max(30).optional().describe("每页条数，1–30，默认10。有 nextCursor 表示仅为部分结果。"),
   }).strict(),
   search: z.object({
     q: z.string().min(2).max(200).describe("搜索词，2–200字。"),
-    window: z.enum(["24h", "7d"]).optional().describe("搜索窗口，默认7d；只看今天用24h。"),
+    ...rangeSchema,
+    mode: z.enum(["selected", "all"]).optional().describe("省略时先查精选，无结果扩到全部。翻页须使用返回的 mode。"),
     category: categorySchema,
     limit: z.number().int().min(1).max(30).optional().describe("最多返回条数，1–30，默认10。"),
   }).strict(),
@@ -53,7 +65,7 @@ const SCHEMAS: Record<AskToolName, z.ZodType> = {
     limit: z.number().int().min(1).max(10).optional().describe("热点条数，1–10，默认10。"),
   }).strict(),
   get_story: z.object({
-    public_id: z.string().min(1).max(128).describe("事件公开 ID，须来自 get_hot_topics 返回值，不要猜测。"),
+    public_id: z.string().min(1).max(128).describe("事件公开 ID，来自用户站内链接、历史出处或工具返回，不要猜测。"),
     limit: z.number().int().min(1).max(50).optional().describe("时间线条数，1–50，默认20。"),
   }).strict(),
   explain_selection: z.object({
@@ -65,16 +77,18 @@ const SCHEMAS: Record<AskToolName, z.ZodType> = {
   get_daily: z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("可选真实日历日期 YYYY-MM-DD；省略则取最新一期日报。"),
   }).strict(),
+  get_article: z.object({ article_id: z.string().min(1).max(128).describe("用户当前文章 /items/… 或工具返回的资讯 ID。") }).strict(),
 };
 
 const ASK_TOOL_DESCRIPTIONS: Record<AskToolName, string> = {
-  get_latest: "查近期资讯（精选或全部）。默认 mode=selected、window=24h。无独立1小时窗口：先拉24h精选，再按结果「站内时间」（与精选页一致）过滤；不要只用原文发布时间。列表仅供浏览，不会登记为可引用「来源」。",
-  search: "按关键词站内搜索。先查精选，精选无结果时自动扩到全部公开动态。",
+  get_latest: "按精确时间范围查近期资讯；默认精选、过去24小时。支持1h/7d/30d/全部历史、自定义日期及游标翻页。不用于具名游戏搜索。",
+  search: "按游戏或关键词查站内报道，自动匹配中英文别名。q 使用游戏名，可附空格分隔的关键词。默认近7天，支持全部历史、日期及翻页；先精选，无结果扩到全部。",
   get_hot_topics: "查当前热点榜（多信源同时讨论的事件）。",
-  get_story: "查某一热点事件的来龙去脉与报道时间线；public_id 必须来自 get_hot_topics。",
+  get_story: "查事件的来龙去脉与报道时间线；public_id 来自用户站内链接、历史出处或工具返回。",
   explain_selection: "解释某条目为何入选精选（评分与门槛说明）。",
   explain_hot: "解释某事件为何上热点榜。",
-  get_daily: "查本站编辑过的 AI 日报（固定成品，不是过去24小时滚动列表）。省略 date 取最新一期；指定 date=YYYY-MM-DD 取该日。问「今天日报／某日日报」用本工具，不要用 get_latest 冒充。",
+  get_daily: "查本站游戏日报成品。省略 date 取最新一期；今天须指定北京时间日期。不要用滚动资讯列表冒充日报。",
+  get_article: "读取指定公开资讯的标题、摘要、来源、时间与关联事件，供文章上下文提问和连续追问。不能据摘要补写全文细节。",
 };
 
 /** OpenAI tool specs for the model (short names). */
@@ -143,41 +157,46 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
 
   try {
     switch (tool) {
-      case "get_latest": {
-        const a = parsed.data as { window?: AgentWindow; mode?: "selected" | "all"; category?: string | null; limit?: number };
-        const p = {
-          window: (a.window ?? "24h") as AgentWindow,
-          mode: (a.mode ?? "selected") as "selected" | "all",
-          category: (a.category ?? null) as never,
-          limit: a.limit ?? 10,
-        };
-        const res = await v1Items({ ...p, by: "timeline", q: null, cursor: null });
-        const text = truncate(latestAnswer(res, p));
-        const count = (res.items ?? []).slice(0, p.limit).length;
-        // Timeline / recent-list dumps are browsing context for the model, not query-matched
-        // hits. Do not register them as citeable 来源 (avoids empty-search fallbacks showing
-        // unrelated DOOM/MTG/etc. items under「来源 N」).
-        return { ok: true, name: tool, text, structured: { count, mode: p.mode }, evidence: [] };
-      }
+      case "get_latest":
       case "search": {
-        const a = parsed.data as { q: string; window?: AgentWindow; category?: string | null; limit?: number };
-        const window = (a.window ?? "7d") as AgentWindow;
-        const category = (a.category ?? null) as never;
-        const limit = a.limit ?? 10;
-        const found = await searchItems(a.q, window, category, limit);
-        const text = truncate(searchAnswer(found, { q: a.q, window, category }));
-        const evidence: EvidenceCandidate[] = (found.res.items ?? []).slice(0, limit).map((it: { id: string; title: string; sourceName?: string; source?: { name: string }; publishedAt?: string | null; links?: { original?: string } }) => ({
-          kind: "item" as const,
-          objectId: it.id,
-          title: it.title,
-          sourceName: it.sourceName ?? it.source?.name ?? null,
-          publishedAt: it.publishedAt ?? null,
-          siteUrl: `/items/${it.id}`,
-          originalUrl: it.links?.original ?? null,
-          toolName: tool,
-          rawRef: { id: it.id, q: a.q },
+        const a = parsed.data as AskRangeInput & { q?: string; mode?: "selected" | "all"; category?: typeof PUBLIC_API_CATEGORY_KEYS[number]; limit?: number; cursor?: string };
+        let range;
+        try { range = askRange(a, tool === "search" ? "7d" : "24h"); }
+        catch (e) { return { ok: false, name: tool, errorCode: "invalid_arguments", message: String((e as Error).message) }; }
+        const queries = tool === "search" ? askAliases(a.q!) : [];
+        const base = { queries, category: a.category, limit: a.limit ?? 10, cursor: a.cursor, ...range,
+          rangeKey: JSON.stringify([a.window ?? (tool === "search" ? "7d" : "24h"), a.from ?? null, a.until ?? null]) };
+        let mode = a.mode ?? "selected";
+        let res = await askItems({ ...base, mode });
+        let expanded = false;
+        if (tool === "search" && !a.mode && !a.cursor && !res.items.length) {
+          mode = "all";
+          expanded = true;
+          res = await askItems({ ...base, mode });
+        }
+        const evidence: EvidenceCandidate[] = res.items.map((it) => ({
+          kind: "item", objectId: it.id, title: it.title, sourceName: it.source.name,
+          publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original,
+          toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty },
         }));
-        return { ok: true, name: tool, text, structured: { expanded: found.expanded, count: evidence.length }, evidence };
+        const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries };
+        const text = JSON.stringify({ scope: mode === "selected" ? "精选" : "全部公开动态（含未入选）", ...structured,
+          note: "时间范围按站内时间，开始含、结束不含。有 nextCursor 仅为一页，不得冒充完整统计。来源类型不代表事实已核实。空结果仅指本查询范围；具名搜索无结果不得改用无关近期列表凑答案。",
+          items: res.items.map((it, i) => ({ evidencePosition: i + 1, article_id: it.id, title: it.title, summary: it.summary,
+            source: it.source.name, sourceType: it.firstParty ? "官方来源" : "媒体报道", publishedAt: it.publishedAt, timelineAt: it.timelineAt })) });
+        return { ok: true, name: tool, text, structured, evidence };
+      }
+      case "get_article": {
+        const { article_id } = parsed.data as { article_id: string };
+        const detail = await loadItemDetail(article_id);
+        if (detail.kind !== "found" || detail.item.readingMode === "summary-only") return { ok: false, name: tool, errorCode: "not_found", message: "这篇资讯已不可用或仅保留来源信息，暂不支持问答。" };
+        const it = detail.item;
+        return { ok: true, name: tool, text: JSON.stringify({ article_id: it.id, title: it.title, summary: it.summary,
+          source: it.source.name, publishedAt: it.publishedAt, story: it.story,
+          note: "只有标题与摘要。不得补写未提供的全文细节；媒体转述不等于官方确认。" }),
+          structured: { count: 1 }, evidence: [{ kind: "item", objectId: it.id, title: it.title, sourceName: it.source.name,
+            publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original, toolName: tool,
+            rawRef: { id: it.id } }] };
       }
       case "get_hot_topics": {
         const a = parsed.data as { limit?: number };
@@ -316,6 +335,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
       }
     }
   } catch (e) {
+    if (e instanceof InvalidCursorError) return { ok: false, name, errorCode: "invalid_arguments", message: "翻页参数与查询不匹配，请重新检索。" };
     return { ok: false, name, errorCode: "internal_error", message: "工具执行失败。" };
   }
 }

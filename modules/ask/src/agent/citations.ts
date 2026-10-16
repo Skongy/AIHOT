@@ -8,6 +8,7 @@ export function checkCitations(answer: string, evidenceIds: number[]): { ok: boo
     seen.add(n);
     if (!registered.has(n)) issues.push(`unregistered_citation:${n}`);
   }
+  if (registered.size && !seen.size && answer.trim()) issues.push("missing_citations");
   // Bare http(s) URLs in the answer that are not a simple citation marker — flagged for degraded (links must come from evidence).
   for (const m of answer.matchAll(/https?:\/\/[^\s)\]>]+/g)) {
     issues.push(`raw_url:${m[0]!.slice(0, 80)}`);
@@ -22,7 +23,7 @@ export function sanitizeAskMarkdown(md: string, allowedUrls: Set<string>): strin
   out = out.replace(/<img\b[^>]*>/gi, "");
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text: string, href: string) => {
     const h = href.trim();
-    if (allowedUrls.has(h) || [...allowedUrls].some((u) => h === u || h.endsWith(u) || u.endsWith(h))) {
+    if (isAllowedAskHref(h, allowedUrls)) {
       return `[${text}](${h})`;
     }
     return text; // unlink unregistered
@@ -32,10 +33,7 @@ export function sanitizeAskMarkdown(md: string, allowedUrls: Set<string>): strin
 }
 
 export function isAllowedAskHref(href: string, allowedUrls: Set<string>): boolean {
-  if (!href || /^(javascript|data|vbscript):/i.test(href)) return false;
-  if (allowedUrls.has(href)) return true;
-  for (const u of allowedUrls) {
-    if (href === u || href.endsWith(u) || u.endsWith(href)) return true;
-  }
-  return false;
+  if (!href || /[\s\\\u0000-\u001f]/.test(href) || href.startsWith("//")) return false;
+  if (!(href.startsWith("/") || /^https?:\/\//i.test(href))) return false;
+  return allowedUrls.has(href);
 }

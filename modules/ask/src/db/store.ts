@@ -229,8 +229,10 @@ export async function listEvidence(taskId: string) {
 
 export async function listMessages(sessionId: string, limit = 40) {
   return sql<{ id: string; role: string; content: string; task_id: string | null; created_at: Date }[]>`
-    SELECT id::text, role, content, task_id::text, created_at FROM ask_messages
-    WHERE session_id = ${sessionId}::uuid ORDER BY created_at ASC LIMIT ${limit}`;
+    SELECT * FROM (
+      SELECT id::text, role, content, task_id::text, created_at FROM ask_messages
+      WHERE session_id = ${sessionId}::uuid ORDER BY created_at DESC, id DESC LIMIT ${limit}
+    ) recent ORDER BY created_at ASC, id ASC`;
 }
 
 export async function insertAssistantMessage(sessionId: string, taskId: string, content: string): Promise<void> {

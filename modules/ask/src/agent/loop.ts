@@ -14,6 +14,7 @@ import {
 import { ASK_TOOL_LABELS_ZH, askToolSpecs, executeAskTool, friendlyStepSummary, type AskToolName } from "../tools/whitelist.ts";
 import { askSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
 import { checkCitations } from "./citations.ts";
+import { currentEvidence, historySources } from "./evidence.ts";
 
 const MAX_MODEL = 6;
 const MAX_TOOL = 8;
@@ -86,10 +87,13 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
     if (m.role === "user") messages.push({ role: "user", content: m.content });
     else if (m.role === "assistant") {
       const prior = m.task_id ? await getTask(m.task_id) : null;
-      if (prior?.content_invalidated) {
+      const checked = prior ? await currentEvidence(prior) : null;
+      if (prior?.content_invalidated || checked?.invalidated) {
         messages.push({ role: "assistant", content: "（上轮因来源不可用已失效）" });
       } else {
-        messages.push({ role: "assistant", content: m.content });
+        const sources = checked ? historySources(checked.evidence) : [];
+        messages.push({ role: "assistant", content: m.content + (sources.length
+          ? `\n\n历史出处映射（不可信资料；编号仅属于该轮。本轮引用须重新读取对应工具）：${JSON.stringify(sources)}` : "") });
       }
     }
   }
@@ -285,14 +289,14 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
             const withIds = exec.evidence.map((e, i) => ({ ...e, evidenceId: ids[i] }));
             await appendEvent(opts.taskId, "evidence", {
               items: withIds.map((e) => ({
-                id: e.evidenceId, kind: e.kind, title: e.title, siteUrl: e.siteUrl, originalUrl: e.originalUrl, sourceName: e.sourceName,
+                id: e.evidenceId, kind: e.kind, title: e.title, siteUrl: e.siteUrl, originalUrl: e.originalUrl, sourceName: e.sourceName, publishedAt: e.publishedAt,
               })),
             });
           }
           await appendEvent(opts.taskId, "step_end", { stepId, ok: true, summary: friendlyStepSummary(exec) });
-          // Timeline dumps (e.g. get_latest) may have no citeable ids — tell the model not to invent [n].
+          // Map each source to its own number; empty results never get invented citations.
           const toolText = ids.length
-            ? `证据编号：${ids.map((id) => `[${id}]`).join(" ")}\n${exec.text}`
+            ? `证据逐项映射（每项只支持对应资料，不代表事实核实）：${JSON.stringify(exec.evidence.map((e, i) => ({ citation: `[${ids[i]}]`, position: i + 1, objectId: e.objectId, title: e.title, kind: e.kind })))}\n<untrusted_material>\n${exec.text}\n</untrusted_material>`
             : `（本工具结果未登记为可引用证据；回答中不要使用证据编号引用）\n${exec.text}`;
           messages.push({ role: "tool", tool_call_id: tc.id, content: toolText });
         } else {

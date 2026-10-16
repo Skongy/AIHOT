@@ -9,6 +9,9 @@ import {
 } from "../db/store.ts";
 import { sendAskProblem } from "./problem.ts";
 import { attachAskSse } from "./sse.ts";
+import { currentEvidence } from "../agent/evidence.ts";
+import { loadItemDetail } from "@aihot/backend/publication/detail";
+import { config } from "@aihot/backend/config";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -17,6 +20,15 @@ function isUuid(v: string) {
 }
 
 export function registerAskRoutes(app: FastifyInstance) {
+  app.get("/api/ask/capabilities", async (_req, reply) => reply.header("Cache-Control", "no-store").send({ available: config.modelCallsEnabled }));
+
+  app.get("/api/ask/context/:articleId", async (req, reply) => {
+    const { articleId } = req.params as { articleId: string };
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(articleId)) return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "无效的资讯地址" });
+    const result = await loadItemDetail(articleId);
+    if (result.kind !== "found" || result.item.readingMode === "summary-only") return sendAskProblem(req, reply, { status: 404, code: "not_found", detail: "这篇资讯已不可用，请换一个问题。" });
+    return reply.header("Cache-Control", "no-store").send({ id: result.item.id, title: result.item.title, sourceName: result.item.source.name });
+  });
   app.post("/api/ask/sessions", async (req, reply) => {
     const body = (req.body ?? {}) as { clientSessionId?: string };
     const created = await createSession(body.clientSessionId ?? null);
@@ -29,6 +41,11 @@ export function registerAskRoutes(app: FastifyInstance) {
     const session = await getSession(sessionId);
     if (!session) return sendAskProblem(req, reply, { status: 404, code: "session_not_found", detail: "会话不存在或已过期" });
     const messages = await listMessages(sessionId, 30);
+    for (const message of messages) {
+      if (message.role !== "assistant" || !message.task_id) continue;
+      const task = await getTask(message.task_id);
+      if (task && (await currentEvidence(task)).invalidated) message.content = "相关来源已不可用，原回答不再展示";
+    }
     const active = await hasActiveTask(sessionId);
     const tasks = await sql<{ id: string; status: string; client_request_id: string }[]>`
       SELECT id::text, status, client_request_id FROM ask_tasks
@@ -47,6 +64,8 @@ export function registerAskRoutes(app: FastifyInstance) {
     if (!isUuid(sessionId)) return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "无效的 sessionId" });
     const session = await getSession(sessionId);
     if (!session) return sendAskProblem(req, reply, { status: 404, code: "session_not_found", detail: "会话不存在或已过期" });
+
+    if (!config.modelCallsEnabled) return sendAskProblem(req, reply, { status: 503, code: "service_disabled", detail: "问答暂未开放，仍可浏览站内资讯与历史对话。" });
 
     const body = (req.body ?? {}) as { message?: string; clientRequestId?: string };
     const message = (body.message ?? "").trim();
@@ -98,6 +117,7 @@ export function registerAskRoutes(app: FastifyInstance) {
     if (!isUuid(taskId)) return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "无效的 taskId" });
     const task = await getTask(taskId);
     if (!task) return sendAskProblem(req, reply, { status: 404, code: "task_not_found", detail: "任务不存在" });
+    if ((await currentEvidence(task)).invalidated) task.content_invalidated = true;
     const snapshotSeq = await maxEventSeq(taskId);
     const answers = redactedAnswer(task);
     const evidence = await listEvidence(taskId);
@@ -140,6 +160,7 @@ export function registerAskRoutes(app: FastifyInstance) {
     if (!isUuid(taskId)) return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "无效的 taskId" });
     const task = await getTask(taskId);
     if (!task) return sendAskProblem(req, reply, { status: 404, code: "task_not_found", detail: "任务不存在" });
+    if ((await currentEvidence(task)).invalidated) task.content_invalidated = true;
     return attachAskSse(req, reply, task);
   });
 

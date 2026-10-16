@@ -22,10 +22,15 @@ export function proxyToApi(req: IncomingMessage, res: ServerResponse, set: Outgo
   if (req.headers["transfer-encoding"] && req.headers["content-length"] === undefined) headers["transfer-encoding"] = "chunked";
   const upstream = httpRequest({ hostname: API.hostname, port: API.port, path: req.url, method: req.method, headers }, (up) => {
     res.writeHead(up.statusCode ?? 502, endToEnd(up.headers));
+    // A broken SSE response must close the browser's stream so EventSource can reconnect.
+    up.on("error", () => res.destroy());
     up.pipe(res);
   });
+  res.on("close", () => upstream.destroy());
   upstream.on("error", (error) => {
+    if (res.destroyed) return;
     logError(error, { msg: "api proxy request failed", method: req.method, path: req.url });
+    if (res.headersSent) { res.destroy(); return; }
     res.statusCode = 502;
     res.end("api unavailable");
   });
