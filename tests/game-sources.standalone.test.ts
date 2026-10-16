@@ -56,14 +56,16 @@ test("the seed holds the media list and the official list, nothing else", () => 
   assert.equal(new Set(sources.map((s) => s.id)).size, sources.length);
 });
 
-test("every game source has a config its kind implements and the agreed defaults", () => {
+test("every game source has a supported config and the requested news-reading policy", () => {
   const identities = new Set<string>();
   for (const s of sources) {
     assert.deepEqual(unsupportedConfig(s.kind, s.config), [], s.id);
     assert.ok(["rss", "web_list", "json_list"].includes(s.kind), `${s.id}: only the existing collectors`);
     const hot = HOT.includes(s.id);
     assert.equal(s.participation_mode, hot ? "hot_signal" : "editorial", s.id);
-    assert.equal(s.site_fulltext, false, s.id);
+    const readsNews = !hot && s.enabled !== false;
+    assert.equal(s.site_fulltext, readsNews, `${s.id}: on-site bodies only for active news sources`);
+    if (readsNews) assert.equal(s.config.fetchPublicContent, true, `${s.id}: fetch the article body for reading`);
     assert.equal(s.syndicate_fulltext, false, s.id);
     assert.ok(s.interval_minutes >= 30 && s.interval_minutes <= 1440, s.id);
     assert.deepEqual(
