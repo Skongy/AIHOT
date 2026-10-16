@@ -1,6 +1,6 @@
 # GAMEHOT 前端设计 Token / 视觉规范
 
-> 主视觉：**墨铜暗刊**（dark）· 日间：**瓷光浅馆**（light）  
+> 主视觉：**墨铜暗刊**（dark）· 日间：**云雾灰**（light）<br>
 > 栈：React Router SSR + Tailwind 4 · 主题用 CSS 变量切换  
 > 硬约束：保留左侧边栏（资讯 / 热点 / AI 日报 / 主题 / 收藏 + 更多里的 Agent 接入等），栏目结构不砍
 
@@ -27,24 +27,24 @@
 | `--focus-ring` | `#C4A48466` | 键盘焦点环 |
 | `--overlay` | `#000000A6` | 模态遮罩 |
 
-### Light — 瓷光浅馆
+### Light — 云雾灰（全站统一）
 
 | Token | Hex | 用途 |
 |-------|-----|------|
-| `--bg` | `#F6F1EA` | 暖纸底（可加极轻纸纹，opacity ≤ 4%） |
-| `--bg-elevated` | `#FFFBF6` | 侧栏、浮层 |
+| `--bg` | `#F3F4F6` | 全站页面底、亮色浏览器主题与 PWA 启动背景 |
+| `--bg-elevated` | `#FAFBFC` | 侧栏、浮层 |
 | `--surface` | `#FFFFFF` | 卡片面（或同 `--bg` + 细边，二选一保持克制） |
-| `--surface-hover` | `#EFE8DE` | hover |
-| `--text` | `#1A1A1A` | 主文、大标题 |
-| `--text-secondary` | `#3D3A36` | 摘要 |
-| `--muted` | `#8A847A` | 元信息、日期 |
+| `--surface-hover` | `#E8EBEF` | hover、凹面与代码底色 |
+| `--text` | `#20242B` | 主文、大标题 |
+| `--text-secondary` | `#37414C` | 摘要、阅读正文 |
+| `--muted` | `#626B76` | 元信息、日期 |
 | `--accent` | `#8B6914` | 导航下划线、链接箭头（偏墨金，避免抢朱红） |
 | `--accent-muted` | `#8B69141A` | accent 浅底 |
 | `--hot` | `#B42318` | **仅**热点印章 / HOT 角标 |
-| `--border` | `#E4DDD2` | 细分割线 |
-| `--border-strong` | `#D0C8BA` | 侧栏分隔 |
+| `--border` | `#D8DDE3` | 细分割线 |
+| `--border-strong` | `#CBD2DB` | 侧栏分隔 |
 | `--focus-ring` | `#B4231840` | 焦点环（弱朱红） |
-| `--overlay` | `#1A1A1A73` | 模态遮罩 |
+| `--overlay` | `#20242B73` | 模态遮罩 |
 
 ### 语义映射（组件层只用语义名）
 
@@ -122,7 +122,7 @@ Tailwind 4：在 `@theme` 里挂 `var(--*)`，组件写 `bg-surface text-text bo
 | `radius-sheet` | 16 | 抽屉、对话框、hero 壳 |
 | `radius-full` | 9999 | 按钮、搜索框、徽章、主题切换、头像、圆形图标钮 |
 
-原则：与上游 AIHOT 半径阶梯对齐；控件/搜索/徽章用 `rounded-full` pill，卡片用 `rounded-card`。保留墨铜／瓷光色与左侧边栏结构。
+原则：与上游 AIHOT 半径阶梯对齐；控件/搜索/徽章用 `rounded-full` pill，卡片用 `rounded-card`。保留墨铜／云雾灰配色与左侧边栏结构。
 
 ### 线宽
 

@@ -6,7 +6,7 @@
 @source "../../../modules/*/{web.tsx,web/**}";
 
 /* ---------------------------------------------------------------------------
-   Design tokens: GAMEHOT ink-copper dark / porcelain light magazine. Fonts: Playfair+Noto Serif SC (display), Inter+Noto Sans SC/PingFang (body).
+   Design tokens: GAMEHOT ink-copper dark / cloud-gray light magazine. Fonts: Playfair+Noto Serif SC (display), Inter+Noto Sans SC/PingFang (body).
    Hairline borders, upstream AIHOT radii, copper/ink-gold accent — no neon,
    purple gradients, or glassmorphism. Spec: docs/visual-tokens.md
    --------------------------------------------------------------------------- */
@@ -103,37 +103,37 @@
   --gutter-l: max(16px, env(safe-area-inset-left));
   --gutter-r: max(16px, env(safe-area-inset-right));
   color-scheme: light;
-  /* Porcelain light magazine (ci-guang) */
-  --bg: #F6F1EA;
-  --bg-elevated: #FFFBF6;
-  --bg-sunk: #EFE8DE;
-  --bg-muted: #EFE8DE;
+  /* Cloud-gray light magazine */
+  --bg: #F3F4F6;
+  --bg-elevated: #FAFBFC;
+  --bg-sunk: #E8EBEF;
+  --bg-muted: #E8EBEF;
   --surface: #FFFFFF;
-  --surface-hover: #EFE8DE;
-  --surface-2: #FFFBF6;
-  --raised: #FFFBF6;
-  --sidebar: #FFFBF6;
-  --daybar: #EFE8DE;
-  --field: #EFE8DE;
-  --ink: #1A1A1A;
-  --ink-2: #3D3A36;
-  --ink-3: #3D3A36;
-  --ink-4: #8A847A;
-  --text: #1A1A1A;
-  --text-secondary: #3D3A36;
-  --muted: #8A847A;
-  --line: #E4DDD2;
-  --line-strong: #D0C8BA;
-  --line-soft: #EDE6DB;
-  --border: #E4DDD2;
-  --border-strong: #D0C8BA;
+  --surface-hover: #E8EBEF;
+  --surface-2: #FAFBFC;
+  --raised: #FAFBFC;
+  --sidebar: #FAFBFC;
+  --daybar: #E8EBEF;
+  --field: #E8EBEF;
+  --ink: #20242B;
+  --ink-2: #37414C;
+  --ink-3: #53606E;
+  --ink-4: #626B76;
+  --text: #20242B;
+  --text-secondary: #37414C;
+  --muted: #626B76;
+  --line: #D8DDE3;
+  --line-strong: #CBD2DB;
+  --line-soft: #E2E6EB;
+  --border: #D8DDE3;
+  --border-strong: #CBD2DB;
   --accent: #8B6914;
   --accent-ink: #6F540F;
   --accent-soft: rgba(139, 105, 20, 0.1);
   --accent-softer: rgba(139, 105, 20, 0.06);
   --accent-muted: #8B69141A;
-  --accent-contrast: #FFFBF6;
-  --note: #8A847A;
+  --accent-contrast: #FFFFFF;
+  --note: #626B76;
   --hot: #B42318;
   --hot-soft: rgba(180, 35, 24, 0.08);
   --amber: #8B6914;
@@ -145,16 +145,16 @@
   --rank-1: #8B6914;
   --rank-2: #8B6914;
   --rank-3: #8B6914;
-  --rank-rest: #8A847A;
+  --rank-rest: #626B76;
   --focus-ring: #B4231840;
-  --overlay: #1A1A1A73;
+  --overlay: #20242B73;
   --shadow-card: 0 1px 0 var(--border);
   --shadow-card-hover: 0 4px 16px rgba(26, 26, 26, 0.06);
   --shadow-soft: 0 4px 16px rgba(26, 26, 26, 0.06);
   --shadow-thumb: 0 1px 0 var(--border);
   --shadow-pop: 0 8px 24px rgba(26, 26, 26, 0.1);
-  --prose-ink: #3D3A36;
-  --code-bg: #EFE8DE;
+  --prose-ink: #37414C;
+  --code-bg: #E8EBEF;
   --code-keyword: #8B6914;
   --code-string: #2F6F44;
   --code-number: #9A6700;
@@ -619,12 +619,6 @@
   color: var(--ink);
   font-weight: 600;
   white-space: nowrap;
-}
-
-/* Report pages read on a faintly toned paper in the light theme, lighter than the site's page ground;
-   the archive column is halfway between the site sidebar and white. */
-:root:not([data-theme="dark"]) body:has(.report-shell) {
-  background: color-mix(in srgb, var(--bg) 60%, var(--surface));
 }
 
 /* ---------------------------------------------------------------------------
