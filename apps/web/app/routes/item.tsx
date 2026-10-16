@@ -530,6 +530,14 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             </section>
           )}
 
+          {!summaryOnly && !isX && !bodyHtml && (
+            <section className="mt-9 border-t border-line pt-4">
+              <h2 className="mb-3 text-[14px] font-semibold text-ink-2">新闻正文</h2>
+              <p className="text-[14px] leading-relaxed text-ink-3">暂未获取到可展示的正文，上方是 AI 导读。</p>
+              <a href={item.links.original} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-1 text-[14px] text-accent hover:underline">前往来源网站阅读完整原文 <IconExternal size={15} /></a>
+            </section>
+          )}
+
           {isX && item.x!.media.length > 0 && <MediaGallery media={item.x!.media} postUrl={item.links.original} />}
           {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} original={lang === "original"} />}
 

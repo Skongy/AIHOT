@@ -58,8 +58,13 @@ export default function AskPage() {
   const [context, setContext] = useState<{ id: string; title: string; sourceName: string } | null>(null);
   const [contextLoading, setContextLoading] = useState(false); const [contextError, setContextError] = useState<string | null>(null);
   const [input, setInput] = useState(""); const [showLatest, setShowLatest] = useState(false);
-  const textarea = useRef<HTMLTextAreaElement>(null); const bottom = useRef<HTMLDivElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null); const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(false); const composing = useRef(false); const empty = chat.messages.length === 0;
+  const latest = () => {
+    const viewport = scroll.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    setShowLatest(false);
+  };
   useEffect(() => {
     const controller = new AbortController(); setContext(null); setContextError(null); setContextLoading(!!articleId);
     if (articleId) void fetch(`/api/ask/context/${encodeURIComponent(articleId)}`, { signal: controller.signal }).then(async (res) => {
@@ -70,15 +75,49 @@ export default function AskPage() {
   }, [articleId]);
   useEffect(() => { if (textarea.current) { textarea.current.style.height = "auto"; textarea.current.style.height = `${Math.min(180, Math.max(64, textarea.current.scrollHeight))}px`; } }, [input]);
   useEffect(() => {
-    let previous = window.scrollY;
-    const onScroll = () => { const y = window.scrollY; const near = document.documentElement.scrollHeight - window.innerHeight - y < 160;
-      if (y < previous - 5) follow.current = false; else if (near) follow.current = true; previous = y; setShowLatest(!near && !empty); };
+    const viewport = scroll.current;
+    if (!viewport) return;
+    let previous = viewport.scrollTop;
+    let touchY = 0;
+    let frame = 0;
+    const onScroll = () => { const y = viewport.scrollTop; const near = viewport.scrollHeight - viewport.clientHeight - y <= 8;
+      // Input resizing can clamp scrollTop upwards. Only reader gestures pause following.
+      if (y > previous && near) follow.current = true;
+      previous = y; setShowLatest(!near && !empty); };
     const wheel = (event: WheelEvent) => { if (event.deltaY < 0) follow.current = false; };
-    window.addEventListener("scroll", onScroll, { passive: true }); window.addEventListener("wheel", wheel, { passive: true });
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("wheel", wheel); };
+    const touchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
+    const touchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? touchY;
+      if (y > touchY) follow.current = false;
+      touchY = y;
+    };
+    const keyDown = (event: KeyboardEvent) => {
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)) follow.current = false;
+    };
+    const resize = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { if (follow.current) latest(); else onScroll(); });
+    });
+    resize.observe(viewport);
+    onScroll();
+    viewport.addEventListener("scroll", onScroll, { passive: true }); viewport.addEventListener("wheel", wheel, { passive: true });
+    viewport.addEventListener("touchstart", touchStart, { passive: true }); viewport.addEventListener("touchmove", touchMove, { passive: true });
+    viewport.addEventListener("keydown", keyDown);
+    return () => {
+      resize.disconnect(); cancelAnimationFrame(frame);
+      viewport.removeEventListener("scroll", onScroll); viewport.removeEventListener("wheel", wheel);
+      viewport.removeEventListener("touchstart", touchStart); viewport.removeEventListener("touchmove", touchMove); viewport.removeEventListener("keydown", keyDown);
+    };
   }, [empty]);
-  useEffect(() => { if (follow.current) bottom.current?.scrollIntoView({ behavior: "instant", block: "end" }); }, [chat.messages]);
-  const pick = (text: string) => { setInput(text); textarea.current?.focus({ preventScroll: true }); textarea.current?.scrollIntoView({ block: "nearest", behavior: "instant" }); };
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const viewport = scroll.current;
+      if (follow.current) latest();
+      else if (viewport) setShowLatest(chat.messages.length > 0 && viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop > 8);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chat.messages]);
+  const pick = (text: string) => { setInput(text); textarea.current?.focus({ preventScroll: true }); };
   const clearContext = () => { const next = new URLSearchParams(params); next.delete("article"); setParams(next, { replace: true }); };
   const tooLong = [...(input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""))].length > 2000;
   const canSend = chat.available === true && !chat.busy && !chat.restoring && !contextLoading && !contextError && !!input.trim() && !tooLong;
@@ -86,17 +125,19 @@ export default function AskPage() {
     event?.preventDefault(); if (!canSend) return;
     const text = input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""); setInput(""); follow.current = true; await chat.send(text);
   };
-  return <div className={`ask-page${empty ? " is-empty" : ""}`}>
+  return <div className={`ask-page${empty ? " is-empty" : ""}`} data-pull-refresh="disabled">
     <header className="ask-page-header"><Link to="/ask" className="ask-page-name">AI 问答</Link><button type="button" className="ask-new-chat" disabled={chat.busy || chat.restoring} onClick={() => { chat.reset(); setInput(""); follow.current = false; }}><Glyph name="plus" size={16}/>新对话</button></header>
+    <div ref={scroll} className="ask-scroll" role="region" aria-label="问答内容" tabIndex={0} onPointerDown={() => { follow.current = false; }}>
     {empty && !chat.restoring && <section className="ask-intro" aria-labelledby="ask-heading"><div className="ask-intro-mark" aria-hidden="true"><span/><span/><span/></div>
       <h1 id="ask-heading"><span className="ask-title-line">游戏圈的消息，</span><span className="ask-title-line">帮你理清楚。</span></h1><p>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</p></section>}
     {chat.restoring && <p className="ask-restore" role="status">正在恢复对话…</p>}
     {!empty && <div className="ask-conversation" aria-label="问答记录"><h1 className="sr-only">AI 问答记录</h1>{chat.messages.map((m, i) => m.role === "user"
       ? <div className="ask-user" key={m.key}><span className="ask-user-label">你</span><p>{m.text.replace(contextSuffix, "")}{m.text.match(contextSuffix)?.[1] && <Link className="ask-user-context" to={m.text.match(contextSuffix)![1]!}>附带资讯</Link>}</p></div>
       : <div key={m.key}><AssistantMessage message={m} busy={chat.busy} onPick={pick}/>{m.status === "send_failed" && <button className="ask-retry" type="button" disabled={chat.busy} onClick={() => { const user = chat.messages[i - 1]; if (user?.requestId) { follow.current = true; void chat.send(user.text, user); } }}>重试发送</button>}</div>)}</div>}
-    <div ref={bottom} className="ask-bottom-anchor"/>
+    {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
+    </div>
     {!chat.restoring && <div className="ask-composer-area" onFocusCapture={(event) => finishEntrance(event.currentTarget)}>
-      {showLatest && <button type="button" className="ask-latest" onClick={() => { follow.current = true; bottom.current?.scrollIntoView({ behavior: "instant", block: "end" }); }}>回到最新回答 ↓</button>}
+      {showLatest && <button type="button" className="ask-latest" onClick={() => { follow.current = true; latest(); }}>回到最新回答 ↓</button>}
       {chat.disconnected && <p className="ask-notice" role="status">连接中断，正在恢复。已提交的任务仍会继续，请勿重复发送。</p>}
       {chat.error && <p className="ask-error" role="alert">{chat.error}</p>}
       {chat.available === false && <p className="ask-notice" role="status">问答暂未开放。你仍可<Link to="/">浏览精选</Link>或阅读已有对话。</p>}
@@ -110,6 +151,5 @@ export default function AskPage() {
       </form>
       <p className="ask-footnote">依据站内公开报道回答，附来源供核对。<span>不搜全网，不提供游戏攻略。</span></p>
     </div>}
-    {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
   </div>;
 }

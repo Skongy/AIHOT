@@ -6,6 +6,7 @@
       "name": "机核",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.gcores.com/rss",
         "allowUrlPrefixes": [
           "https://www.gcores.com/articles/"
@@ -24,7 +25,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -32,6 +33,7 @@
       "name": "IGN中国",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.ign.com.cn/feed.xml",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -44,7 +46,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -52,6 +54,7 @@
       "name": "巴哈姆特GNN",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://gnn.gamer.com.tw/rss.xml",
         "ingestNoiseFilter": {
           "dropMarkersTitleOnly": [
@@ -81,7 +84,7 @@
         "媒体",
         "繁体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -89,6 +92,7 @@
       "name": "游研社",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.yystv.cn/rss/feed",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -101,7 +105,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -109,6 +113,7 @@
       "name": "触乐",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.chuapp.com/feed",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -121,7 +126,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -129,6 +134,7 @@
       "name": "游茶",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.youxichaguan.com/feed",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -141,7 +147,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -149,6 +155,7 @@
       "name": "HLTV",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.hltv.org/rss/news",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -163,7 +170,7 @@
         "英文",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -171,6 +178,7 @@
       "name": "PC Gamer",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.pcgamer.com/rss/",
         "allowUrlPrefixes": [
           "https://www.pcgamer.com/"
@@ -188,7 +196,7 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -197,6 +205,7 @@
       "name": "Rock Paper Shotgun",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.rockpapershotgun.com/feed",
         "allowUrlPrefixes": [
           "https://www.rockpapershotgun.com/"
@@ -214,7 +223,7 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -223,6 +232,7 @@
       "name": "Gematsu",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.gematsu.com/feed",
         "allowUrlPrefixes": [
           "https://www.gematsu.com/"
@@ -240,7 +250,7 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -249,6 +259,7 @@
       "name": "AUTOMATON",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://automaton-media.com/feed/",
         "allowUrlPrefixes": [
           "https://automaton-media.com/articles/"
@@ -269,7 +280,7 @@
         "海外",
         "日文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -278,6 +289,7 @@
       "name": "4Gamer",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.4gamer.net/rss/index.xml",
         "allowUrlPrefixes": [
           "https://www.4gamer.net/"
@@ -295,7 +307,7 @@
         "海外",
         "日文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -304,6 +316,7 @@
       "name": "VGC",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.videogameschronicle.com/feed/",
         "allowUrlPrefixes": [
           "https://www.videogameschronicle.com/"
@@ -324,7 +337,7 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true
     },
@@ -333,6 +346,7 @@
       "name": "游民星空",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.gamersky.com/news/",
         "itemSelector": "ul.pictxt li",
         "linkSelector": "div.tit a",
@@ -351,7 +365,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -359,6 +373,7 @@
       "name": "3DM",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.3dmgame.com/news/",
         "itemSelector": "div.Revision_list li",
         "linkSelector": "a.bt",
@@ -377,7 +392,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -385,6 +400,7 @@
       "name": "A9VG",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.a9vg.com/list/news",
         "itemSelector": "li.a9-rich-card-list_item-gap",
         "linkSelector": "a",
@@ -404,7 +420,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -412,6 +428,7 @@
       "name": "17173",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://news.17173.com/",
         "itemSelector": "ul.ptlist-news li.item",
         "linkSelector": "div.tit a",
@@ -432,7 +449,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -440,6 +457,7 @@
       "name": "新浪电竞",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://dj.sina.com.cn/",
         "itemSelector": "h3.article_title",
         "linkSelector": "a",
@@ -462,7 +480,7 @@
         "媒体",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -470,6 +488,7 @@
       "name": "玩加电竞",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.wanplus.cn/",
         "allowUrlPrefixes": [
           "https://www.wanplus.cn/article/"
@@ -490,7 +509,7 @@
         "媒体",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -498,6 +517,7 @@
       "name": "游戏陀螺",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.youxituoluo.com/",
         "itemSelector": "ul.article_list li",
         "linkSelector": "a.title",
@@ -521,7 +541,7 @@
         "媒体",
         "行业"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -556,6 +576,7 @@
       "name": "国家新闻出版署·国产网络游戏审批",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.nppa.gov.cn/bsfw/jggs/yxspjg/gcwlyxspxx/",
         "itemSelector": "ul.m2nrul li",
         "linkSelector": "a",
@@ -575,7 +596,7 @@
         "官方",
         "版号"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1005,6 +1026,7 @@
       "name": "Steam·CS2 更新",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/730/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1020,7 +1042,7 @@
         "CS2",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1028,6 +1050,7 @@
       "name": "无畏契约官网·新闻公告",
       "kind": "json_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://apps.game.qq.com/cmc/cross?serviceId=329&source=val_gw&tagids=125139&typeids=1&chanid=6700&start=0&limit=15&withtop=yes",
         "itemsPath": "data.items",
         "titlePaths": [
@@ -1098,7 +1121,7 @@
         "无畏契约",
         "射击"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1106,6 +1129,7 @@
       "name": "无畏契约电竞·VCT资讯",
       "kind": "json_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://apps.game.qq.com/cmc/cross?serviceId=329&source=val_gw&typeids=1&logic=or&tagids=126584,126585,126586,126785&start=0&limit=15&sortby=sIdxTime",
         "itemsPath": "data.items",
         "titlePaths": [
@@ -1180,7 +1204,7 @@
         "电竞",
         "射击"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1188,6 +1212,7 @@
       "name": "VALORANT 官方新闻（繁中）",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://playvalorant.com/zh-tw/news/",
         "baseUrl": "https://playvalorant.com",
         "itemSelector": "a[href*=\"/zh-tw/news/\"]",
@@ -1218,7 +1243,7 @@
         "射击",
         "繁中"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1226,6 +1251,7 @@
       "name": "Steam·Dota 2 更新",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/570/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1241,7 +1267,7 @@
         "Dota 2",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1249,6 +1275,7 @@
       "name": "PlayStation 中文博客",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://blog.zh-hant.playstation.com/feed/",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1263,7 +1290,7 @@
         "官方",
         "繁体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1271,6 +1298,7 @@
       "name": "Xbox Wire",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://news.xbox.com/en-us/feed/",
         "allowUrlPrefixes": [
           "https://news.xbox.com/"
@@ -1288,7 +1316,7 @@
         "官方",
         "英文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1296,6 +1324,7 @@
       "name": "任天堂日本·新着情報",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://www.nintendo.co.jp/news/whatsnew.xml",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1310,7 +1339,7 @@
         "官方",
         "日文"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1318,6 +1347,7 @@
       "name": "任天堂香港·最新消息",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://www.nintendo.com.hk/topics/",
         "baseUrl": "https://www.nintendo.com/hk/topics/",
         "itemSelector": "a.ncmn-u-linkbox",
@@ -1339,7 +1369,7 @@
         "官方",
         "繁体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1347,6 +1377,7 @@
       "name": "Steam 官方新闻",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1359,7 +1390,7 @@
       "tags": [
         "官方"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1367,6 +1398,7 @@
       "name": "网易投资者关系",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://ir.netease.com/rss/news-releases.xml",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1382,7 +1414,7 @@
         "英文",
         "财报"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1390,6 +1422,7 @@
       "name": "Steam·以撒的结合：重生",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/250900/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1408,7 +1441,7 @@
         "Steam",
         "以撒的结合"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1416,6 +1449,7 @@
       "name": "Steam·杀戮尖塔 2",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/2868840/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1434,7 +1468,7 @@
         "Steam",
         "杀戮尖塔"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1442,6 +1476,7 @@
       "name": "Steam·喵喵的结合",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/686060/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1460,7 +1495,7 @@
         "Steam",
         "喵喵的结合"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1468,6 +1503,7 @@
       "name": "Steam·博德之门 3",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://store.steampowered.com/feeds/news/app/1086940/?l=schinese",
         "_aihot": {
           "initialBackfillLimit": 8,
@@ -1486,7 +1522,7 @@
         "Steam",
         "博德之门"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1494,6 +1530,7 @@
       "name": "Mega Crit·新闻",
       "kind": "rss",
       "config": {
+        "fetchPublicContent": true,
         "feedUrl": "https://megacrit.com/feed.xml",
         "allowUrlPrefixes": [
           "https://megacrit.com/news/"
@@ -1515,7 +1552,7 @@
         "英文",
         "杀戮尖塔"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {
@@ -1523,6 +1560,7 @@
       "name": "Larian Studios·新闻",
       "kind": "web_list",
       "config": {
+        "fetchPublicContent": true,
         "url": "https://larian.com/news",
         "baseUrl": "https://larian.com",
         "itemSelector": "a.blog-item",
@@ -1546,7 +1584,7 @@
         "英文",
         "博德之门"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false
     },
     {

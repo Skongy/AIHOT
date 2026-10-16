@@ -59,10 +59,10 @@ before(async()=>{
   phoneBrowser=process.env.ASK_TEST_CHROME_PATH?browser:await webkit.launch();
 });
 after(async()=>{sseResponse?.end();if(phoneBrowser&&phoneBrowser!==browser)await phoneBrowser.close();await browser?.close();await web?.stop();});
-async function visit(options:{phone?:boolean;dark?:boolean;article?:boolean}={}){
+async function visit(options:{phone?:boolean;dark?:boolean;article?:boolean;standalone?:boolean}={}){
   enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;
   const context=await(options.phone?phoneBrowser:browser).newContext({viewport:options.phone?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
-  await context.addInitScript((dark)=>{sessionStorage.setItem('gamehot-intro-seen-v1','1');if(dark)localStorage.setItem('theme','dark');},!!options.dark);
+  await context.addInitScript(({dark,standalone})=>{sessionStorage.setItem('gamehot-intro-seen-v1','1');localStorage.setItem('aihot-theme',dark?'dark':'light');if(standalone)Object.defineProperty(navigator,'standalone',{value:true});},{dark:!!options.dark,standalone:!!options.standalone});
   const page=await context.newPage();
   await page.route('https://fonts.googleapis.com/**',route=>route.abort());
   const errors:string[]=[];page.on('pageerror',e=>errors.push(String(e)));
@@ -135,18 +135,68 @@ test('mobile layout fits, drafting stays available while generating and stop ter
 });
 test('scrolling up during a long streamed answer keeps the reading position',async()=>{
   const {context,page}=await visit();try{
+    const viewport=page.locator('.ask-scroll');const composer=page.locator('.ask-composer-area');
+    const initial=await composer.boundingBox();assert.ok(initial);
     hold=true;await send(page);await expect(page.getByRole('button',{name:'停止生成'})).toBeVisible();
     await expect.poll(()=>!!sseResponse).toBe(true);
     const text=Array.from({length:60},(_,i)=>`段落 ${i}：这是用于滚动行为检查的固定说明。\n\n`).join('');
     sseResponse!.write(event('answer_delta',{text},2));
     await expect(page.locator('.ask-answer')).toContainText('段落 59');
-    await page.mouse.wheel(0,-10000);await expect.poll(()=>page.evaluate(()=>scrollY)).toBeLessThan(200);
-    const y=await page.evaluate(()=>scrollY);
+    await expect.poll(()=>viewport.evaluate(el=>el.scrollTop)).toBeGreaterThan(200);
+    await viewport.hover();await page.mouse.wheel(0,-10000);await expect.poll(()=>viewport.evaluate(el=>el.scrollTop)).toBe(0);
+    const y=await viewport.evaluate(el=>el.scrollTop);
     sseResponse!.write(event('answer_delta',{text:'\n新到达的一段内容。'},3));
     await expect(page.locator('.ask-answer')).toContainText('新到达的一段内容');
-    assert.ok(Math.abs((await page.evaluate(()=>scrollY))-y)<20);
+    assert.ok(Math.abs((await viewport.evaluate(el=>el.scrollTop))-y)<1);
+    const current=await composer.boundingBox();assert.ok(current);assert.ok(Math.abs(current.y-initial.y)<1);
+    assert.equal(await page.evaluate(()=>scrollY),0);
     await expect(page.getByRole('button',{name:'回到最新回答 ↓'})).toBeVisible();
     await page.getByRole('button',{name:'停止生成'}).click();
+  }finally{await context.close();}
+});
+for(const phone of [false,true])test(`${phone?'phone':'desktop'} composer stays docked and small upward scrolls pause streaming until returning to latest`,async()=>{
+  const {context,page}=await visit({phone});try{
+    const viewport=page.locator('.ask-scroll');const composer=page.locator('.ask-composer-area');
+    const original=await composer.boundingBox();assert.ok(original);
+    const windowHeight=page.viewportSize()!.height;
+    assert.ok(Math.abs(original.y+original.height-(windowHeight-(phone?50:0)))<2);
+    hold=true;await send(page);await expect.poll(()=>!!sseResponse).toBe(true);
+    sseResponse!.write(event('answer_delta',{text:Array.from({length:45},(_,i)=>`正文 ${i}：固定测试段落，用来模拟持续到达的长回答。\n\n`).join('')},2));
+    await expect(page.locator('.ask-answer')).toContainText('正文 44');
+    await expect.poll(()=>viewport.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(1);
+    await viewport.hover();const before=await viewport.evaluate(el=>el.scrollTop);
+    await page.mouse.wheel(0,-2);await expect.poll(()=>viewport.evaluate(el=>el.scrollTop)).toBeLessThan(before-.5);
+    const paused=await viewport.evaluate(el=>el.scrollTop);
+    for(let i=0;i<2;i++){
+      sseResponse!.write(event('answer_delta',{text:`\n增量 ${i}：${'新内容继续到达。'.repeat(90)}\n`},3+i));
+      await expect(page.locator('.ask-answer')).toContainText(`增量 ${i}`);
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.ok(Math.abs((await viewport.evaluate(el=>el.scrollTop))-paused)<1,'streaming must not pull the reader back down');
+      const dock=await composer.boundingBox();assert.ok(dock);assert.ok(Math.abs(dock.y-original.y)<1);
+      assert.equal(await page.evaluate(()=>scrollY),0);
+    }
+    await page.getByRole('button',{name:'回到最新回答 ↓'}).click();
+    await expect.poll(()=>viewport.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(1);
+    await page.getByLabel('你的游戏资讯问题').fill('下一条问题\n'.repeat(7));
+    const expanded=await composer.boundingBox();assert.ok(expanded);assert.ok(Math.abs(expanded.y+expanded.height-(original.y+original.height))<1,'growing the input must preserve its bottom edge');
+    assert.ok(await viewport.evaluate(el=>el.getBoundingClientRect().bottom)<=expanded.y+1,'the input must not overlap the answer pane');
+    await page.getByLabel('你的游戏资讯问题').fill('下一条问题');
+    sseResponse!.write(event('answer_delta',{text:'\n恢复跟随后的新段落。\n'},5));
+    await expect(page.locator('.ask-answer')).toContainText('恢复跟随后的新段落');
+    await expect.poll(()=>viewport.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(1);
+    await page.getByRole('button',{name:'停止生成'}).click();
+  }finally{await context.close();}
+});
+test('standalone phone conversations retain downward touch gestures instead of triggering page refresh',async()=>{
+  const {context,page}=await visit({phone:true,standalone:true});try{
+    await page.getByLabel('你的游戏资讯问题').fill('测试草稿');
+    await expect(page.getByRole('button',{name:'发送问题',exact:true})).toBeEnabled();
+    const prevented=await page.locator('.ask-scroll').evaluate(el=>{
+      const touch=(type:string,y:number)=>{const event=new Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:[{clientX:150,clientY:y}]});el.dispatchEvent(event);return event.defaultPrevented;};
+      touch('touchstart',100);const prevented=touch('touchmove',300);el.dispatchEvent(new Event('touchcancel',{bubbles:true}));return prevented;
+    });
+    assert.equal(prevented,false);assert.equal(submissions,0);
+    await expect(page.getByLabel('你的游戏资讯问题')).toHaveValue('测试草稿');
   }finally{await context.close();}
 });
 test('interrupted event streams reconnect without creating another task',async()=>{

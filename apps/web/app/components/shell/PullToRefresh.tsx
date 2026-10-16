@@ -38,8 +38,8 @@ export function PullToRefresh() {
     const onStart = (e: TouchEvent) => {
       onCancel();
       if (busy || e.touches.length !== 1 || window.scrollY > 0 || !isPhone()) return;
-      // Not inside a sheet, the search or anything else laid over the page (they hold the page still).
-      if (document.documentElement.style.overflow === "hidden" || (e.target instanceof Element && e.target.closest('[role="dialog"]'))) return;
+      // Sheets and views with their own scrolling (such as a live conversation) own their gestures.
+      if (document.documentElement.style.overflow === "hidden" || (e.target instanceof Element && e.target.closest('[role="dialog"], [data-pull-refresh="disabled"]'))) return;
       start = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
       pulling = false;
       distance = 0;

@@ -32,7 +32,7 @@ GAMEHOT 的种子信源包含六家海外媒体（2026-10-16 核验）：
 
 六家均使用现有 `rss` 采集器、`T2` 媒体分级和 `editorial` 参与方式，每 60 分钟抓取；首次最多回灌近一个月的 8 条。AUTOMATON 仅接日文版，避免同时接英文版带来同站重复。其他导购、硬件与手游内容继续由现有预筛和精选规则判断，不额外改评分门槛。
 
-合入并部署后，现有 setup 中的 `scripts/seed.ts` 会按新 ID 补入这些源，保留已存在源的后台配置；仅推送功能分支不会触发 main 的自动部署。订阅不需要 API key，不启用 Jina、X 等付费采集服务，也不修改 `COLLECT_ENABLED` 或 `MODEL_CALLS_ENABLED`。新增源的 `site_fulltext`、`syndicate_fulltext` 均为 `false`，仍只公开摘要与原文链接。
+合入并部署后，现有 setup 中的 `scripts/seed.ts` 会按新 ID 补入这些源，保留已存在源的后台配置；仅推送功能分支不会触发 main 的自动部署。RSS 订阅本身不需要 API key。当前按站点所有者的新闻正文展示要求，这些源配置 `site_fulltext: true` 和 `fetchPublicContent: true`，正文获取沿用已有直连提取及预算内的 Jina 兜底；`syndicate_fulltext` 仍为 `false`。采集与模型是否运行由生产总开关控制。旧数据库的配置同步和正文补取见 [新闻正文](news-reading.md)。
 
 离线测试快照位于 `tests/fixtures/game-sources/rss-{pcgamer,rockpapershotgun,gematsu,automaton-jp,4gamer,vgc}.xml`，保留真实标题、链接、时间和分类，省略正文；测试只读取本地快照，不请求媒体网站。
 
