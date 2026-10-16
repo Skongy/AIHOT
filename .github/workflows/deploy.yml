@@ -1,12 +1,13 @@
-# Deploy to the GAMEHOT VPS on every push to main.
+# Deploy only after the complete Check workflow succeeds on main.
 # Secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (ed25519 private key).
 # Server path: /opt/gamehot  — .env is never overwritten.
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,15 +18,38 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Verify the checked commit is still main
+        id: revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          latest_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$CHECKED_SHA" != "$latest_sha" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping an outdated Check result; main has a newer commit." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+          echo "Deploying checked commit: $CHECKED_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Deploy over SSH
+        if: steps.revision.outputs.deploy == 'true'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: CHECKED_SHA
           command_timeout: 40m
           script: |
             set -euo pipefail
@@ -33,23 +57,49 @@ jobs:
             # HTTP/2 TLS to GitHub sometimes drops mid-fetch on this VPS; prefer 1.1 and retry.
             git config http.version HTTP/1.1
             git config http.postBuffer 524288000
-            fetch_ok=0
-            for attempt in 1 2 3 4 5; do
-              if git fetch origin main; then
-                fetch_ok=1
-                break
-              fi
-              echo "git fetch failed (attempt ${attempt}); retrying in $((attempt * 5))s..."
-              sleep $((attempt * 5))
-            done
-            if [ "$fetch_ok" -ne 1 ]; then
+            fetch_main() {
+              for attempt in 1 2 3 4 5; do
+                if git fetch origin main; then
+                  return 0
+                fi
+                echo "git fetch failed (attempt ${attempt}); retrying in $((attempt * 5))s..."
+                sleep $((attempt * 5))
+              done
               echo "git fetch failed after retries" >&2
-              exit 1
+              return 1
+            }
+            fetch_main
+            if [ "$(git rev-parse origin/main)" != "$CHECKED_SHA" ]; then
+              echo "Skipping outdated deployment; main changed before the build."
+              exit 0
             fi
-            git reset --hard origin/main
+            git reset --hard "$CHECKED_SHA"
             # Keep existing .env; rebuild and restart (China npm mirror)
             sudo docker compose build --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+            # A newer push can arrive while the image is building. Leave running services alone.
+            fetch_main
+            if [ "$(git rev-parse origin/main)" != "$CHECKED_SHA" ]; then
+              echo "Skipping outdated deployment; main changed during the build."
+              exit 0
+            fi
             sudo docker compose stop api worker web
             sudo docker compose run --rm setup
             sudo docker compose up -d
             sudo docker compose ps
+            sudo docker compose exec -T web node --input-type=module - <<'NODE'
+            let healthy = false;
+            for (let attempt = 0; attempt < 30; attempt++) {
+              try {
+                const response = await fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(3000) });
+                const body = await response.json();
+                if (response.ok && body.ok === true && body.db === "ok") {
+                  healthy = true;
+                  break;
+                }
+              } catch {}
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            if (!healthy) throw new Error("Deployment health check failed");
+            console.log("Deployment health check passed");
+            NODE
+            sudo docker compose exec -T web node scripts/smoke.ts --base http://127.0.0.1:3000

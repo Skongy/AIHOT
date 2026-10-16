@@ -47,9 +47,9 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
       - name: Online migration safety
-        # New migrations against the PR base: deployed ones unchanged, no whole-table rewrite or blocking index in a release.
+        # Compare the entire push (or PR) with its base; comparing a push with itself misses unsafe migrations.
         env:
-          MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+          MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || format('{0}^', github.sha) }}
         run: node scripts/check-migrations.ts --base "$MIGRATION_BASE"
       - name: PostgreSQL backup tools
         # 恢复测试需要与 PostgreSQL 17 服务匹配的客户端，不能依赖 runner 的默认版本。
