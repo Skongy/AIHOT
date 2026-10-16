@@ -107,8 +107,8 @@ export function IntroSplash() {
       return;
     }
     setPhase("enter");
-    const t1 = window.setTimeout(() => setPhase("settle"), ENTER_MS);
-    const t2 = window.setTimeout(() => setPhase("ambient"), ENTER_MS + SETTLE_MS);
+    const t1 = window.setTimeout(() => setPhase((p) => p === "exit" ? p : "settle"), ENTER_MS);
+    const t2 = window.setTimeout(() => setPhase((p) => p === "exit" ? p : "ambient"), ENTER_MS + SETTLE_MS);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);

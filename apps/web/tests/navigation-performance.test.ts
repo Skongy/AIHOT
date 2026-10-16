@@ -83,10 +83,72 @@ after(async()=>{
   await web?.stop();
 });
 
+// Navigation scenarios start as returning readers; fresh-session intro behavior is tested below.
+async function readerContext(browser:Browser,options:Parameters<Browser['newContext']>[0]={}){
+  const context=await browser.newContext(options);
+  await context.addInitScript(()=>sessionStorage.setItem('gamehot-intro-seen-v1','1'));
+  return context;
+}
+
 // One engine per behaviour: WebKit for what phone readers do (iPhone Safari), Chromium for desktop-only
 // intent such as hover. The router and caches are the same code in both.
+test('first visit enters the site, restores scrolling and stays dismissed in the session',async()=>{
+  const context=await chrome.newContext();const page=await context.newPage();
+  try{
+    await page.goto(origin+'/');
+    const splash=page.getByRole('dialog',{name:'GAMEHOT 开场'});
+    await expect(splash).toHaveAttribute('data-phase','ambient');
+    await page.getByRole('button',{name:'「进入」',exact:true}).click();
+    await expect(splash).toHaveCount(0);
+    assert.equal(await page.evaluate(()=>document.documentElement.style.overflow),'');
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('gamehot-intro-seen-v1')),'1');
+    await page.reload();
+    await page.getByRole('link',{name:'性能检查文章',exact:true}).click();
+    await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
+    await page.goto(origin+'/?intro=1');
+    await expect(splash).toBeVisible();
+  }finally{await context.close();}
+});
+
+test('phone readers with reduced motion enter without a mouse or running ring animations',async()=>{
+  const context=await safari.newContext({viewport:{width:390,height:844},hasTouch:true,reducedMotion:'reduce'});
+  const page=await context.newPage();
+  try{
+    await page.goto(origin+'/');
+    const splash=page.getByRole('dialog',{name:'GAMEHOT 开场'});
+    await expect(splash).toHaveClass(/is-reduced/);
+    assert.equal(await page.locator('.intro-splash__ring').first().evaluate(e=>getComputedStyle(e).animationName),'none');
+    await page.getByRole('button',{name:'「进入」',exact:true}).tap();
+    await expect(splash).toHaveCount(0);
+    await page.getByRole('link',{name:'性能检查文章',exact:true}).tap();
+    await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
+  }finally{await context.close();}
+});
+
+for(const elapsed of [650,1950]){
+  test(`Escape at ${elapsed}ms stays dismissed across the next intro animation phase`,async()=>{
+    const context=await chrome.newContext();const page=await context.newPage();
+    try{
+      const now=Date.now();
+      await page.clock.install({time:now});
+      await page.clock.pauseAt(now+1000);
+      await page.goto(origin+'/');
+      const splash=page.getByRole('dialog',{name:'GAMEHOT 开场'});
+      await expect(splash).toBeVisible();
+      await page.clock.runFor(elapsed);
+      await page.keyboard.press('Escape');
+      await expect(splash).toHaveAttribute('data-phase','exit');
+      await page.clock.runFor(300);
+      await expect(splash).toHaveAttribute('data-phase','exit');
+      await page.clock.runFor(300);
+      await expect(splash).toHaveCount(0);
+      assert.equal(await page.evaluate(()=>document.documentElement.style.overflow),'');
+    }finally{await context.close();}
+  });
+}
+
 test('SSR list and visited query variants return offline without another read',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await readerContext(safari,{viewport:{width:390,height:844}});
   const page=await context.newPage();
   try{
     await page.goto(origin+'/');
@@ -111,7 +173,7 @@ test('SSR list and visited query variants return offline without another read',a
 });
 
 test('hover still fetches article data, touches that move do not, and failed prefetch does not replace the current page',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   try{
     await page.goto(origin+'/');
     const link=page.getByRole('link',{name:'性能检查文章',exact:true});
@@ -124,7 +186,7 @@ test('hover still fetches article data, touches that move do not, and failed pre
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/items/')).length,1);
     await link.click();await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/items/')).length,1,'navigation reuses its intent-prefetched response');
-    const fresh=await chrome.newContext();const freshPage=await fresh.newPage();
+    const fresh=await readerContext(chrome);const freshPage=await fresh.newPage();
     try{
       await freshPage.goto(origin+'/');failing='/api/site/items/navigation-fixture';
       const failed=freshPage.waitForResponse(r=>r.url().includes('/items/navigation-fixture.data')&&r.status()===503);
@@ -135,7 +197,7 @@ test('hover still fetches article data, touches that move do not, and failed pre
 });
 
 test('SSR all-pages and report kinds return offline with their own content',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   try{
     await page.goto(origin+'/all');
     await page.locator('a[href="/all?page=2"]').first().click();
@@ -153,7 +215,7 @@ test('SSR all-pages and report kinds return offline with their own content',asyn
 // A prefetch of the newly selected link must not be mistaken for an explicit refresh of that page.
 // Disable HTTP reuse here: otherwise the browser cache can hide a lost document-level result.
 test('intent on a selected link preserves visited data and the next revisit starts no data request',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   const requests:string[]=[];
   await context.route('**/*.data*',route=>route.continue());
   page.on('request',request=>{if(request.url().includes('.data'))requests.push(request.url());});
@@ -175,7 +237,7 @@ test('intent on a selected link preserves visited data and the next revisit star
 });
 
 test('a revisit never renews the original deadline; an expired read shows an error and a reload asks again',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   try{
     await page.clock.install();ttl=1;
     await page.goto(origin+'/');
@@ -189,7 +251,7 @@ test('a revisit never renews the original deadline; an expired read shows an err
 });
 
 test('SSR freshness spent in an upstream cache is not renewed by HTML hydration',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   try{
     ttl=0;await page.goto(origin+'/');
     await page.getByRole('link',{name:'性能检查文章',exact:true}).click();await expect(page.getByText('固定正文',{exact:true})).toBeVisible();
@@ -200,7 +262,7 @@ test('SSR freshness spent in an upstream cache is not renewed by HTML hydration'
 });
 
 test('Agent tabs finish offline with matching canonical; invalid direct tabs and anchored links keep a panel',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
+  const context=await readerContext(chrome);const page=await context.newPage();
   try{
     await page.goto(origin+'/agent');
     await context.setOffline(true);
@@ -227,7 +289,7 @@ test('Agent tabs finish offline with matching canonical; invalid direct tabs and
 });
 
 test('phone suggestions load only on opening, use one small read, retry failures and update on reopening',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});const page=await context.newPage();
+  const context=await readerContext(safari,{viewport:{width:390,height:844}});const page=await context.newPage();
   try{
     suggestionsVersion=1;await page.goto(origin+'/');
     assert.equal(hits.filter(x=>x==='/api/site/search/suggestions').length,0);
@@ -250,7 +312,7 @@ test('phone suggestions load only on opening, use one small read, retry failures
 });
 
 test('reader enhancements wait for visible code and update only the picture that loaded',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await readerContext(safari,{viewport:{width:390,height:844}});
   const page=await context.newPage();
   const scripts:string[]=[];page.on('request',r=>{if(r.url().includes('/assets/')&&r.url().includes('highlight-'))scripts.push(r.url());});
   await page.route('**/reader-image/*.svg',route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${route.request().url().endsWith('/tiny.svg')?16:640}" height="360"><rect width="640" height="360" fill="red"/></svg>`}));
@@ -283,7 +345,7 @@ test('reader enhancements wait for visible code and update only the picture that
 });
 
 test('deep reading returns to its anchor, including folded dates',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});
+  const context=await readerContext(safari,{viewport:{width:390,height:844}});
   const page=await context.newPage();
   try{
     await page.goto(origin+'/?tag=long-reading');
