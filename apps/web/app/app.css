@@ -897,7 +897,8 @@
 /* ---------------------------------------------------------------------------
    Intro splash — 1:1 post-beach darc-room Main_* motion
    Dual rings: big 80vw/40s reverse + small 45vw/30s; img counter-rotate;
-   8 %-slots/ring; opacity .2; CTA hover brightens wall; GAME|HOT scale(3)→corners. Skip beach.
+   8 %-slots/ring; opacity .2; photo hover blurs others; ENTER hover brightens wall;
+   GAME|HOT scale(3)→corners. Custom red-dot cursor. Skip beach.
    --------------------------------------------------------------------------- */
 .intro-splash {
   position: fixed;
@@ -914,10 +915,39 @@
   opacity: 0;
   pointer-events: none;
 }
+/* Hide system cursor on the splash when the red dot is active (fine pointer). */
+@media (hover: hover) and (pointer: fine) {
+  .intro-splash.has-cursor,
+  .intro-splash.has-cursor * {
+    cursor: none !important;
+  }
+}
 .intro-splash__bg {
   position: absolute;
   inset: 0;
   background: #131414;
+}
+/* Period-sized solid bright red circular cursor — matches darc-room reference. */
+.intro-splash__cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 90;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff1a1a;
+  box-shadow: 0 0 0 0.5px rgba(255, 26, 26, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+  transform: translate3d(-100px, -100px, 0) translate(-50%, -50%);
+}
+.intro-splash__cursor.is-on {
+  opacity: 1;
+}
+.intro-splash.is-exit .intro-splash__cursor {
+  opacity: 0;
 }
 
 /* Wordmarks — InitialLoader: mid-height scale(3) → bottom:6 scale(1) */
@@ -1025,22 +1055,28 @@
 }
 
 /* Main_image — square slots, opacity .2, counter-spin.
-   Per-photo hover → 1; hovering center 「探索」 brightens the whole wall. */
+   Per-photo hover: hovered stays sharp/bright; siblings blur.
+   Hovering center 「进入」 brightens the whole wall (:has below). */
 .intro-splash__photo {
   position: absolute;
   transform: translate(-50%, -50%);
   opacity: 0.2;
-  filter: brightness(1);
+  filter: brightness(1) blur(0);
   transition:
     opacity 0.55s cubic-bezier(0.19, 1, 0.22, 1),
-    filter 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+    filter 0.55s cubic-bezier(0.19, 1, 0.22, 1);
   overflow: hidden;
   pointer-events: auto;
-  cursor: default;
 }
-.intro-splash__photo:hover {
-  opacity: 1;
-  filter: brightness(1.05);
+@media (hover: hover) and (pointer: fine) {
+  .intro-splash__stage:has(.intro-splash__photo:hover) .intro-splash__photo {
+    opacity: 0.12;
+    filter: brightness(0.75) blur(6px);
+  }
+  .intro-splash__stage:has(.intro-splash__photo:hover) .intro-splash__photo:hover {
+    opacity: 1;
+    filter: brightness(1.08) blur(0);
+  }
 }
 .intro-splash__photo--big {
   width: 160px;
@@ -1074,15 +1110,18 @@
 }
 .intro-splash__cta {
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
   font-size: clamp(2.4rem, 6vw, 3.6rem);
   font-weight: 700;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
   color: #ebe9db;
   line-height: 1;
   text-transform: none;
   pointer-events: auto;
-  cursor: default;
   transition:
     color 0.4s cubic-bezier(0.19, 1, 0.22, 1),
     text-shadow 0.55s cubic-bezier(0.19, 1, 0.22, 1);
@@ -1093,44 +1132,14 @@
   text-shadow: 0 0 28px rgba(235, 233, 219, 0.42);
   outline: none;
 }
-/* Hovering 「探索」 lifts every cover on both rings (darc-room wall glow). */
+/* Hovering 「进入」 lifts every cover on both rings (darc-room wall glow).
+   Wins over photo-sibling blur while the CTA itself is hovered. */
 @media (hover: hover) and (pointer: fine) {
   .intro-splash__stage:has(.intro-splash__cta:hover) .intro-splash__photo,
   .intro-splash__stage:has(.intro-splash__cta:focus-visible) .intro-splash__photo {
     opacity: 0.88;
-    filter: brightness(1.12);
+    filter: brightness(1.12) blur(0);
   }
-}
-
-.intro-splash__skip {
-  position: absolute;
-  top: max(0.85rem, env(safe-area-inset-top));
-  right: max(0.85rem, env(safe-area-inset-right));
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid rgba(235, 233, 219, 0.18);
-  background: rgba(19, 20, 20, 0.55);
-  color: rgba(235, 233, 219, 0.78);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-}
-.intro-splash__skip:hover {
-  color: #ebe9db;
-  border-color: rgba(235, 233, 219, 0.35);
-}
-.intro-splash__skip:focus-visible {
-  outline: 2px solid rgba(196, 164, 132, 0.7);
-  outline-offset: 2px;
-}
-.intro-splash__skip-hint {
-  opacity: 0.45;
-  font-size: 10px;
-  letter-spacing: 0.04em;
 }
 
 /* Breakpoints mirror darc-room: base = desktop (>1140); smaller viewports enlarge rings */
@@ -1182,8 +1191,8 @@
     height: 90px;
   }
   .intro-splash__cta {
-    letter-spacing: 0.28em;
-    text-indent: 0.28em;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
   }
 }
 
@@ -1200,6 +1209,29 @@
     width: 60px;
     height: 60px;
   }
+}
+
+
+/* Bottom tagline — centered, subtle; stays clear of GAME|HOT corner marks */
+.intro-splash__footer {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 3;
+  margin: 0;
+  transform: translateX(-50%);
+  max-width: min(52vw, 18rem);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: clamp(0.65rem, 1.1vw, 0.75rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  line-height: 1.2;
+  color: rgba(235, 233, 219, 0.42);
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
 }
 
 .intro-splash.is-reduced .intro-splash__mark--left,
