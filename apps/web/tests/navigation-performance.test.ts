@@ -129,12 +129,11 @@ for(const elapsed of [650,1950]){
   test(`Escape at ${elapsed}ms stays dismissed across the next intro animation phase`,async()=>{
     const context=await chrome.newContext();const page=await context.newPage();
     try{
-      const now=Date.now();
-      await page.clock.install({time:now});
-      await page.clock.pauseAt(now+1000);
+      await page.clock.install();
       await page.goto(origin+'/');
       const splash=page.getByRole('dialog',{name:'GAMEHOT 开场'});
-      await expect(splash).toBeVisible();
+      await expect(splash).toHaveAttribute('data-phase','enter');
+      await page.clock.pauseAt(Date.now()+100);
       await page.clock.runFor(elapsed);
       await page.keyboard.press('Escape');
       await expect(splash).toHaveAttribute('data-phase','exit');
