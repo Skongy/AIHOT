@@ -167,6 +167,168 @@
       "syndicate_fulltext": false
     },
     {
+      "id": "rss-pcgamer",
+      "name": "PC Gamer",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.pcgamer.com/rss/",
+        "allowUrlPrefixes": [
+          "https://www.pcgamer.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-rockpapershotgun",
+      "name": "Rock Paper Shotgun",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.rockpapershotgun.com/feed",
+        "allowUrlPrefixes": [
+          "https://www.rockpapershotgun.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-gematsu",
+      "name": "Gematsu",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.gematsu.com/feed",
+        "allowUrlPrefixes": [
+          "https://www.gematsu.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-automaton-jp",
+      "name": "AUTOMATON",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://automaton-media.com/feed/",
+        "allowUrlPrefixes": [
+          "https://automaton-media.com/articles/"
+        ],
+        "denyCategories": [
+          "PR"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "日文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-4gamer",
+      "name": "4Gamer",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.4gamer.net/rss/index.xml",
+        "allowUrlPrefixes": [
+          "https://www.4gamer.net/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "日文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "rss-vgc",
+      "name": "VGC",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.videogameschronicle.com/feed/",
+        "allowUrlPrefixes": [
+          "https://www.videogameschronicle.com/"
+        ],
+        "denyUrlPrefixes": [
+          "https://www.videogameschronicle.com/guide/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
       "id": "web-gamersky",
       "name": "游民星空",
       "kind": "web_list",

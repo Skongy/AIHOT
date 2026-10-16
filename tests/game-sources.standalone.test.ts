@@ -1,7 +1,8 @@
 // The game sources seeded from industry/sources.json (信源官 v1 media list and official list): every
 // config is one its kind implements, the per-source filters do what was agreed, and each listing's rules
 // still parse the page it was written for. Snapshots in tests/fixtures/game-sources are trimmed copies of
-// the real pages (2026-10-08); a site redesign shows up here as a parse failure, not as silent empty runs.
+// the real pages (2026-10-08; overseas media 2026-10-16); a site redesign shows up here as a parse failure,
+// not as silent empty runs.
 import "./setup.ts";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -27,6 +28,7 @@ const byId = new Map(sources.map((s) => [s.id, s]));
 
 const MEDIA = [
   "rss-gcores", "rss-ign-cn", "rss-gnn", "rss-yystv", "rss-chuapp", "rss-youxichaguan", "rss-hltv",
+  "rss-pcgamer", "rss-rockpapershotgun", "rss-gematsu", "rss-automaton-jp", "rss-4gamer", "rss-vgc",
   "web-gamersky", "web-3dm", "web-a9vg", "web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-nppa-games",
 ];
 const OFFICIAL = [
@@ -199,6 +201,22 @@ test("巴哈姆特 drops anime, film screenings and light novels at collection",
   assert.ok(raw.some((c) => noise.test(c.title)), "snapshot has anime news");
   assert.ok(!kept.some((c) => noise.test(c.title)));
   assert.ok(kept.some((c) => c.title.includes("《王國之心")), "game news stays");
+});
+
+test("VGC drops walkthroughs but keeps news and interviews", async () => {
+  const { raw, kept } = await readSnapshot(byId.get("rss-vgc")!);
+  assert.ok(raw.some((c) => new URL(c.url).pathname.startsWith("/guide/")), "snapshot has walkthroughs");
+  assert.ok(!kept.some((c) => new URL(c.url).pathname.startsWith("/guide/")));
+  assert.ok(kept.some((c) => new URL(c.url).pathname.startsWith("/news/")), "news stays");
+  assert.ok(kept.some((c) => new URL(c.url).pathname.startsWith("/features/interviews/")), "interviews stay");
+});
+
+test("AUTOMATON drops labelled PR while keeping Japanese news and interviews", async () => {
+  const { raw, kept } = await readSnapshot(byId.get("rss-automaton-jp")!);
+  assert.ok(raw.some((c) => c.categories?.includes("PR")), "snapshot has a labelled promotion");
+  assert.ok(!kept.some((c) => c.categories?.includes("PR")));
+  assert.ok(kept.some((c) => c.url.includes("/newsjp/")), "Japanese news stays");
+  assert.ok(kept.some((c) => c.categories?.includes("インタビュー")), "interviews stay");
 });
 
 test("17173 keeps news articles only, no gift-pack or game-library pages", async () => {
