@@ -26,7 +26,7 @@ export function proxyToApi(req: IncomingMessage, res: ServerResponse, set: Outgo
     up.on("error", () => res.destroy());
     up.pipe(res);
   });
-  res.on("close", () => upstream.destroy());
+  res.on("close", () => { if (!res.writableFinished) upstream.destroy(); });
   upstream.on("error", (error) => {
     if (res.destroyed) return;
     logError(error, { msg: "api proxy request failed", method: req.method, path: req.url });
