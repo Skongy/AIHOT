@@ -40,7 +40,32 @@ jobs:
           fi
           echo "deploy=true" >> "$GITHUB_OUTPUT"
           echo "Deploying checked commit: $CHECKED_SHA" >> "$GITHUB_STEP_SUMMARY"
-      - name: Deploy over SSH
+      - name: Check out the checked commit
+        if: steps.revision.outputs.deploy == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Package the checked commit
+        if: steps.revision.outputs.deploy == 'true'
+        run: |
+          set -euo pipefail
+          git bundle create aihot-deploy.bundle HEAD
+          git bundle verify aihot-deploy.bundle
+      # Send the checked Git object database through the existing SSH channel. The VPS no longer
+      # needs outbound GitHub access, which is unreliable on some mainland routes.
+      - name: Upload the checked commit
+        if: steps.revision.outputs.deploy == 'true'
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: aihot-deploy.bundle
+          target: /tmp
+          overwrite: true
+          command_timeout: 10m
+      - name: Prepare the checked release
         if: steps.revision.outputs.deploy == 'true'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
@@ -53,35 +78,49 @@ jobs:
           command_timeout: 40m
           script: |
             set -euo pipefail
+            BUNDLE=/tmp/aihot-deploy.bundle
+            trap 'rm -f "$BUNDLE"' EXIT
+            test -s "$BUNDLE"
             cd /opt/gamehot
-            # HTTP/2 TLS to GitHub sometimes drops mid-fetch on this VPS; prefer 1.1 and retry.
-            git config http.version HTTP/1.1
-            git config http.postBuffer 524288000
-            fetch_main() {
-              for attempt in 1 2 3 4 5; do
-                if git fetch origin main; then
-                  return 0
-                fi
-                echo "git fetch failed (attempt ${attempt}); retrying in $((attempt * 5))s..."
-                sleep $((attempt * 5))
-              done
-              echo "git fetch failed after retries" >&2
-              return 1
-            }
-            fetch_main
-            if [ "$(git rev-parse origin/main)" != "$CHECKED_SHA" ]; then
-              echo "Skipping outdated deployment; main changed before the build."
-              exit 0
+            git fetch "$BUNDLE" HEAD
+            if [ "$(git rev-parse FETCH_HEAD)" != "$CHECKED_SHA" ]; then
+              echo "Uploaded bundle does not contain the checked commit" >&2
+              exit 1
             fi
+            git update-ref refs/remotes/origin/main "$CHECKED_SHA"
             git reset --hard "$CHECKED_SHA"
             # Keep existing .env; rebuild and restart (China npm mirror)
             sudo docker compose build --build-arg NPM_REGISTRY=https://registry.npmmirror.com
-            # A newer push can arrive while the image is building. Leave running services alone.
-            fetch_main
-            if [ "$(git rev-parse origin/main)" != "$CHECKED_SHA" ]; then
-              echo "Skipping outdated deployment; main changed during the build."
-              exit 0
-            fi
+      - name: Verify the built commit is still main
+        if: steps.revision.outputs.deploy == 'true'
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          latest_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$CHECKED_SHA" != "$latest_sha" ]; then
+            echo "activate=false" >> "$GITHUB_OUTPUT"
+            echo "Built commit is no longer main; running services were left unchanged." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "activate=true" >> "$GITHUB_OUTPUT"
+      - name: Activate the checked release
+        if: steps.current.outputs.activate == 'true'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: CHECKED_SHA
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            cd /opt/gamehot
+            test "$(git rev-parse HEAD)" = "$CHECKED_SHA"
             sudo docker compose stop api worker web
             sudo docker compose run --rm setup
             sudo docker compose up -d
