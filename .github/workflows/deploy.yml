@@ -46,11 +46,42 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+      - name: Read the deployed commit
+        if: steps.revision.outputs.deploy == 'true'
+        id: deployed
+        continue-on-error: true
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          capture_stdout: true
+          command_timeout: 1m
+          script: |
+            set -euo pipefail
+            cd /opt/gamehot
+            printf 'DEPLOYED_SHA=%s\n' "$(git rev-parse HEAD)"
       - name: Package the checked commit
         if: steps.revision.outputs.deploy == 'true'
+        env:
+          DEPLOYED_OUTPUT: ${{ steps.deployed.outputs.stdout }}
         run: |
           set -euo pipefail
-          git bundle create aihot-deploy.bundle HEAD
+          deployed_sha=$(printf '%s\n' "$DEPLOYED_OUTPUT" | sed -n 's/^DEPLOYED_SHA=\([0-9a-f]\{40\}\)$/\1/p' | tail -n 1)
+          checked_sha=$(git rev-parse HEAD)
+          if [ -n "$deployed_sha" ] && git cat-file -e "$deployed_sha^{commit}" 2>/dev/null && git merge-base --is-ancestor "$deployed_sha" HEAD; then
+            bundle_base=$deployed_sha
+            # A manual redeploy can package the commit already on the server; include that commit
+            # and use its parent as the prerequisite so the bundle is still non-empty.
+            if [ "$bundle_base" = "$checked_sha" ]; then
+              bundle_base=$(git rev-parse HEAD^)
+            fi
+            git bundle create aihot-deploy.bundle HEAD "^$bundle_base"
+            echo "Created incremental bundle from $bundle_base" >> "$GITHUB_STEP_SUMMARY"
+          else
+            git bundle create aihot-deploy.bundle HEAD
+            echo "Could not verify the deployed commit; created a complete fallback bundle." >> "$GITHUB_STEP_SUMMARY"
+          fi
           git bundle verify aihot-deploy.bundle
       # Send the checked Git object database through the existing SSH channel. The VPS no longer
       # needs outbound GitHub access, which is unreliable on some mainland routes.
@@ -64,7 +95,7 @@ jobs:
           source: aihot-deploy.bundle
           target: /tmp
           overwrite: true
-          command_timeout: 10m
+          command_timeout: 20m
       - name: Prepare the checked release
         if: steps.revision.outputs.deploy == 'true'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
