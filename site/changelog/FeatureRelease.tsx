@@ -1,12 +1,32 @@
+import { useEffect, useRef, useState } from "react";
 import type { ChangelogRelease } from "@aihot/contracts/site";
 
-const ASK_TOOLS = ["近期资讯", "站内搜索", "热点", "事件", "精选解释", "热榜解释", "日报", "文章摘要"];
+const ASK_FLOW = ["提问", "检索", "引用", "回答"];
+const ASK_CAPABILITIES = ["主动检索", "来源可追溯", "连续追问"];
 
 /** The editorial feature card used for changelog milestones that deserve more than a timeline row. */
 export function FeatureRelease({ release, id }: { release: ChangelogRelease; id?: string }) {
   const [, month, day] = release.date.split("-");
+  const root = useRef<HTMLElement>(null);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    const node = root.current;
+    if (!node || typeof IntersectionObserver === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setEntered(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return;
+      setEntered(true);
+      observer.disconnect();
+    }, { threshold: 0.22, rootMargin: "0px 0px -8%" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id={id} className="changelog-feature scroll-mt-[calc(var(--bar-h)+1.5rem)]" aria-labelledby={`feature-${release.date}`}>
+    <section ref={root} id={id} className={`changelog-feature scroll-mt-[calc(var(--bar-h)+1.5rem)] ${entered ? "is-entered" : ""}`} aria-labelledby={`feature-${release.date}`}>
       <div className="changelog-feature__glow" aria-hidden="true" />
       <div className="changelog-feature__rings" aria-hidden="true">
         <span />
@@ -28,28 +48,31 @@ export function FeatureRelease({ release, id }: { release: ChangelogRelease; id?
       </header>
 
       <div className="relative z-10 pt-7">
-        <p className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-accent">GAMEHOT INTELLIGENCE</p>
-        <h2 id={`feature-${release.date}`} className="font-display text-[30px] font-semibold leading-[1.16] tracking-[-0.025em] text-ink sm:text-[38px]">
+        <p className="changelog-feature__eyebrow mb-2 text-[11px] font-semibold tracking-[0.16em] text-accent">GAMEHOT INTELLIGENCE</p>
+        <h2 id={`feature-${release.date}`} className="changelog-feature__heading font-display text-[30px] font-semibold leading-[1.16] tracking-[-0.025em] text-ink sm:text-[38px]">
           {release.title}
         </h2>
-        <p className="mt-4 max-w-[52rem] text-[15px] leading-[1.9] text-ink-2 sm:text-[16px]">{release.body[0]}</p>
+        <p className="changelog-feature__lead mt-4 max-w-[52rem] text-[15px] leading-[1.9] text-ink-2 sm:text-[16px]">{release.body[0]}</p>
 
-        <div className="mt-6 flex flex-wrap gap-2" aria-label="AI 问答可用工具">
-          {ASK_TOOLS.map((tool, index) => (
-            <span key={tool} className="changelog-feature__tool rounded-full border border-line bg-surface/75 px-3 py-1.5 text-[12px] text-ink-2" style={{ animationDelay: `${180 + index * 45}ms` }}>
-              {tool}
+        <div className="changelog-feature__trajectory mt-8" role="img" aria-label="AI 问答工作过程：提问、检索、引用、回答">
+          <span className="changelog-feature__trajectory-line" aria-hidden="true" />
+          {ASK_FLOW.map((step, index) => (
+            <span key={step} className="changelog-feature__node" style={{ animationDelay: `${360 + index * 110}ms` }}>
+              <span className="changelog-feature__node-mark" aria-hidden="true">{index + 1}</span>
+              <span>{step}</span>
             </span>
           ))}
         </div>
 
-        <ol className="mt-8 grid gap-3 border-t border-line-soft pt-5 lg:grid-cols-3">
-          {release.body.slice(1).map((line, index) => (
-            <li key={line} className="changelog-feature__detail flex gap-3 rounded-tile bg-surface/55 p-4" style={{ animationDelay: `${360 + index * 80}ms` }}>
-              <span className="mono mt-0.5 text-[11px] font-semibold text-accent">0{index + 1}</span>
-              <span className="text-[13px] leading-[1.75] text-ink-3">{line}</span>
-            </li>
+        <div className="mt-7 flex flex-wrap gap-2" aria-label="主要能力">
+          {ASK_CAPABILITIES.map((capability, index) => (
+            <span key={capability} className="changelog-feature__capability rounded-full border border-accent/20 bg-accent-softer px-3 py-1.5 text-[12px] font-medium text-accent-ink" style={{ animationDelay: `${820 + index * 70}ms` }}>
+              {capability}
+            </span>
           ))}
-        </ol>
+        </div>
+
+        {release.body[1] && <p className="changelog-feature__summary mt-5 border-t border-line-soft pt-5 text-[13.5px] leading-[1.8] text-ink-3">{release.body[1]}</p>}
       </div>
     </section>
   );

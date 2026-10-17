@@ -938,6 +938,10 @@
     linear-gradient(135deg, color-mix(in srgb, var(--accent-softer) 72%, transparent), transparent 52%),
     var(--surface);
   box-shadow: var(--shadow-card);
+  opacity: 0;
+  transform: translateY(12px);
+}
+.changelog-feature.is-entered {
   animation: changelog-feature-in 560ms var(--ease-out-quart) both;
 }
 .changelog-feature__glow {
@@ -967,18 +971,88 @@
 }
 .changelog-feature__rings span:nth-child(2) { --ring: 1; }
 .changelog-feature__rings span:nth-child(3) { --ring: 2; }
-.changelog-feature__pulse { animation: changelog-feature-pulse 2.4s ease-in-out infinite; }
-.changelog-feature__tool,
-.changelog-feature__detail { animation: changelog-feature-item-in 440ms var(--ease-out-quart) both; }
+.changelog-feature__eyebrow,
+.changelog-feature__heading,
+.changelog-feature__lead,
+.changelog-feature__node,
+.changelog-feature__capability,
+.changelog-feature__summary {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.changelog-feature.is-entered .changelog-feature__rings { animation: changelog-feature-rings-in 720ms 140ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__pulse { animation: changelog-feature-pulse 900ms 180ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__eyebrow { animation: changelog-feature-item-in 420ms 100ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__heading { animation: changelog-feature-item-in 520ms 150ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__lead { animation: changelog-feature-item-in 500ms 230ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__node,
+.changelog-feature.is-entered .changelog-feature__capability,
+.changelog-feature.is-entered .changelog-feature__summary { animation: changelog-feature-item-in 440ms var(--ease-out-quart) both; }
+.changelog-feature.is-entered .changelog-feature__summary { animation-delay: 1040ms; }
+
+.changelog-feature__trajectory {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+.changelog-feature__trajectory-line {
+  position: absolute;
+  left: 12.5%;
+  right: 12.5%;
+  top: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), var(--accent), var(--line-strong));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.changelog-feature.is-entered .changelog-feature__trajectory-line {
+  animation: changelog-feature-line-in 720ms 280ms var(--ease-out-quart) both;
+}
+.changelog-feature__node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.changelog-feature__node-mark {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--surface) 84%, transparent);
+}
 
 @keyframes changelog-feature-in {
   from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes changelog-feature-item-in {
   from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes changelog-feature-line-in {
+  to { transform: scaleX(1); }
+}
+@keyframes changelog-feature-rings-in {
+  from { opacity: 0; transform: rotate(-8deg) scale(.9); }
+  to { opacity: .46; transform: none; }
 }
 @keyframes changelog-feature-pulse {
-  50% { opacity: .35; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent); }
+  0% { opacity: .45; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 18%, transparent); }
+  55% { opacity: 1; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 8%, transparent); }
+  100% { opacity: 1; box-shadow: 0 0 0 0 transparent; }
 }
 
 @media (min-width: 641px) {
@@ -987,8 +1061,14 @@
 @media (prefers-reduced-motion: reduce) {
   .changelog-feature,
   .changelog-feature__pulse,
-  .changelog-feature__tool,
-  .changelog-feature__detail { animation: none !important; }
+  .changelog-feature__rings,
+  .changelog-feature__eyebrow,
+  .changelog-feature__heading,
+  .changelog-feature__lead,
+  .changelog-feature__node,
+  .changelog-feature__capability,
+  .changelog-feature__summary { animation: none !important; opacity: 1; transform: none; }
+  .changelog-feature__trajectory-line { animation: none !important; transform: scaleX(1); }
 }
 
 /* ---------------------------------------------------------------------------
