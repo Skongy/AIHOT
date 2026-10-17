@@ -20,20 +20,18 @@ function TrendMark({ trend }: { trend: HotStripEntry["trend"] }) {
   return <IconMinus size={14} strokeWidth={2.2} className="text-ink-4" aria-label="热度持平" />;
 }
 
-/**
- * Top of the hot ranking on the home page: accent numerals 01–05, hairline rows,
- * no flame ping or gradient wash — magazine editorial strip.
- */
+/** Top of the hot ranking on the home page: a quiet live marker and an editorial ranking strip. */
 export function HotTopics({ entries }: { entries: HotStripEntry[] }) {
   if (entries.length === 0) return null;
   return (
     <section
       aria-labelledby="hot-topics"
-      className="mb-4 border border-line bg-surface px-3.5 pb-1 pt-2.5 lg:mb-6 lg:px-5 lg:pb-2 lg:pt-3.5"
+      className="mb-4 overflow-hidden rounded-panel border border-line bg-surface px-3.5 pb-1 pt-2.5 shadow-[0_6px_20px_rgba(32,36,43,0.045)] dark:shadow-none lg:mb-6 lg:px-5 lg:pb-2 lg:pt-3.5"
     >
       <div className="flex items-center justify-between border-b border-line pb-2 lg:mb-1">
-        <h2 id="hot-topics" className="text-[13px] font-semibold tracking-[0.06em] text-ink">
-          当前热点
+        <h2 id="hot-topics" className="flex items-center gap-2 text-[13px] font-semibold tracking-[0.06em] text-ink">
+          <span className="hot-topics__live-dot" aria-hidden="true" />
+          <span className="hot-topics__title">当前热点</span>
         </h2>
         <Link to="/hot" className="group -my-2 -mr-1.5 inline-flex h-10 items-center gap-1 px-1.5 text-[12.5px] text-accent transition-colors hover:text-accent-ink lg:my-0 lg:mr-0 lg:h-auto lg:px-0">
           查看完整榜单 <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">→</span>

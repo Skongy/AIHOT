@@ -402,6 +402,45 @@
   animation: fade-up 280ms var(--ease-out-quart) both;
 }
 
+/* A restrained live signal for the home-page hot ranking. */
+.hot-topics__live-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: #d1433c;
+  box-shadow: 0 0 0 0 rgba(209, 67, 60, 0.24);
+  animation: hot-topics-breathe 2.2s ease-in-out infinite;
+}
+
+.hot-topics__title {
+  color: var(--ink);
+  background: linear-gradient(100deg, var(--ink) 15%, var(--accent) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes hot-topics-breathe {
+  0%, 100% {
+    opacity: 0.82;
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(209, 67, 60, 0.22);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(209, 67, 60, 0.08);
+  }
+}
+
+@media (forced-colors: active) {
+  .hot-topics__title {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 /* Enter/leave keyframes for components/ui/Presence.tsx; --anim-ms overrides a default length. */
 @keyframes aihot-collapse-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
 @keyframes aihot-collapse-out { from { grid-template-rows: 1fr; opacity: 1; } to { grid-template-rows: 0fr; opacity: 0; } }
