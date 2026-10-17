@@ -2,22 +2,31 @@
 import { SITE } from "../site.ts";
 
 export function Wordmark({ size = 24, className = "", title = SITE.name }: { size?: number; className?: string; title?: string }) {
+  const height = Math.round(size * (size < 20 ? 0.82 : 1));
+  const width = Math.round(height * (1024 / 156));
   return (
     <span
-      className={`font-display inline-flex items-center gap-[0.42em] font-semibold leading-none tracking-[0.12em] ${className}`}
-      style={{ fontSize: Math.round(size * 0.88) }}
+      className={`inline-flex shrink-0 items-center ${className}`}
+      style={{ width, height }}
       aria-label={title}
       role="img"
     >
       <img
-        src="/logo-mark.png?v=gold-g-2"
-        width={Math.round(size * (21 / 32))}
-        height={size}
+        src="/wordmark.png?v=gamehot-art-1"
+        width={1024}
+        height={156}
         alt=""
         aria-hidden="true"
-        className="shrink-0"
+        className="h-full w-full object-contain dark:hidden"
       />
-      <span aria-hidden="true">{SITE.name}</span>
+      <img
+        src="/wordmark-dark.png?v=gamehot-art-1"
+        width={1024}
+        height={156}
+        alt=""
+        aria-hidden="true"
+        className="hidden h-full w-full object-contain dark:block"
+      />
     </span>
   );
 }
