@@ -927,6 +927,70 @@
   .ask-chip button:hover { transform: none; }
 }
 
+/* Changelog feature release: a restrained editorial spotlight for major product milestones. */
+.changelog-feature {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-panel);
+  padding: 24px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-softer) 72%, transparent), transparent 52%),
+    var(--surface);
+  box-shadow: var(--shadow-card);
+  animation: changelog-feature-in 560ms var(--ease-out-quart) both;
+}
+.changelog-feature__glow {
+  position: absolute;
+  right: -90px;
+  top: -120px;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent), transparent 68%);
+  pointer-events: none;
+}
+.changelog-feature__rings {
+  position: absolute;
+  right: -62px;
+  top: -76px;
+  width: 250px;
+  height: 250px;
+  opacity: .46;
+  pointer-events: none;
+}
+.changelog-feature__rings span {
+  position: absolute;
+  inset: calc(var(--ring, 0) * 24px);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 999px;
+}
+.changelog-feature__rings span:nth-child(2) { --ring: 1; }
+.changelog-feature__rings span:nth-child(3) { --ring: 2; }
+.changelog-feature__pulse { animation: changelog-feature-pulse 2.4s ease-in-out infinite; }
+.changelog-feature__tool,
+.changelog-feature__detail { animation: changelog-feature-item-in 440ms var(--ease-out-quart) both; }
+
+@keyframes changelog-feature-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@keyframes changelog-feature-item-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes changelog-feature-pulse {
+  50% { opacity: .35; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent); }
+}
+
+@media (min-width: 641px) {
+  .changelog-feature { padding: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .changelog-feature,
+  .changelog-feature__pulse,
+  .changelog-feature__tool,
+  .changelog-feature__detail { animation: none !important; }
+}
+
 /* ---------------------------------------------------------------------------
    Intro splash — 1:1 post-beach darc-room Main_* motion
    Dual rings: big 80vw/40s reverse + small 45vw/30s; img counter-rotate;

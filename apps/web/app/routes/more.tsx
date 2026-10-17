@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import { POLICY, SITE } from "@aihot/site";
+import type { loader as rootLoader } from "../root";
+import { useChangelogDot } from "../components/shell/Sidebar";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import type { Screen } from "../components/shell/screens";
 import { edgeTtl } from "../lib/api.server";
@@ -8,7 +10,7 @@ import { webModules } from "../site-modules";
 import { pageMeta } from "../lib/seo";
 import { useStarred } from "../lib/local-state";
 import { ThemeSwitch } from "../components/shell/ThemeSwitch";
-import { IconBookmark, IconChevronRight, IconHeart, IconMoon, IconPlug } from "../components/icons";
+import { IconBookmark, IconChevronRight, IconHeart, IconMoon, IconPlug, IconSparkles } from "../components/icons";
 
 export const handle: Screen = { tab: "me", name: "我的" };
 
@@ -61,6 +63,8 @@ function RowLink({ row, dot = false }: { row: Row; dot?: boolean }) {
 }
 
 export default function MorePage() {
+  const root = useRouteLoaderData<typeof rootLoader>("root");
+  const changelogDot = useChangelogDot(root?.changelogVersion ?? null);
   const starred = useStarred();
   // The count is this browser's: shown once the page runs here, never in the shared server copy.
   const [here, setHere] = useState(false);
@@ -87,6 +91,7 @@ export default function MorePage() {
         </Group>
         <Group title="关于">
           <RowLink row={{ to: "/about", label: `关于 ${SITE.name}`, icon: <IconHeart size={20} /> }} />
+          <RowLink row={{ to: "/changelog", label: "更新日志", icon: <IconSparkles size={20} /> }} dot={changelogDot} />
         </Group>
       </div>
       <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[12px] leading-[2] text-ink-4">
