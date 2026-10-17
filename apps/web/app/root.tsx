@@ -30,9 +30,9 @@ export const links: Route.LinksFunction = () => [
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&family=Playfair+Display:wght@600;700&display=swap",
   },
-  { rel: "icon", href: "/favicon.ico", sizes: "any" },
-  { rel: "icon", type: "image/png", href: "/icon.png" },
-  { rel: "apple-touch-icon", href: "/apple-icon.png" },
+  { rel: "icon", href: "/favicon.ico?v=gold-g-2", sizes: "any" },
+  { rel: "icon", type: "image/png", href: "/icon.png?v=gold-g-2" },
+  { rel: "apple-touch-icon", href: "/apple-icon.png?v=gold-g-2" },
   { rel: "manifest", href: "/manifest.webmanifest" },
   { rel: "alternate", type: "application/rss+xml", title: `${SITE.name} — 精选`, href: "/feed.xml" },
 ];
