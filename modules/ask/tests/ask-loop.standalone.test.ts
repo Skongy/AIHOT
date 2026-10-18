@@ -2,7 +2,7 @@
 // DB-backed cases use the test database when available via sibling file.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkCitations, sanitizeAskMarkdown, isAllowedAskHref } from "../src/agent/citations.ts";
+import { checkCitations, sanitizeAskMarkdown, isAllowedAskHref, stripThinkTags, stripThinkTagsStreaming } from "../src/agent/citations.ts";
 import { ASK_TOOL_NAMES, ASK_TOOL_LABELS_ZH, friendlyStepSummary } from "../src/tools/whitelist.ts";
 import { logicalKeyFor } from "@aihot/backend/providers/receipts";
 import { sha256, stableJson } from "@aihot/backend/lib/ids";
@@ -39,6 +39,27 @@ test("sanitize unlinks unregistered markdown links", () => {
   const out = sanitizeAskMarkdown("[坏链](https://evil.example) 与 [好](/items/1)", new Set(["/items/1"]));
   assert.ok(!out.includes("](https://evil.example)"));
   assert.ok(out.includes("[好](/items/1)"));
+});
+
+test("stripThinkTags removes closed and unclosed reasoning blocks", () => {
+  assert.equal(stripThinkTags("前<think>秘密</think>后"), "前后");
+  assert.equal(stripThinkTags("可见<think>未闭合仍在想"), "可见");
+  assert.equal(stripThinkTags("a</think>b"), "ab");
+  assert.equal(stripThinkTags("无标签"), "无标签");
+});
+
+test("sanitizeAskMarkdown also strips think tags", () => {
+  const out = sanitizeAskMarkdown("答<think>推理</think>案 [好](/items/1)", new Set(["/items/1"]));
+  assert.ok(!out.includes("think"));
+  assert.ok(!out.includes("推理"));
+  assert.ok(out.includes("答案"));
+  assert.ok(out.includes("[好](/items/1)"));
+});
+
+test("stripThinkTagsStreaming withholds incomplete open-tag prefixes", () => {
+  assert.equal(stripThinkTagsStreaming("你好 <thi"), "你好 ");
+  assert.equal(stripThinkTagsStreaming("你好 <think>藏"), "你好 ");
+  assert.equal(stripThinkTagsStreaming("你好 <think>藏</think>世界"), "你好 世界");
 });
 
 test("isAllowedAskHref blocks javascript and data", () => {

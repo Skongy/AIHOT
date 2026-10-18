@@ -51,10 +51,13 @@ test("article context reads public summaries and registers a citeable source", a
   assert.equal(result.ok, true);
   if (result.ok) { assert.equal(result.evidence[0]?.objectId, ids[0]); assert.match(result.text, /固定摘要/); }
 });
-test("latest recommendations also have registered evidence", async () => {
+test("get_latest timeline dumps are browsing-only and register no citeable evidence", async () => {
   const result = await executeAskTool('get_latest', JSON.stringify({ window:'all', mode:'all', limit:1 }));
   assert.equal(result.ok, true);
-  if (result.ok) assert.equal(result.evidence.length, 1);
+  if (result.ok) {
+    assert.equal(result.evidence.length, 0);
+    assert.ok(typeof result.structured.count === "number");
+  }
 });
 test("empty named searches return no unrelated evidence", async () => {
   const result=await executeAskTool('search',JSON.stringify({q:'no-such-game-unique-fixture',window:'all'}));

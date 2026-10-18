@@ -174,8 +174,11 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
           expanded = true;
           res = await askItems({ ...base, mode });
         }
-        const evidence: EvidenceCandidate[] = res.items.map((it) => ({
-          kind: "item", objectId: it.id, title: it.title, sourceName: it.source.name,
+        // get_latest is an unfiltered recent dump for model browsing only — do not register
+        // citeable 来源 (avoids empty-search fallbacks dumping unrelated items under「参考来源」).
+        // Named retrieval (search) still registers evidence as before.
+        const evidence: EvidenceCandidate[] = tool === "get_latest" ? [] : res.items.map((it) => ({
+          kind: "item" as const, objectId: it.id, title: it.title, sourceName: it.source.name,
           publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original,
           toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty },
         }));

@@ -14,6 +14,9 @@ export function Answer({ text, evidence, streaming }: { text: string; evidence: 
   const prefix = useId().replace(/:/g, "");
   const allowed = new Set(evidence.flatMap((e) => e.unavailable ? [] : [e.siteUrl, e.originalUrl].filter((v): v is string => !!v)));
   const safe = sanitizeAskMarkdown(text, allowed);
+  // 参考来源只展示答案正文里出现过的 [n]，无引用则不展示整块。
+  const citedIds = new Set([...safe.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
+  const citedEvidence = evidence.filter((e) => citedIds.has(e.id));
   const cite = (id: number) => {
     const element = document.getElementById(`${prefix}-source-${id}`);
     const details = element?.closest("details");
@@ -49,10 +52,10 @@ export function Answer({ text, evidence, streaming }: { text: string; evidence: 
   }
   return <>
     <div className={`ask-answer${streaming ? " is-streaming" : ""}`}>{blocks}</div>
-    {evidence.length > 0 && <details className="ask-sources">
-      <summary><span>参考来源 <span className="ask-source-count">{evidence.length}</span></span><span>查看出处</span></summary>
+    {citedEvidence.length > 0 && <details className="ask-sources">
+      <summary><span>参考来源 <span className="ask-source-count">{citedEvidence.length}</span></span><span>查看出处</span></summary>
       <p className="ask-source-note">来源与回答关联，新闻事实仍以原始报道为准。</p>
-      <ol>{evidence.map((e) => <li id={`${prefix}-source-${e.id}`} key={e.id} tabIndex={-1}>
+      <ol>{citedEvidence.map((e) => <li id={`${prefix}-source-${e.id}`} key={e.id} tabIndex={-1}>
         <span className="ask-source-number">{e.id}</span><div><p className="ask-source-title">{e.unavailable ? "来源已不可用" : e.title ?? "参考资料"}</p>
           {!e.unavailable && <><p className="ask-source-meta">{e.sourceName ?? (e.kind?.includes("explain") ? "GAMEHOT 机制说明" : "GAMEHOT")}<span>{dateLabel(e.publishedAt)}</span></p>
           <div className="ask-source-links">{e.siteUrl && <SourceLink href={e.siteUrl} allowed={allowed}>站内阅读</SourceLink>}{e.originalUrl && <SourceLink href={e.originalUrl} allowed={allowed}>查看原文 ↗</SourceLink>}</div></>}

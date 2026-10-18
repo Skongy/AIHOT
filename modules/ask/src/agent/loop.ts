@@ -13,7 +13,7 @@ import {
 } from "../db/store.ts";
 import { ASK_TOOL_LABELS_ZH, askToolSpecs, executeAskTool, friendlyStepSummary, type AskToolName } from "../tools/whitelist.ts";
 import { askSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
-import { checkCitations } from "./citations.ts";
+import { checkCitations, stripThinkTags, stripThinkTagsStreaming } from "./citations.ts";
 import { currentEvidence, historySources } from "./evidence.ts";
 
 const MAX_MODEL = 6;
@@ -103,6 +103,8 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
 
   const tools = askToolSpecs();
   let draft = "";
+  let rawDraft = ""; // pre-strip accumulator so think tags split across deltas stay hidden
+  let sentClean = "";
   let deltaBuf = "";
   let lastFlush = now();
   const evidenceIds: number[] = [];
@@ -115,6 +117,25 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
     lastFlush = now();
     await appendEvent(opts.taskId, "answer_delta", { text });
     await updateDraft(opts.taskId, draft);
+  };
+
+  /** Append model delta, strip think tags, emit only newly visible clean text. */
+  const ingestDelta = async (text: string) => {
+    rawDraft += text;
+    const clean = stripThinkTagsStreaming(rawDraft);
+    draft = stripThinkTags(rawDraft); // final/stored draft: full strip, no holdback
+    if (clean.startsWith(sentClean)) {
+      const piece = clean.slice(sentClean.length);
+      sentClean = clean;
+      if (piece) {
+        deltaBuf += piece;
+        await flushDelta(false);
+      }
+    } else {
+      // Rare shrink when an unclosed think later closes differently — prefer clean draft.
+      sentClean = clean;
+      draft = stripThinkTags(rawDraft);
+    }
   };
 
   const cancelled = async () => {
@@ -180,9 +201,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
           enableTools: !forceFinal,
           maxTokens: 2048,
           onDelta: async (text) => {
-            draft += text;
-            deltaBuf += text;
-            await flushDelta(false);
+            await ingestDelta(text);
           },
         });
       } catch (e) {
@@ -211,21 +230,28 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       await flushDelta(true);
 
       if (result.content && !draft.includes(result.content) && result.reused) {
-        draft = result.content;
-        await appendEvent(opts.taskId, "answer_delta", { text: result.content });
+        const cleaned = stripThinkTags(result.content);
+        draft = cleaned;
+        rawDraft = result.content;
+        sentClean = cleaned;
+        await appendEvent(opts.taskId, "answer_delta", { text: cleaned });
         await updateDraft(opts.taskId, draft);
       } else if (result.content && draft !== result.content && !result.content.startsWith(draft.slice(0, 20))) {
         // Prefer assembled content as source of truth after stream.
         if (!draft) {
-          draft = result.content;
+          draft = stripThinkTags(result.content);
+          rawDraft = result.content;
+          sentClean = draft;
           await updateDraft(opts.taskId, draft);
         }
       }
+      // Ensure stored draft never retains think tags after a stream round.
+      draft = stripThinkTags(draft || rawDraft || result.content || "");
 
       const toolCalls = forceFinal ? [] : result.toolCalls;
       if (toolCalls.length === 0) {
         // Final answer path
-        const answer = draft || result.content || "";
+        const answer = stripThinkTags(draft || result.content || "");
         const evidence = await listEvidence(opts.taskId);
         const check = checkCitations(answer, evidence.map((e) => e.id));
         await appendEvent(opts.taskId, "citation_check", { ok: check.ok, issues: check.issues });
@@ -306,6 +332,8 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       }
       // Clear draft between tool rounds (answer deltas for final round only).
       draft = "";
+      rawDraft = "";
+      sentClean = "";
       deltaBuf = "";
     }
   } catch (e) {
