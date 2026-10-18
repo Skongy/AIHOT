@@ -37,6 +37,17 @@ function degradeSummary(evidence: Array<{ id: number; title: string | null; kind
   return ["已达模型或工具调用上限，以下为已收集到的要点（未再请求模型总结）：", ...lines].join("\n");
 }
 
+/** Prefer model draft; never leave the user with steps-only blank answers. */
+function visibleAnswer(draft: string, evidence: Array<{ id: number; title: string | null; kind: string }>, emptyFallback: string): string {
+  const text = draft.trim();
+  if (text) return draft;
+  if (evidence.length) {
+    const lines = evidence.slice(0, 8).map((e) => `- [${e.id}] ${e.title ?? e.kind}`);
+    return ["已检索到相关资料，但未能整理成完整回答。以下为已登记来源，请直接打开查看：", ...lines].join("\n");
+  }
+  return emptyFallback;
+}
+
 export async function runAskTask(opts: LoopOptions): Promise<void> {
   const chat = opts.chat ?? chatToolsStream;
   const now = opts.now ?? Date.now;
@@ -206,22 +217,34 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
         });
       } catch (e) {
         await flushDelta(true);
+        const ev = await listEvidence(opts.taskId);
+        const failText = visibleAnswer(
+          draft,
+          ev.map((x) => ({ id: x.id, title: x.title, kind: x.kind })),
+          "这次未能生成回答，请稍后再试。",
+        );
         if (e instanceof BudgetExceededError) {
           await appendEvent(opts.taskId, "error", { code: "budget_exhausted", message: "服务预算不足" });
+          await appendEvent(opts.taskId, "answer_done", { text: failText, finishReason: "budget_exhausted" });
           await appendEvent(opts.taskId, "task_status", { status: "failed", reason: "budget_exhausted" });
-          await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "budget_exhausted", errorMessage: e.message, draftAnswer: draft || null });
+          await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "budget_exhausted", errorMessage: e.message, finalAnswer: failText, draftAnswer: failText });
+          await insertAssistantMessage(task.session_id, opts.taskId, failText);
           return;
         }
         if (e instanceof ReceiptUnknownError) {
           await setActiveReceipt(opts.taskId, e.receiptId);
           await appendEvent(opts.taskId, "error", { code: "receipt_unknown", message: "付费回执结果不明" });
+          await appendEvent(opts.taskId, "answer_done", { text: failText, finishReason: "receipt_unknown" });
           await appendEvent(opts.taskId, "task_status", { status: "failed", reason: "receipt_unknown" });
-          await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "receipt_unknown", errorMessage: e.message, draftAnswer: draft || null });
+          await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "receipt_unknown", errorMessage: e.message, finalAnswer: failText, draftAnswer: failText });
+          await insertAssistantMessage(task.session_id, opts.taskId, failText);
           return;
         }
         await appendEvent(opts.taskId, "error", { code: "internal_error", message: "模型调用失败" });
+        await appendEvent(opts.taskId, "answer_done", { text: failText, finishReason: "internal_error" });
         await appendEvent(opts.taskId, "task_status", { status: "failed" });
-        await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "internal_error", errorMessage: String(e).slice(0, 500), draftAnswer: draft || null });
+        await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "internal_error", errorMessage: String(e).slice(0, 500), finalAnswer: failText, draftAnswer: failText });
+        await insertAssistantMessage(task.session_id, opts.taskId, failText);
         return;
       }
 
@@ -251,8 +274,12 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       const toolCalls = forceFinal ? [] : result.toolCalls;
       if (toolCalls.length === 0) {
         // Final answer path
-        const answer = stripThinkTags(draft || result.content || "");
         const evidence = await listEvidence(opts.taskId);
+        const answer = visibleAnswer(
+          stripThinkTags(draft || result.content || ""),
+          evidence.map((e) => ({ id: e.id, title: e.title, kind: e.kind })),
+          "这次没能整理出回答。你可以换个问法，或缩小时间范围后再试。",
+        );
         const check = checkCitations(answer, evidence.map((e) => e.id));
         await appendEvent(opts.taskId, "citation_check", { ok: check.ok, issues: check.issues });
         await appendEvent(opts.taskId, "answer_done", { text: answer, finishReason: result.finishReason ?? "stop" });
@@ -337,9 +364,17 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       deltaBuf = "";
     }
   } catch (e) {
+    const ev = await listEvidence(opts.taskId).catch(() => []);
+    const failText = visibleAnswer(
+      draft,
+      ev.map((x) => ({ id: x.id, title: x.title, kind: x.kind })),
+      "这次未能生成回答，请稍后再试。",
+    );
     await appendEvent(opts.taskId, "error", { code: "internal_error", message: "任务异常结束" });
+    await appendEvent(opts.taskId, "answer_done", { text: failText, finishReason: "internal_error" });
     await appendEvent(opts.taskId, "task_status", { status: "failed" });
-    await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "internal_error", errorMessage: String(e).slice(0, 500), draftAnswer: draft || null });
+    await finishTask(opts.taskId, opts.workerId, "failed", { errorCode: "internal_error", errorMessage: String(e).slice(0, 500), finalAnswer: failText, draftAnswer: failText });
+    await insertAssistantMessage(task.session_id, opts.taskId, failText).catch(() => {});
   }
 }
 

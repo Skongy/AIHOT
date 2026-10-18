@@ -41,7 +41,7 @@ export const ASK_TOOL_LABELS_ZH: Record<AskToolName, string> = {
 
 const categorySchema = z.enum(PUBLIC_API_CATEGORY_KEYS as unknown as [string, ...string[]]).optional();
 const rangeSchema = {
-  window: z.enum(["1h", "24h", "7d", "30d", "all"]).optional().describe("滚动时间；all=全部历史。指定 from/until 时优先使用日期范围。"),
+  window: z.enum(["1h", "24h", "7d", "30d", "all"]).optional().describe("滚动时间，仅 1h|24h|7d|30d|all；超过30天用 all 或 from/until。指定 from/until 时优先日期范围。"),
   from: z.string().max(40).optional().describe("开始（含）：YYYY-MM-DD 按北京时间，或带时区 ISO 时间。"),
   until: z.string().max(40).optional().describe("结束：日期包含当天；ISO 时间不含该时刻。今天用北京时间当日日期作为 from。"),
   cursor: z.string().max(4096).optional().describe("下一页游标，保持其余查询参数和 mode 不变，不要编造。"),
@@ -81,8 +81,8 @@ const SCHEMAS: Record<AskToolName, z.ZodType> = {
 };
 
 const ASK_TOOL_DESCRIPTIONS: Record<AskToolName, string> = {
-  get_latest: "按精确时间范围查近期资讯；默认精选、过去24小时。支持1h/7d/30d/全部历史、自定义日期及游标翻页。不用于具名游戏搜索。",
-  search: "按游戏或关键词查站内报道，自动匹配中英文别名。q 使用游戏名，可附空格分隔的关键词。默认近7天，支持全部历史、日期及翻页；先精选，无结果扩到全部。",
+  get_latest: "按精确时间范围查近期资讯；默认精选、过去24小时。window 仅允许 1h/24h/7d/30d/all；超过30天用 all 或 from/until。支持自定义日期及游标翻页。不用于具名游戏搜索。",
+  search: "按游戏或关键词查站内报道，自动匹配中英文别名。q 使用游戏名，可附空格分隔的关键词。默认近7天。window 仅允许 1h/24h/7d/30d/all；超过30天用 all 或 from/until。支持日期及翻页；先精选，无结果扩到全部。",
   get_hot_topics: "查当前热点榜（多信源同时讨论的事件）。",
   get_story: "查事件的来龙去脉与报道时间线；public_id 来自用户站内链接、历史出处或工具返回。",
   explain_selection: "解释某条目为何入选精选（评分与门槛说明）。",
@@ -138,6 +138,34 @@ function truncate(text: string, max = 4000): string {
   return [...text].slice(0, max).join("") + "\n…(已截断)";
 }
 
+const ASK_WINDOWS = ["1h", "24h", "7d", "30d", "all"] as const;
+type AskWindowLiteral = (typeof ASK_WINDOWS)[number];
+
+/** Model often invents 90d/14d/2w; map common mistakes before Zod so search still runs. */
+const WINDOW_COERCE: Record<string, AskWindowLiteral> = {
+  "1h": "1h", "24h": "24h", "7d": "7d", "30d": "30d", "all": "all",
+  "90d": "all", "60d": "all", "180d": "all", "365d": "all", "1y": "all", "12m": "all", "6m": "all", "3m": "all",
+  "14d": "30d", "2w": "30d", "15d": "30d", "21d": "30d",
+  "3d": "7d", "2d": "7d", "4d": "7d", "5d": "7d", "10d": "7d",
+};
+
+/** Coerce tool args in place for schema recovery. Exported for unit tests. */
+export function coerceAskToolArgs(tool: AskToolName, args: unknown): unknown {
+  if (!args || typeof args !== "object" || Array.isArray(args)) return args;
+  if (tool !== "get_latest" && tool !== "search") return args;
+  const out: Record<string, unknown> = { ...(args as Record<string, unknown>) };
+  if (!("window" in out) || out.window === undefined || out.window === null) return out;
+  if (typeof out.window !== "string") {
+    delete out.window;
+    return out;
+  }
+  const key = out.window.trim().toLowerCase();
+  const mapped = WINDOW_COERCE[key];
+  if (mapped) out.window = mapped;
+  else delete out.window; // unknown → drop, tool uses its default window
+  return out;
+}
+
 /** Validate and execute one whitelist tool call. Unknown names / bad JSON / schema fail without side effects. */
 export async function executeAskTool(name: string, argsJson: string): Promise<ToolExecResult> {
   if (!(ASK_TOOL_NAMES as readonly string[]).includes(name)) {
@@ -150,7 +178,8 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
   } catch {
     return { ok: false, name, errorCode: "invalid_arguments", message: "工具参数不是完整 JSON，未执行。" };
   }
-  const parsed = SCHEMAS[tool].safeParse(args);
+  const coerced = coerceAskToolArgs(tool, args);
+  const parsed = SCHEMAS[tool].safeParse(coerced);
   if (!parsed.success) {
     return { ok: false, name, errorCode: "invalid_arguments", message: `参数校验失败：${parsed.error.message}` };
   }
