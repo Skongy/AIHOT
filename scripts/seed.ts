@@ -33,13 +33,25 @@ for (const s of sources) {
   }
   const tier = s.tier ?? "T2";
   const enabled = s.enabled ?? true;
-  const managedRevision = s.seed_revision === undefined ? null : `industry:${s.seed_revision}`;
+  const revision = s.seed_revision ?? null;
+  const revisionKey = `seed:source:${s.id}`;
   // First-party means a T1 source, as the admin sets it.
   const changed = await sql`
-    INSERT INTO sources (id, name, kind, config, tier, first_party, owner_entity_id, participation_mode, interval_minutes, tags, site_fulltext, syndicate_fulltext, enabled, health, next_fetch_at, imported_from)
-    VALUES (${s.id}, ${s.name}, ${s.kind}, ${sql.json(s.config as never)}, ${tier}, ${tier === "T1"}, ${s.owner_entity_id ?? null},
+    WITH bumped AS (
+      INSERT INTO settings (key, value, updated_by)
+      SELECT ${revisionKey}, ${sql.json({ revision } as never)}, 'industry-seed'
+      WHERE ${revision}::integer IS NOT NULL
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()
+      WHERE coalesce((settings.value->>'revision')::integer, 0) < ${revision}
+      RETURNING 1
+    ), gate AS (
+      SELECT 1 WHERE ${revision}::integer IS NULL OR EXISTS (SELECT 1 FROM bumped)
+    )
+    INSERT INTO sources (id, name, kind, config, tier, first_party, owner_entity_id, participation_mode, interval_minutes, tags, site_fulltext, syndicate_fulltext, enabled, health, next_fetch_at)
+    SELECT ${s.id}, ${s.name}, ${s.kind}, ${sql.json(s.config as never)}, ${tier}, ${tier === "T1"}, ${s.owner_entity_id ?? null},
             ${s.participation_mode ?? "editorial"}, ${s.interval_minutes ?? 60}, ${s.tags ?? []}, ${s.site_fulltext ?? false}, ${s.syndicate_fulltext ?? false},
-            ${enabled}, ${enabled ? "unknown" : "paused"}, now(), ${managedRevision})
+            ${enabled}, ${enabled ? "unknown" : "paused"}, now()
+    FROM gate
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config, tier = EXCLUDED.tier,
       first_party = EXCLUDED.first_party, owner_entity_id = EXCLUDED.owner_entity_id,
@@ -50,11 +62,8 @@ for (const s of sources) {
       fail_count = CASE WHEN EXCLUDED.enabled AND NOT sources.enabled THEN 0 ELSE sources.fail_count END,
       last_error = CASE WHEN EXCLUDED.enabled AND NOT sources.enabled THEN NULL ELSE sources.last_error END,
       next_fetch_at = CASE WHEN EXCLUDED.enabled THEN now() ELSE sources.next_fetch_at END,
-      imported_from = EXCLUDED.imported_from, updated_at = now()
-    WHERE EXCLUDED.imported_from IS NOT NULL AND (
-      sources.imported_from IS NULL OR sources.imported_from !~ '^industry:[0-9]+$'
-      OR split_part(sources.imported_from, ':', 2)::integer < split_part(EXCLUDED.imported_from, ':', 2)::integer
-    )
+      updated_at = now()
+    WHERE ${revision}::integer IS NOT NULL
     RETURNING id`;
   applied += changed.length;
 }
