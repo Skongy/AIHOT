@@ -14,12 +14,18 @@ const answer = "## 重点\n**这次有一项版本更新。** [1]\n\n- 地图发
 function event(type: string, payload: any, seq: number) { return `id: ${seq}\nevent: ${type}\ndata: ${JSON.stringify({payload})}\n\n`; }
 function complete() {
   if (!activeTask) return;
-  activeTask = {...activeTask,status:'completed',finalAnswer:answer,evidence, snapshotSeq:5};
+  const steps = [
+    {type:'step_start',payload:{stepId:'search-1',tool:'search',labelZh:'检索站内资料'}},
+    {type:'step_end',payload:{stepId:'search-1',ok:true,summary:'找到相关报道'}},
+  ];
+  activeTask = {...activeTask,status:'completed',finalAnswer:answer,evidence,steps,snapshotSeq:7};
   savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:answer});
-  sseResponse?.write(event('evidence',{items:evidence},2));
-  sseResponse?.write(event('answer_delta',{text:answer},3));
-  sseResponse?.write(event('answer_done',{text:answer},4));
-  sseResponse?.end(event('task_status',{status:'completed'},5)); sseResponse=null;
+  sseResponse?.write(event('step_start',steps[0].payload,2));
+  sseResponse?.write(event('step_end',steps[1].payload,3));
+  sseResponse?.write(event('evidence',{items:evidence},4));
+  sseResponse?.write(event('answer_delta',{text:answer},5));
+  sseResponse?.write(event('answer_done',{text:answer},6));
+  sseResponse?.end(event('task_status',{status:'completed'},7)); sseResponse=null;
 }
 const api=createServer(async(req,res)=>{
   const url=new URL(req.url!,'http://local'); const p=url.pathname;
@@ -95,6 +101,10 @@ test('Chinese IME Enter never sends; Shift+Enter adds a line; deliberate Enter s
 test('answers render safe typography, numbered citations open matching sources, refresh keeps them',async()=>{
   const {context,page,errors}=await visit();try{
     await send(page);await expect(page.getByRole('heading',{name:'重点',exact:true})).toBeVisible();
+    const progressButton=page.getByRole('button',{name:/资料整理完成/});
+    await expect(progressButton).toBeVisible();await expect(progressButton).toHaveAttribute('aria-expanded','false',{timeout:3000});
+    await progressButton.click();await expect(progressButton).toHaveAttribute('aria-expanded','true');
+    await expect(page.getByText('找到相关报道',{exact:true})).toBeVisible();
     await expect(page.locator('.ask-answer strong')).toHaveText('这次有一项版本更新。');
     await expect(page.locator('.ask-answer img')).toHaveCount(0);await expect(page.locator('a[href*="evil.test"]')).toHaveCount(0);
     await page.getByRole('button',{name:'查看来源 1：无畏契约版本更新'}).first().click();

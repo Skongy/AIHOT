@@ -25,6 +25,31 @@ function Glyph({ name, size = 22 }: { name: string; size?: number }) {
       : <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></>}
   </svg>;
 }
+function ProgressSteps({ steps, streaming }: { steps: NonNullable<Message["steps"]>; streaming: boolean }) {
+  const [open, setOpen] = useState(streaming);
+  const wasStreaming = useRef(streaming);
+  useEffect(() => {
+    if (streaming) {
+      wasStreaming.current = true;
+      setOpen(true);
+      return;
+    }
+    if (!wasStreaming.current) return;
+    wasStreaming.current = false;
+    const timer = setTimeout(() => setOpen(false), 900);
+    return () => clearTimeout(timer);
+  }, [streaming]);
+  const done = steps.filter((step) => step.status === "ok").length;
+  return <section className={`ask-steps${open ? " is-open" : ""}${streaming ? " is-live" : ""}`} aria-label="资料整理过程">
+    <button type="button" className="ask-steps-trigger" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <span className="ask-steps-heading"><span className="ask-steps-spark" aria-hidden="true"/><span>{streaming ? "正在整理资料" : `资料整理完成 · ${done}/${steps.length}`}</span></span>
+      <span className="ask-steps-toggle">{open ? "收起" : "查看过程"}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span>
+    </button>
+    <div className="ask-steps-collapse" aria-hidden={!open}><div><ol>{steps.map((step) => <li key={step.stepId}>
+      <span className={`ask-step-dot ${step.status}`}/><span className="ask-step-name">{step.labelZh}</span><span className="ask-step-state">{step.status === "running" ? "进行中" : step.status === "ok" ? "完成" : "未完成"}</span>{step.summary && <small>{step.summary}</small>}
+    </li>)}</ol></div></div>
+  </section>;
+}
 function AssistantMessage({ message, busy, onPick }: { message: Message; busy: boolean; onPick: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -34,8 +59,8 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
   const active = steps.filter((s) => s.status === "running");
   const label = active.length ? active.map((s) => s.labelZh).join("、") : steps.length ? "正在整理回答" : message.status === "queued" ? "正在排队" : "正在理解问题";
   return <article className="ask-response" aria-label="助手回答">
-    <div className="ask-response-heading"><span className="ask-avatar" aria-hidden="true"><Glyph name="brief" size={17}/></span><span>GAMEHOT</span>{streaming && <span className="ask-progress" role="status">{label}<span className="ask-wait-dot"/></span>}</div>
-    {steps.length > 0 && <details className="ask-steps"><summary>{streaming ? "查看检索进度" : `已检索 ${steps.length} 步`}</summary><ul>{steps.map((s) => <li key={s.stepId}><span className={`ask-step-dot ${s.status}`}/><span>{s.labelZh}</span><span>{s.status === "running" ? "进行中" : s.status === "ok" ? "完成" : "未完成"}</span>{s.summary && <small>{s.summary}</small>}</li>)}</ul></details>}
+    <div className="ask-response-heading"><span className="ask-avatar" aria-hidden="true"><Glyph name="brief" size={17}/></span><span>GAMEHOT</span>{streaming && <span className="ask-progress" role="status"><span className="ask-progress-label">{label}</span><span className="ask-wait-dots" aria-hidden="true"><i/><i/><i/></span></span>}</div>
+    {steps.length > 0 && <ProgressSteps steps={steps} streaming={streaming}/>}
     {message.contentInvalidated ? <p className="ask-turn-note">相关来源已不可用，原回答不再展示。</p>
       : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming}/>
       : <p className="ask-turn-note" role="status">{streaming ? "正在查找站内资料，请稍候。" : message.status === "send_failed" ? "消息未确认送达，可重试发送。" : message.status === "failed" ? "这次未能生成回答，请稍后再试。" : message.status === "cancelled" ? "已停止生成。" : "本次没有生成回答。"}</p>}
@@ -58,6 +83,7 @@ export default function AskPage() {
   const [context, setContext] = useState<{ id: string; title: string; sourceName: string } | null>(null);
   const [contextLoading, setContextLoading] = useState(false); const [contextError, setContextError] = useState<string | null>(null);
   const [input, setInput] = useState(""); const [showLatest, setShowLatest] = useState(false);
+  const [scrollFades, setScrollFades] = useState({ top: false, bottom: false });
   const textarea = useRef<HTMLTextAreaElement>(null); const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(false); const composing = useRef(false); const empty = chat.messages.length === 0;
   const latest = () => {
@@ -80,10 +106,14 @@ export default function AskPage() {
     let previous = viewport.scrollTop;
     let touchY = 0;
     let frame = 0;
-    const onScroll = () => { const y = viewport.scrollTop; const near = viewport.scrollHeight - viewport.clientHeight - y <= 8;
+    const onScroll = () => { const y = viewport.scrollTop; const distance = viewport.scrollHeight - viewport.clientHeight - y; const near = distance <= 8;
       // Input resizing can clamp scrollTop upwards. Only reader gestures pause following.
       if (y > previous && near) follow.current = true;
-      previous = y; setShowLatest(!near && !empty); };
+      previous = y; setShowLatest(!near && !empty);
+      setScrollFades((current) => {
+        const next = { top: y > 10, bottom: distance > 10 };
+        return current.top === next.top && current.bottom === next.bottom ? current : next;
+      }); };
     const wheel = (event: WheelEvent) => { if (event.deltaY < 0) follow.current = false; };
     const touchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
     const touchMove = (event: TouchEvent) => {
@@ -127,6 +157,7 @@ export default function AskPage() {
   };
   return <div className={`ask-page${empty ? " is-empty" : ""}`} data-pull-refresh="disabled">
     <header className="ask-page-header"><Link to="/ask" className="ask-page-name">AI 问答</Link><button type="button" className="ask-new-chat" disabled={chat.busy || chat.restoring} onClick={() => { chat.reset(); setInput(""); follow.current = false; }}><Glyph name="plus" size={16}/>新对话</button></header>
+    <div className="ask-scroll-frame">
     <div ref={scroll} className="ask-scroll" role="region" aria-label="问答内容" tabIndex={0} onPointerDown={() => { follow.current = false; }}>
     {empty && !chat.restoring && <section className="ask-intro" aria-labelledby="ask-heading"><div className="ask-intro-mark" aria-hidden="true"><span/><span/><span/></div>
       <h1 id="ask-heading"><span className="ask-title-line">游戏圈的消息，</span><span className="ask-title-line">帮你理清楚。</span></h1><p>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</p></section>}
@@ -135,6 +166,9 @@ export default function AskPage() {
       ? <div className="ask-user" key={m.key}><span className="ask-user-label">你</span><p>{m.text.replace(contextSuffix, "")}{m.text.match(contextSuffix)?.[1] && <Link className="ask-user-context" to={m.text.match(contextSuffix)![1]!}>附带资讯</Link>}</p></div>
       : <div key={m.key}><AssistantMessage message={m} busy={chat.busy} onPick={pick}/>{m.status === "send_failed" && <button className="ask-retry" type="button" disabled={chat.busy} onClick={() => { const user = chat.messages[i - 1]; if (user?.requestId) { follow.current = true; void chat.send(user.text, user); } }}>重试发送</button>}</div>)}</div>}
     {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
+    </div>
+    <span className={`ask-scroll-fade is-top${scrollFades.top ? " is-visible" : ""}`} aria-hidden="true"/>
+    <span className={`ask-scroll-fade is-bottom${scrollFades.bottom ? " is-visible" : ""}`} aria-hidden="true"/>
     </div>
     {!chat.restoring && <div className="ask-composer-area" onFocusCapture={(event) => finishEntrance(event.currentTarget)}>
       {showLatest && <button type="button" className="ask-latest" onClick={() => { follow.current = true; latest(); }}>回到最新回答 ↓</button>}
