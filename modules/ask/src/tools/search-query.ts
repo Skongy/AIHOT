@@ -39,7 +39,17 @@ export function askAliases(query: string): string[] {
       if (index < 0) continue;
       if (/^[a-z0-9]/.test(name) && /[a-z0-9]/.test(q[index - 1] ?? "")) continue;
       if (/[a-z0-9]$/.test(name) && /[a-z0-9]/.test(q[index + name.length] ?? "")) continue;
-      return [...new Set([q, ...names.map((alias) => q.slice(0, index) + alias + q.slice(index + name.length))])].slice(0, 16);
+      const before = q.slice(0, index);
+      const after = q.slice(index + name.length);
+      const expanded = names.flatMap((alias) => {
+        const replaced = before + alias + after;
+        // Chinese questions commonly attach a qualifier directly to the game name
+        // (e.g. “无畏契约冠军赛”). Add a tokenized variant so SQL can match the
+        // entity and qualifier independently even when the article inserts other words.
+        const separated = after && !/^\s/.test(after) ? `${before}${alias} ${after}` : replaced;
+        return [replaced, separated];
+      });
+      return [...new Set([q, ...expanded])].slice(0, 16);
     }
   }
   return [q];

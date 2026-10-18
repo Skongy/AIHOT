@@ -57,7 +57,7 @@ const SCHEMAS: Record<AskToolName, z.ZodType> = {
   search: z.object({
     q: z.string().min(2).max(200).describe("搜索词，2–200字。"),
     ...rangeSchema,
-    mode: z.enum(["selected", "all"]).optional().describe("省略时先查精选，无结果扩到全部。翻页须使用返回的 mode。"),
+    mode: z.enum(["selected", "all"]).optional().describe("all=全部公开动态（默认，适合具名事实查询）；selected=仅精选。翻页须使用返回的 mode。"),
     category: categorySchema,
     limit: z.number().int().min(1).max(30).optional().describe("最多返回条数，1–30，默认10。"),
   }).strict(),
@@ -82,7 +82,7 @@ const SCHEMAS: Record<AskToolName, z.ZodType> = {
 
 const ASK_TOOL_DESCRIPTIONS: Record<AskToolName, string> = {
   get_latest: "按精确时间范围查近期资讯；默认精选、过去24小时。window 仅允许 1h/24h/7d/30d/all；超过30天用 all 或 from/until。支持自定义日期及游标翻页。不用于具名游戏搜索。",
-  search: "按游戏或关键词查站内报道，自动匹配中英文别名。q 使用游戏名，可附空格分隔的关键词。默认近7天。window 仅允许 1h/24h/7d/30d/all；超过30天用 all 或 from/until。支持日期及翻页；先精选，无结果扩到全部。",
+  search: "按游戏或关键词查全部站内公开报道，自动匹配中英文别名。q 使用游戏名，可附空格分隔的关键词；只有明确要求精选时才传 mode=selected。默认近7天。window 仅允许 1h/24h/7d/30d/all；超过30天用 all 或 from/until。支持日期及翻页。",
   get_hot_topics: "查当前热点榜（多信源同时讨论的事件）。",
   get_story: "查事件的来龙去脉与报道时间线；public_id 来自用户站内链接、历史出处或工具返回。",
   explain_selection: "解释某条目为何入选精选（评分与门槛说明）。",
@@ -195,14 +195,11 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         const queries = tool === "search" ? askAliases(a.q!) : [];
         const base = { queries, category: a.category, limit: a.limit ?? 10, cursor: a.cursor, ...range,
           rangeKey: JSON.stringify([a.window ?? (tool === "search" ? "7d" : "24h"), a.from ?? null, a.until ?? null]) };
-        let mode = a.mode ?? "selected";
+        // A named fact query must not hide a fresh public report merely because it missed
+        // the editorial selection threshold while older selected results still match.
+        let mode = a.mode ?? (tool === "search" ? "all" : "selected");
         let res = await askItems({ ...base, mode });
         let expanded = false;
-        if (tool === "search" && !a.mode && !a.cursor && !res.items.length) {
-          mode = "all";
-          expanded = true;
-          res = await askItems({ ...base, mode });
-        }
         // Every returned public item is citeable. The answer renderer only shows evidence actually
         // cited in the final text, so a recent page can expose exact source ids without dumping the
         // whole page under「参考来源」.

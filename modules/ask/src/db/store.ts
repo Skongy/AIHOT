@@ -205,6 +205,16 @@ export async function insertEvidence(taskId: string, items: Array<{
 }>) {
   const out: number[] = [];
   for (const it of items) {
+    // Repeated searches in one turn reuse the same citation number instead of showing the
+    // same article several times under「参考来源」.
+    const [existing] = it.objectId ? await sql<{ id: number }[]>`
+      SELECT id FROM ask_evidence
+      WHERE task_id = ${taskId}::uuid AND kind = ${it.kind} AND object_id = ${it.objectId}
+      ORDER BY id LIMIT 1` : [];
+    if (existing) {
+      out.push(existing.id);
+      continue;
+    }
     const [row] = await sql<{ id: number }[]>`
       INSERT INTO ask_evidence (id, task_id, kind, object_id, title, source_name, published_at, site_url, original_url, tool_name, raw_ref, public_ok)
       SELECT coalesce(max(id), 0) + 1, ${taskId}::uuid, ${it.kind}, ${it.objectId}, ${it.title}, ${it.sourceName},

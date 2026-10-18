@@ -141,6 +141,7 @@ test("agent loop refuses tools when only one model call remains and degrades wit
     chat: async (opts) => {
       calls += 1;
       assert.equal(opts.enableTools, false, "last slot must disable tools");
+      assert.match(opts.system, /最后一次模型调用/);
       if (opts.onDelta) await opts.onDelta("降级回答");
       return { content: "降级回答", toolCalls: [{ id: "x", type: "function", function: { name: "search", arguments: "{\"q\":\"ab\"}" } }], finishReason: "tool_calls", receiptId: rec!.id, reused: false, model: "default", usage: null, jsonModeForced: false };
     },

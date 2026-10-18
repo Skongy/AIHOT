@@ -23,7 +23,7 @@ before(async () => {
   for (let i = 0; i < 4; i++) {
     const at = new Date(clock.getTime() - (i === 3 ? 20 * 86400000 : i * 2 * 3600000));
     const { articleId } = await upsertMaterial({ sourceId: source, url: `https://example.org/${source}/${i}`, title: `博德之门3 测试更新 ${i}`, bodyText: '测试资料', bodyStatus: 'ok', via: 'fetch', publishedAt: at });
-    await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, score, selected) VALUES (${articleId}, 1, 'rule', 'pass', 'updates', ${`博德之门3 测试更新 ${i}`}, '固定摘要，不是真实报道', 90, true)`;
+    await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, score, selected) VALUES (${articleId}, 1, 'rule', 'pass', 'updates', ${`博德之门3 测试更新 ${i}`}, '固定摘要，不是真实报道', ${i === 0 ? 66 : 90}, ${i !== 0})`;
     await publishArticle(articleId, { releasedAt: at });
     await sql`UPDATE publications SET timeline_at = ${at}, sort_at = ${at}, visible_after = ${at} WHERE article_id = ${articleId}`;
     ids.push(articleId);
@@ -60,6 +60,14 @@ test("get_latest registers each public item so recent-news answers can link orig
     assert.equal(result.evidence[0]?.siteUrl, `/items/${ids[0]}`);
     assert.match(result.evidence[0]?.originalUrl ?? "", /^https:\/\//);
     assert.equal(result.structured.count, 1);
+  }
+});
+test("named search defaults to all public reports instead of hiding a fresh non-selected match", async () => {
+  const result = await executeAskTool('search', JSON.stringify({ q:'BG3', window:'all', limit:1 }));
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.structured.mode, 'all');
+    assert.equal(result.evidence[0]?.objectId, ids[0]);
   }
 });
 test("illegal window 90d is coerced to all and still retrieves", async () => {

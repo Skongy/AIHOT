@@ -204,7 +204,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
           purpose: "ask.tools_stream",
           subject: `ask:${opts.taskId}:r${round}`,
           promptVersion: PROMPT_VERSION,
-          system,
+          system: forceFinal ? `${system}\n\n# 本轮必须直接回答\n这是最后一次模型调用。不得再调用或输出任何工具调用标记；请仅依据已经取得的资料，用自然语言直接回答用户。资料不足时明确说明缺少什么。` : system,
           messages,
           tools,
           taskId: opts.taskId,

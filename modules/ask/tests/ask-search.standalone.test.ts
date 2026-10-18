@@ -30,6 +30,7 @@ test("existing game vocabulary bridges English, Chinese, abbreviations and extra
   assert.ok(askAliases("BG3").includes("博德之门3"));
   assert.ok(askAliases("《无畏契约》").includes("valorant"));
   assert.ok(askAliases("BG3 补丁").includes("博德之门3 补丁"));
+  assert.ok(askAliases("无畏契约冠军赛 冠军").includes("无畏契约 冠军赛 冠军"));
   assert.deepEqual(askAliases("unrelatedgame"), ["unrelatedgame"]);
   assert.deepEqual(askAliases("xbg3x"), ["xbg3x"]);
 });
