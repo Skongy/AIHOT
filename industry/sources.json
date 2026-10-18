@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。已启用英雄联盟、原神、崩坏：星穹铁道官方 JSON，CS2、Dota 2、PUBG、三角洲行动、Apex 等 Steam 官方 RSS，以及 GamesIndustry.biz、Game Developer 等全球行业媒体；低效的巴哈姆特 GNN、网易投资者关系和游戏陀螺默认停用。标题规则只用于单游戏公告源，平台、Steam 和厂商官源不套用。热榜（B站热搜、贴吧热议）以 hot_signal 接入，只给已有事件加分。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。当前收窄为约 12 个高质量 editorial 信源（机核/游研社/触乐、Gematsu、GamesIndustry.biz、版署、英雄联盟/原神/崩铁/无畏契约与 VCT、Steam·CS2）加 B站/贴吧热榜；其余默认停用，减少无效抓取与分析开销。提高 seed_revision 以便部署时把启停推到已有库；后续部署不会重复覆盖管理员操作。标题规则只用于单游戏公告源。热榜以 hot_signal 接入，几乎不耗 LLM。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -26,7 +26,9 @@
         "媒体"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "rss-ign-cn",
@@ -46,8 +48,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-gnn",
@@ -87,7 +91,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "rss-yystv",
@@ -108,7 +112,9 @@
         "媒体"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "rss-chuapp",
@@ -129,7 +135,9 @@
         "媒体"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "rss-youxichaguan",
@@ -149,8 +157,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-hltv",
@@ -172,8 +182,10 @@
         "英文",
         "电竞"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-pcgamer",
@@ -198,9 +210,10 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-rockpapershotgun",
@@ -225,9 +238,10 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-gematsu",
@@ -254,7 +268,8 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "rss-automaton-jp",
@@ -282,9 +297,10 @@
         "海外",
         "日文"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-4gamer",
@@ -309,9 +325,10 @@
         "海外",
         "日文"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-vgc",
@@ -339,9 +356,10 @@
         "海外",
         "英文"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-gamesindustry-biz",
@@ -370,7 +388,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "rss-game-developer",
@@ -396,10 +414,10 @@
         "英文",
         "开发"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true,
-      "seed_revision": 1
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-gamersky",
@@ -425,8 +443,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-3dm",
@@ -452,8 +472,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-a9vg",
@@ -480,8 +502,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-17173",
@@ -509,8 +533,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-sina-esports",
@@ -540,8 +566,10 @@
         "媒体",
         "电竞"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-wanplus",
@@ -569,8 +597,10 @@
         "媒体",
         "电竞"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-youxituoluo",
@@ -604,7 +634,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "web-indienova",
@@ -631,7 +661,8 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-nppa-games",
@@ -659,7 +690,9 @@
         "版号"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "json-pvp-news",
@@ -724,7 +757,8 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "json-lol-news",
@@ -791,7 +825,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "json-miyoushe-ys",
@@ -858,7 +892,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "json-miyoushe-sr",
@@ -925,7 +959,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "web-yjwujian",
@@ -989,7 +1023,8 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-gp-qq",
@@ -1055,7 +1090,8 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-lolesports",
@@ -1087,7 +1123,8 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-cs2",
@@ -1112,7 +1149,8 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "seed_revision": 1
+      "seed_revision": 2,
+      "enabled": true
     },
     {
       "id": "json-val-news",
@@ -1191,7 +1229,9 @@
         "射击"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "json-vct-news",
@@ -1274,7 +1314,9 @@
         "射击"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "web-playvalorant-news",
@@ -1312,8 +1354,10 @@
         "射击",
         "繁中"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-dota2",
@@ -1336,9 +1380,10 @@
         "Dota 2",
         "电竞"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "seed_revision": 1
+      "seed_revision": 2,
+      "enabled": false
     },
     {
       "id": "rss-steam-pubg",
@@ -1365,10 +1410,10 @@
         "PUBG",
         "电竞"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true,
-      "seed_revision": 1
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-delta-force",
@@ -1395,10 +1440,10 @@
         "三角洲行动",
         "射击"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true,
-      "seed_revision": 1
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-apex",
@@ -1425,10 +1470,10 @@
         "Apex 英雄",
         "射击"
       ],
-      "site_fulltext": true,
+      "site_fulltext": false,
       "syndicate_fulltext": false,
-      "enabled": true,
-      "seed_revision": 1
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-ps-blog-zh-hant",
@@ -1450,8 +1495,10 @@
         "官方",
         "繁体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-xbox-wire",
@@ -1476,8 +1523,10 @@
         "官方",
         "英文"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-nintendo-jp",
@@ -1499,8 +1548,10 @@
         "官方",
         "日文"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-nintendo-hk",
@@ -1529,8 +1580,10 @@
         "官方",
         "繁体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-news",
@@ -1550,8 +1603,10 @@
       "tags": [
         "官方"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-netease-ir",
@@ -1577,7 +1632,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 1
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-isaac-rebirth",
@@ -1603,8 +1658,10 @@
         "Steam",
         "以撒的结合"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-sts2",
@@ -1630,8 +1687,10 @@
         "Steam",
         "杀戮尖塔"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-mewgenics",
@@ -1657,8 +1716,10 @@
         "Steam",
         "喵喵的结合"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-steam-bg3",
@@ -1684,8 +1745,10 @@
         "Steam",
         "博德之门"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "rss-megacrit-news",
@@ -1714,8 +1777,10 @@
         "英文",
         "杀戮尖塔"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "web-larian-news",
@@ -1746,8 +1811,10 @@
         "英文",
         "博德之门"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 2
     },
     {
       "id": "json-bilibili-hotword",
@@ -1783,7 +1850,9 @@
         "B站"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     },
     {
       "id": "json-tieba-hottopic",
@@ -1818,7 +1887,9 @@
         "贴吧"
       ],
       "site_fulltext": false,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 2
     }
   ]
 }

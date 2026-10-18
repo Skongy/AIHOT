@@ -48,20 +48,23 @@ const HOT = ["json-bilibili-hotword", "json-tieba-hottopic"];
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
 /** Enabled Valorant CN announcements: same keep/drop idea, with Valorant-specific markers. */
 const VALORANT_TITLE_RULE = ["json-val-news", "json-vct-news"];
-const DISABLED_OFFICIAL = new Set(["json-pvp-news", "web-yjwujian", "web-gp-qq", "web-lolesports", "rss-netease-ir"]);
-const DISABLED_LOW_YIELD = new Set(["rss-gnn", "rss-netease-ir", "web-youxituoluo"]);
-const REVISION_SYNCED = new Set([
-  ...DISABLED_LOW_YIELD, "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "rss-steam-dota2",
-  "rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-gamesindustry-biz", "rss-game-developer",
+/** High-quality editorial keep-list (~12) plus hot_signal; everything else is paused to cut LLM spend. */
+const ENABLED_KEEP = new Set([
+  "rss-gcores", "rss-yystv", "rss-chuapp", "rss-gematsu", "rss-gamesindustry-biz", "web-nppa-games",
+  "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "json-val-news", "json-vct-news",
+  "json-bilibili-hotword", "json-tieba-hottopic",
 ]);
+const DISABLED_OFFICIAL = new Set(["json-pvp-news", "web-yjwujian", "web-gp-qq", "web-lolesports", "rss-netease-ir", "web-playvalorant-news"]);
+const DISABLED_LOW_YIELD = new Set(["rss-gnn", "rss-netease-ir", "web-youxituoluo"]);
+const SEED_REVISION = 2;
 /** Listings that print no absolute date: their detail pages (or a later listing) date them. */
 const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-gp-qq", "web-playvalorant-news"]);
 
 test("the seed holds the media list and the official list, nothing else", () => {
   assert.deepEqual(sources.map((s) => s.id).sort(), [...MEDIA, ...OFFICIAL, ...HOT].sort());
   assert.equal(new Set(sources.map((s) => s.id)).size, sources.length);
-  assert.deepEqual(sources.filter((s) => s.seed_revision !== undefined).map((s) => s.id).sort(), [...REVISION_SYNCED].sort());
-  for (const id of REVISION_SYNCED) assert.equal(byId.get(id)!.seed_revision, 1, id);
+  assert.equal(sources.every((s) => s.seed_revision === SEED_REVISION), true, "every source bumps seed_revision for the quota keep-list");
+  assert.deepEqual(sources.filter((s) => s.enabled !== false).map((s) => s.id).sort(), [...ENABLED_KEEP].sort());
 });
 
 test("every game source has a supported config and the requested news-reading policy", () => {
@@ -91,37 +94,42 @@ test("every game source has a supported config and the requested news-reading po
   for (const id of OFFICIAL) assert.equal(byId.get(id)!.tier, id === "rss-steam-news" ? "T1_5" : "T1", id);
   for (const id of DISABLED_OFFICIAL) assert.equal(byId.get(id)!.enabled, false, id);
   for (const id of DISABLED_LOW_YIELD) assert.equal(byId.get(id)!.enabled, false, id);
-  for (const id of ["json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr"]) {
-    assert.notEqual(byId.get(id)!.enabled, false, id);
+  for (const id of ["json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "json-val-news", "json-vct-news"]) {
+    assert.equal(byId.get(id)!.enabled, true, id);
     assert.equal(byId.get(id)!.config.fetchPublicContent, true, id);
     assert.equal(byId.get(id)!.site_fulltext, true, id);
   }
   for (const id of HOT) {
-    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.enabled, true, id);
     assert.equal(byId.get(id)!.tier, "T2", id);
     assert.equal(byId.get(id)!.participation_mode, "hot_signal", id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
   }
   for (const id of ["rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
-    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.site_fulltext, false, id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
     const prefixes = byId.get(id)!.config.publisherUrlPrefixes as string[];
     assert.ok(Array.isArray(prefixes) && prefixes.length === 1, id);
     assert.match(prefixes[0]!, /^https:\/\/store\.steampowered\.com\/news\/app\/\d+\/$/, id);
   }
   for (const id of ["rss-megacrit-news", "web-larian-news"]) {
-    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.site_fulltext, false, id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
     assert.equal(byId.get(id)!.tier, "T1", id);
   }
   assert.deepEqual(byId.get("rss-megacrit-news")!.config.allowUrlPrefixes, ["https://megacrit.com/news/"]);
   assert.equal(byId.get("rss-megacrit-news")!.owner_entity_id, "mega-crit");
   assert.equal(byId.get("web-larian-news")!.owner_entity_id, "larian");
-  for (const id of ["json-val-news", "json-vct-news", "web-playvalorant-news"]) {
-    assert.notEqual(byId.get(id)!.enabled, false, id);
+  for (const id of ["json-val-news", "json-vct-news"]) {
+    assert.equal(byId.get(id)!.enabled, true, id);
     assert.equal(byId.get(id)!.tier, "T1", id);
     assert.equal(byId.get(id)!.owner_entity_id, "valorant", id);
   }
+  assert.equal(byId.get("web-playvalorant-news")!.enabled, false, "duplicate VALORANT official paused");
+  assert.equal(byId.get("web-playvalorant-news")!.tier, "T1");
+  assert.equal(byId.get("web-playvalorant-news")!.owner_entity_id, "valorant");
   assert.ok(byId.get("json-val-news")!.config.ingestNoiseFilter, "json-val-news title rule");
   assert.ok(byId.get("json-vct-news")!.config.ingestNoiseFilter, "json-vct-news title rule");
   assert.equal(byId.get("web-playvalorant-news")!.config.ingestNoiseFilter, undefined, "playvalorant uses URL prefixes");

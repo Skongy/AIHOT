@@ -6,7 +6,7 @@ import type { z } from "zod";
 import { PRESETS } from "@aihot/site/models";
 import { config, credential } from "../config.ts";
 import { sha256, stableJson } from "../lib/ids.ts";
-import { assertAccepted, paidRequest, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
+import { assertAccepted, paidRequest, parseRetryAfterSeconds, ProviderRejectedError, rejectReceivedResponse } from "./receipts.ts";
 
 export interface ModelSpec {
   key: string;
@@ -176,7 +176,7 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
         throw error;
       }
       const text = await res.text();
-      assertAccepted(spec.service, res.status, text);
+      assertAccepted(spec.service, res.status, text, { retryAfterSeconds: parseRetryAfterSeconds(res.headers.get("retry-after")) });
       let json: Record<string, unknown>;
       try {
         json = JSON.parse(text);
@@ -440,12 +440,12 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
       const ctype = (res.headers.get("content-type") ?? "").toLowerCase();
       if (!res.ok) {
         const text = await res.text();
-        assertAccepted(spec.service, res.status, text);
+        assertAccepted(spec.service, res.status, text, { retryAfterSeconds: parseRetryAfterSeconds(res.headers.get("retry-after")) });
       }
       // Some stubs / providers may answer with a full JSON object even when stream was requested.
       if (ctype.includes("application/json") && !ctype.includes("event-stream")) {
         const text = await res.text();
-        assertAccepted(spec.service, res.status, text);
+        assertAccepted(spec.service, res.status, text, { retryAfterSeconds: parseRetryAfterSeconds(res.headers.get("retry-after")) });
         let json: Record<string, unknown>;
         try {
           json = JSON.parse(text) as Record<string, unknown>;
