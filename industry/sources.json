@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。当前收窄为约 12 个高质量 editorial 信源（机核/游研社/触乐、Gematsu、GamesIndustry.biz、版署、英雄联盟/原神/崩铁/无畏契约与 VCT、Steam·CS2）加 B站/贴吧热榜；其余默认停用，减少无效抓取与分析开销。提高 seed_revision 以便部署时把启停推到已有库；后续部署不会重复覆盖管理员操作。标题规则只用于单游戏公告源。热榜以 hot_signal 接入，几乎不耗 LLM。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。当前启用约 14 个高质量 editorial 信源（机核/游研社/触乐、Gematsu、GamesIndustry.biz、版署、玩加电竞、17173、英雄联盟/原神/崩铁/无畏契约与 VCT、Steam·CS2）加 B站/贴吧热榜；其余默认停用，减少无效抓取与分析开销。提高 seed_revision 以便部署时把启停推到已有库；后续部署不会重复覆盖管理员操作。标题规则只用于单游戏公告源。热榜以 hot_signal 接入，几乎不耗 LLM。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -28,7 +28,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-ign-cn",
@@ -51,7 +51,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-gnn",
@@ -91,7 +91,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-yystv",
@@ -114,7 +114,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-chuapp",
@@ -137,7 +137,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-youxichaguan",
@@ -160,7 +160,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-hltv",
@@ -185,7 +185,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-pcgamer",
@@ -213,7 +213,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-rockpapershotgun",
@@ -241,7 +241,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-gematsu",
@@ -269,7 +269,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-automaton-jp",
@@ -300,7 +300,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-4gamer",
@@ -328,7 +328,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-vgc",
@@ -359,7 +359,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-gamesindustry-biz",
@@ -388,7 +388,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-game-developer",
@@ -417,7 +417,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-gamersky",
@@ -446,7 +446,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-3dm",
@@ -475,7 +475,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-a9vg",
@@ -505,7 +505,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-17173",
@@ -533,10 +533,10 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false,
-      "seed_revision": 2
+      "enabled": true,
+      "seed_revision": 3
     },
     {
       "id": "web-sina-esports",
@@ -569,7 +569,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-wanplus",
@@ -597,10 +597,10 @@
         "媒体",
         "电竞"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false,
-      "seed_revision": 2
+      "enabled": true,
+      "seed_revision": 3
     },
     {
       "id": "web-youxituoluo",
@@ -634,7 +634,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-indienova",
@@ -662,7 +662,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-nppa-games",
@@ -692,7 +692,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-pvp-news",
@@ -758,7 +758,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-lol-news",
@@ -825,7 +825,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-miyoushe-ys",
@@ -892,7 +892,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-miyoushe-sr",
@@ -959,7 +959,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-yjwujian",
@@ -1024,7 +1024,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-gp-qq",
@@ -1091,7 +1091,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-lolesports",
@@ -1124,7 +1124,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-cs2",
@@ -1149,7 +1149,7 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "seed_revision": 2,
+      "seed_revision": 3,
       "enabled": true
     },
     {
@@ -1231,7 +1231,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-vct-news",
@@ -1316,7 +1316,7 @@
       "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-playvalorant-news",
@@ -1357,7 +1357,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-dota2",
@@ -1382,7 +1382,7 @@
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
-      "seed_revision": 2,
+      "seed_revision": 3,
       "enabled": false
     },
     {
@@ -1413,7 +1413,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-delta-force",
@@ -1443,7 +1443,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-apex",
@@ -1473,7 +1473,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-ps-blog-zh-hant",
@@ -1498,7 +1498,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-xbox-wire",
@@ -1526,7 +1526,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-nintendo-jp",
@@ -1551,7 +1551,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-nintendo-hk",
@@ -1583,7 +1583,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-news",
@@ -1606,7 +1606,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-netease-ir",
@@ -1632,7 +1632,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-isaac-rebirth",
@@ -1661,7 +1661,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-sts2",
@@ -1690,7 +1690,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-mewgenics",
@@ -1719,7 +1719,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-steam-bg3",
@@ -1748,7 +1748,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "rss-megacrit-news",
@@ -1780,7 +1780,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "web-larian-news",
@@ -1814,7 +1814,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-bilibili-hotword",
@@ -1852,7 +1852,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     },
     {
       "id": "json-tieba-hottopic",
@@ -1889,7 +1889,7 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true,
-      "seed_revision": 2
+      "seed_revision": 3
     }
   ]
 }
