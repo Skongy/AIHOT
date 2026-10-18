@@ -57,6 +57,67 @@
       "definition": "《无畏契约》（VALORANT）的版本更新、新特工与地图、平衡调整、国服运营与电竞赛事相关新闻。非 Steam 发行（Riot Client / 国服腾讯）；因产品点名纳入主题，与站点 Steam 焦点并存。"
     },
     {
+      "slug": "counter-strike-2",
+      "name": "CS2",
+      "group": "company",
+      "entityId": "counter-strike-2",
+      "definition": "《反恐精英 2》（Counter-Strike 2 / CS2）的版本更新、地图与武器平衡、反作弊、赛事及社区生态相关新闻。",
+      "steamAppId": 730
+    },
+    {
+      "slug": "dota-2",
+      "name": "Dota 2",
+      "group": "company",
+      "entityId": "dota-2",
+      "definition": "《Dota 2》的版本更新、英雄与装备平衡、赛事、战队及社区生态相关新闻。",
+      "steamAppId": 570
+    },
+    {
+      "slug": "pubg-battlegrounds",
+      "name": "PUBG",
+      "group": "company",
+      "entityId": "pubg-battlegrounds",
+      "definition": "《PUBG: BATTLEGROUNDS》（绝地求生）的版本更新、地图与玩法、赛季、反作弊及电竞赛事相关新闻。",
+      "steamAppId": 578080
+    },
+    {
+      "slug": "delta-force",
+      "name": "三角洲行动",
+      "group": "company",
+      "entityId": "delta-force",
+      "definition": "《三角洲行动》（Delta Force）的版本更新、赛季内容、玩法调整、运营活动及电竞相关新闻。",
+      "steamAppId": 2507950
+    },
+    {
+      "slug": "apex-legends",
+      "name": "Apex 英雄",
+      "group": "company",
+      "entityId": "apex-legends",
+      "definition": "《Apex 英雄》（Apex Legends）的新赛季、传奇与武器平衡、地图、反作弊及 ALGS 赛事相关新闻。",
+      "steamAppId": 1172470
+    },
+    {
+      "slug": "league-of-legends",
+      "name": "英雄联盟",
+      "group": "company",
+      "entityId": "league-of-legends",
+      "definition": "《英雄联盟》（League of Legends）的版本更新、英雄与装备平衡、国服运营及全球电竞赛事相关新闻。"
+    },
+    {
+      "slug": "genshin-impact",
+      "name": "原神",
+      "group": "company",
+      "entityId": "genshin-impact",
+      "definition": "《原神》（Genshin Impact）的版本前瞻、角色与玩法更新、活动、运营公告及社区相关新闻。"
+    },
+    {
+      "slug": "honkai-star-rail",
+      "name": "崩坏：星穹铁道",
+      "group": "company",
+      "entityId": "honkai-star-rail",
+      "definition": "《崩坏：星穹铁道》（Honkai: Star Rail）的版本前瞻、角色与玩法更新、活动、运营公告及社区相关新闻。"
+    },
+    {
       "slug": "mobile",
       "name": "手游",
       "group": "field",

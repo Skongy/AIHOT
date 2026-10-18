@@ -9,12 +9,17 @@ import { TOPICS, findTopic } from "@aihot/backend/publication/topics";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures/steam");
 
-test("four seed topics carry the agreed Steam app ids", () => {
+test("Steam-backed game topics carry the agreed app ids", () => {
   const expected: Record<string, number> = {
     "binding-of-isaac-rebirth": 250900,
     "slay-the-spire-2": 2868840,
     mewgenics: 686060,
     "baldurs-gate-3": 1086940,
+    "counter-strike-2": 730,
+    "dota-2": 570,
+    "pubg-battlegrounds": 578080,
+    "delta-force": 2507950,
+    "apex-legends": 1172470,
   };
   for (const [slug, appId] of Object.entries(expected)) {
     const t = findTopic(slug);
@@ -22,7 +27,7 @@ test("four seed topics carry the agreed Steam app ids", () => {
     assert.equal(t!.steamAppId, appId);
   }
   assert.equal(findTopic("pc-steam")!.steamAppId, null);
-  assert.equal(TOPICS.filter((t) => t.steamAppId).length, 4);
+  assert.equal(TOPICS.filter((t) => t.steamAppId).length, 9);
 });
 
 test("parseSteamAppdetails maps public store fields", () => {

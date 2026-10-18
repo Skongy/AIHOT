@@ -1034,7 +1034,7 @@
         }
       },
       "tier": "T1",
-      "owner_entity_id": "valve",
+      "owner_entity_id": "counter-strike-2",
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "tags": [
@@ -1259,7 +1259,7 @@
         }
       },
       "tier": "T1",
-      "owner_entity_id": "valve",
+      "owner_entity_id": "dota-2",
       "participation_mode": "editorial",
       "interval_minutes": 60,
       "tags": [

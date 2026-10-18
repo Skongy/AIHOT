@@ -21,12 +21,19 @@ export const SELECTION = {
   understandFloor: 20,
 } as const;
 
-/** 热榜匹配时优先认领的种子主体（与 topics.json / IDENTITY_LEXICON 对齐）。
- * 前四款为 Steam 焦点种子；valorant（无畏契约）为产品点名的非 Steam FPS，一并优先认领。 */
+/** 热榜匹配时优先认领的游戏主题主体（与 topics.json / IDENTITY_LEXICON 对齐）。 */
 export const HOT_SEED_ENTITY_IDS = [
   "binding-of-isaac-rebirth",
   "slay-the-spire-2",
   "mewgenics",
   "baldurs-gate-3",
   "valorant",
+  "counter-strike-2",
+  "dota-2",
+  "pubg-battlegrounds",
+  "delta-force",
+  "apex-legends",
+  "league-of-legends",
+  "genshin-impact",
+  "honkai-star-rail",
 ] as const;

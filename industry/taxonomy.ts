@@ -74,12 +74,17 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
  * otherNames 是官方账号名、工作室名等其他称呼，把事实的主体对到发布方时也认它们。
  */
 export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; otherNames?: string[] }> = {
-  // Steam 种子游戏（主题页）
+  // 游戏主题页主体
   "binding-of-isaac-rebirth": { name: "以撒的结合：重生", displayTag: null, aliases: ["以撒的结合：重生", "以撒的结合", "The Binding of Isaac: Rebirth", "Binding of Isaac", "BoI", "Isaac"], otherNames: ["Afterbirth", "Afterbirth+", "Repentance", "Repentance+"] },
   "slay-the-spire-2": { name: "杀戮尖塔 2", displayTag: null, aliases: ["杀戮尖塔 2", "杀戮尖塔2", "Slay the Spire 2", "StS 2", "STS2"] },
   mewgenics: { name: "喵喵的结合", displayTag: null, aliases: ["喵喵的结合", "Mewgenics"] },
   "baldurs-gate-3": { name: "博德之门 3", displayTag: null, aliases: ["博德之门 3", "博德之门3", "Baldur's Gate 3", "Baldurs Gate 3", "BG3"] },
-  // 仍可能出现在媒体报道里的手游/端游（无主题页，仅身份识别）
+  "counter-strike-2": { name: "CS2", displayTag: null, aliases: ["CS2", "Counter-Strike 2", "Counter Strike 2", "反恐精英 2", "反恐精英2"] },
+  "dota-2": { name: "Dota 2", displayTag: null, aliases: ["Dota 2", "DOTA2", "Dota2", "刀塔 2", "刀塔2"] },
+  "pubg-battlegrounds": { name: "PUBG", displayTag: null, aliases: ["PUBG", "PUBG: BATTLEGROUNDS", "绝地求生", "PlayerUnknown's Battlegrounds", "PlayerUnknowns Battlegrounds"] },
+  "delta-force": { name: "三角洲行动", displayTag: null, aliases: ["三角洲行动", "Delta Force", "Delta Force: Hawk Ops"] },
+  "apex-legends": { name: "Apex 英雄", displayTag: null, aliases: ["Apex 英雄", "Apex英雄", "Apex Legends"] },
+  // 仍可能出现在媒体报道里的其他手游/端游（部分也有主题页）
   "honor-of-kings": { name: "王者荣耀", displayTag: null, aliases: ["王者荣耀", "Honor of Kings"] },
   "genshin-impact": { name: "原神", displayTag: null, aliases: ["原神", "Genshin Impact"] },
   "honkai-star-rail": { name: "崩坏：星穹铁道", displayTag: null, aliases: ["崩坏：星穹铁道", "星穹铁道", "崩铁", "Honkai: Star Rail"] },
@@ -110,6 +115,11 @@ export const IDENTITY_LEXICON: ReadonlyArray<{ id: string; name: string; pattern
   { id: "slay-the-spire-2", name: "杀戮尖塔 2", patterns: [/杀戮尖塔\s*2|slay\s+the\s+spire\s*2|\bsts\s*2\b/i] },
   { id: "mewgenics", name: "喵喵的结合", patterns: [/喵喵的结合|mewgenics/i] },
   { id: "baldurs-gate-3", name: "博德之门 3", patterns: [/博德之门\s*3|baldur'?s?\s+gate\s*3|\bbg3\b/i] },
+  { id: "counter-strike-2", name: "CS2", patterns: [/反恐精英\s*2|counter[\s-]*strike\s*2|\bcs2\b/i] },
+  { id: "dota-2", name: "Dota 2", patterns: [/刀塔\s*2|dota\s*2/i] },
+  { id: "pubg-battlegrounds", name: "PUBG", patterns: [/绝地求生|\bpubg\b|playerunknown'?s\s+battlegrounds/i] },
+  { id: "delta-force", name: "三角洲行动", patterns: [/三角洲行动|delta\s+force(?::\s*hawk\s+ops)?/i] },
+  { id: "apex-legends", name: "Apex 英雄", patterns: [/apex\s*英雄|apex\s+legends/i] },
   { id: "honor-of-kings", name: "王者荣耀", patterns: [/王者荣耀|honor\s+of\s+kings/i] },
   { id: "genshin-impact", name: "原神", patterns: [/原神|genshin/i] },
   { id: "honkai-star-rail", name: "崩坏：星穹铁道", patterns: [/星穹铁道|崩铁|star\s?rail/i] },
