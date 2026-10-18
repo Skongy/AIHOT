@@ -2,7 +2,7 @@
 // DB-backed cases use the test database when available via sibling file.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkCitations, sanitizeAskMarkdown, isAllowedAskHref, stripThinkTags, stripThinkTagsStreaming } from "../src/agent/citations.ts";
+import { checkCitations, sanitizeAskMarkdown, isAllowedAskHref, stripThinkTags, stripThinkTagsStreaming, stripToolCallMarkup, stripAskModelText, extractXmlToolCalls } from "../src/agent/citations.ts";
 import { ASK_TOOL_NAMES, ASK_TOOL_LABELS_ZH, friendlyStepSummary } from "../src/tools/whitelist.ts";
 import { logicalKeyFor } from "@aihot/backend/providers/receipts";
 import { sha256, stableJson } from "@aihot/backend/lib/ids";
@@ -115,4 +115,100 @@ test("search/hot step chip still says 相关资料 when evidence present", () =>
     ],
   });
   assert.equal(summary, "找到 1 条相关资料");
+});
+
+test("stripToolCallMarkup removes MiniMax tool_call XML", () => {
+  const raw = `前言
+<minimax:tool_call>
+<invoke name="get_latest">
+<parameter name="window">24h</parameter>
+</invoke>
+</minimax:tool_call>
+后语`;
+  const out = stripToolCallMarkup(raw);
+  assert.equal(out.includes("minimax"), false);
+  assert.equal(out.includes("invoke"), false);
+  assert.equal(out.includes("get_latest"), false);
+  assert.ok(out.includes("前言"));
+  assert.ok(out.includes("后语"));
+});
+
+test("stripAskModelText strips think and tool_call together", () => {
+  const out = stripAskModelText('可见<think>藏</think><minimax:tool_call><invoke name="search"><parameter name="q">无畏契约</parameter></invoke></minimax:tool_call>答案');
+  assert.equal(out.includes("think"), false);
+  assert.equal(out.includes("minimax"), false);
+  assert.equal(out.includes("藏"), false);
+  assert.ok(out.includes("可见"));
+  assert.ok(out.includes("答案"));
+});
+
+test("sanitizeAskMarkdown strips minimax tool_call so it never reaches UI", () => {
+  const leaked = `<minimax:tool_call>
+<invoke name="get_latest">
+<parameter name="window">24h</parameter>
+</invoke>
+</minimax:tool_call>`;
+  const out = sanitizeAskMarkdown(leaked, new Set());
+  assert.equal(out.includes("minimax"), false);
+  assert.equal(out.includes("<invoke"), false);
+  assert.equal(out.trim(), "");
+});
+
+test("stripThinkTagsStreaming withholds incomplete minimax tool_call prefixes", () => {
+  assert.equal(stripThinkTagsStreaming("你好 <mini"), "你好 ");
+  assert.equal(stripThinkTagsStreaming("你好 <minimax:tool_call"), "你好 ");
+  assert.equal(
+    stripThinkTagsStreaming(`你好 <minimax:tool_call>
+<invoke name="get_latest">
+<parameter name="window">24h</parameter>
+</invoke>
+</minimax:tool_call>世界`),
+    "你好 世界",
+  );
+});
+
+test("extractXmlToolCalls parses MiniMax get_latest and leaves prose", () => {
+  const raw = `稍等
+<minimax:tool_call>
+<invoke name="get_latest">
+<parameter name="window">24h</parameter>
+</invoke>
+</minimax:tool_call>`;
+  const { toolCalls, remainder } = extractXmlToolCalls(raw);
+  assert.equal(toolCalls.length, 1);
+  assert.equal(toolCalls[0]!.function.name, "get_latest");
+  assert.equal(JSON.parse(toolCalls[0]!.function.arguments).window, "24h");
+  assert.ok(remainder.includes("稍等"));
+  assert.equal(remainder.includes("minimax"), false);
+});
+
+test("extractXmlToolCalls parses multiple invokes and numeric params", () => {
+  const raw = `<minimax:tool_call>
+<invoke name="search">
+<parameter name="q">Valorant Champions</parameter>
+<parameter name="limit">10</parameter>
+</invoke>
+<invoke name="get_hot_topics">
+<parameter name="limit">5</parameter>
+</invoke>
+</minimax:tool_call>`;
+  const { toolCalls, remainder } = extractXmlToolCalls(raw);
+  assert.equal(toolCalls.length, 2);
+  assert.equal(toolCalls[0]!.function.name, "search");
+  assert.deepEqual(JSON.parse(toolCalls[0]!.function.arguments), { q: "Valorant Champions", limit: 10 });
+  assert.equal(toolCalls[1]!.function.name, "get_hot_topics");
+  assert.deepEqual(JSON.parse(toolCalls[1]!.function.arguments), { limit: 5 });
+  assert.equal(remainder.trim(), "");
+});
+
+test("XML-only model output strips to empty (loop falls back via visibleAnswer)", () => {
+  const leaked = `<minimax:tool_call>
+<invoke name="get_latest">
+<parameter name="window">24h</parameter>
+</invoke>
+</minimax:tool_call>`;
+  assert.equal(stripAskModelText(leaked).trim(), "");
+  const { toolCalls } = extractXmlToolCalls(leaked);
+  assert.equal(toolCalls.length, 1);
+  assert.equal(toolCalls[0]!.function.name, "get_latest");
 });

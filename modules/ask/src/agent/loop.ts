@@ -13,7 +13,7 @@ import {
 } from "../db/store.ts";
 import { ASK_TOOL_LABELS_ZH, askToolSpecs, executeAskTool, friendlyStepSummary, type AskToolName } from "../tools/whitelist.ts";
 import { askSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
-import { checkCitations, stripThinkTags, stripThinkTagsStreaming } from "./citations.ts";
+import { checkCitations, extractXmlToolCalls, stripAskModelText, stripThinkTagsStreaming } from "./citations.ts";
 import { currentEvidence, historySources } from "./evidence.ts";
 
 const MAX_MODEL = 6;
@@ -130,11 +130,11 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
     await updateDraft(opts.taskId, draft);
   };
 
-  /** Append model delta, strip think tags, emit only newly visible clean text. */
+  /** Append model delta, strip think/tool-call markup, emit only newly visible clean text. */
   const ingestDelta = async (text: string) => {
     rawDraft += text;
     const clean = stripThinkTagsStreaming(rawDraft);
-    draft = stripThinkTags(rawDraft); // final/stored draft: full strip, no holdback
+    draft = stripAskModelText(rawDraft); // final/stored draft: full strip (think + tool XML), no holdback
     if (clean.startsWith(sentClean)) {
       const piece = clean.slice(sentClean.length);
       sentClean = clean;
@@ -145,7 +145,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
     } else {
       // Rare shrink when an unclosed think later closes differently — prefer clean draft.
       sentClean = clean;
-      draft = stripThinkTags(rawDraft);
+      draft = stripAskModelText(rawDraft);
     }
   };
 
@@ -253,7 +253,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       await flushDelta(true);
 
       if (result.content && !draft.includes(result.content) && result.reused) {
-        const cleaned = stripThinkTags(result.content);
+        const cleaned = stripAskModelText(result.content);
         draft = cleaned;
         rawDraft = result.content;
         sentClean = cleaned;
@@ -262,21 +262,34 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       } else if (result.content && draft !== result.content && !result.content.startsWith(draft.slice(0, 20))) {
         // Prefer assembled content as source of truth after stream.
         if (!draft) {
-          draft = stripThinkTags(result.content);
+          draft = stripAskModelText(result.content);
           rawDraft = result.content;
           sentClean = draft;
           await updateDraft(opts.taskId, draft);
         }
       }
-      // Ensure stored draft never retains think tags after a stream round.
-      draft = stripThinkTags(draft || rawDraft || result.content || "");
+      // Ensure stored draft never retains think / tool-call markup after a stream round.
+      draft = stripAskModelText(draft || rawDraft || result.content || "");
 
-      const toolCalls = forceFinal ? [] : result.toolCalls;
+      // MiniMax (and similar) may emit XML tool calls as content instead of API tool_calls.
+      let toolCalls = forceFinal ? [] : result.toolCalls;
+      if (!forceFinal && toolCalls.length === 0) {
+        const extracted = extractXmlToolCalls(rawDraft || result.content || "");
+        if (extracted.toolCalls.length) {
+          toolCalls = extracted.toolCalls;
+          draft = stripAskModelText(extracted.remainder);
+          rawDraft = extracted.remainder;
+          sentClean = stripThinkTagsStreaming(rawDraft);
+        }
+      } else {
+        // Even when API tool_calls exist, never leave leaked XML in the visible draft.
+        draft = stripAskModelText(draft);
+      }
       if (toolCalls.length === 0) {
         // Final answer path
         const evidence = await listEvidence(opts.taskId);
         const answer = visibleAnswer(
-          stripThinkTags(draft || result.content || ""),
+          stripAskModelText(draft || result.content || ""),
           evidence.map((e) => ({ id: e.id, title: e.title, kind: e.kind })),
           "这次没能整理出回答。你可以换个问法，或缩小时间范围后再试。",
         );
@@ -299,7 +312,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       // Execute tool calls serially
       messages.push({
         role: "assistant",
-        content: result.content || null,
+        content: stripAskModelText(result.content || "") || null,
         tool_calls: toolCalls,
       });
 
