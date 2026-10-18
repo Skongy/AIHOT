@@ -45,7 +45,7 @@ async function retained(id:string){
     jobs:await sql`SELECT id,name,data FROM pgboss.job ORDER BY id`};
 }
 
-test('verified old dates correct publication and its existing date-based sort without rejudging imported history',async()=>{
+test('verified old dates correct publication without rejudging imported history or rewriting 精选 listing sort',async()=>{
   const id=await fixture();
   const before=await retained(id);
   const plan=(await previewPublicationDateCorrection(id,corrected))!;
@@ -57,8 +57,12 @@ test('verified old dates correct publication and its existing date-based sort wi
   assert.deepEqual(await retained(id),before);
   const [a]=await sql`SELECT published_at,published_at_claim,timeline_at FROM articles WHERE id=${id}`;
   for(const date of Object.values(a!))assert.equal(date.toISOString(),corrected);
-  const [p]=await sql`SELECT published_at,timeline_at,sort_at FROM publications WHERE article_id=${id}`;
-  for(const date of Object.values(p!))assert.equal(date.toISOString(),corrected);
+  // 精选轨 sort_at follows visible_after (上架时钟); date correction only rewrites published/timeline clocks.
+  const [p]=await sql`SELECT published_at,timeline_at,sort_at,visible_after FROM publications WHERE article_id=${id}`;
+  assert.equal(p!.published_at.toISOString(),corrected);
+  assert.equal(p!.timeline_at.toISOString(),corrected);
+  assert.ok(p!.visible_after);
+  assert.equal(p!.sort_at.toISOString(),p!.visible_after.toISOString());
   const [ledger]=await sql`SELECT payload FROM selected_ledger WHERE article_id=${id} ORDER BY seq DESC LIMIT 1`;
   assert.equal(ledger!.payload.publishedAt,corrected);
   assert.equal((await sql`SELECT 1 FROM settings WHERE key=${`date-hook:${id}`}`).length,1);
