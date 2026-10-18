@@ -97,7 +97,7 @@ export interface V1ItemPayload {
   links: { aihot: string; original: string };
   publishedAt: string | null;
   discoveredAt: string;
-  /** Site timeline / feed rail time (sort_at). Matches the 精选页 clock; may differ from publishedAt. */
+  /** Selected-rail time (sort_at = visible_after). Matches the 精选页 clock; may differ from publishedAt / timeline_at. */
   timelineAt?: string;
   category: string | null;
   score: number | null;
@@ -315,14 +315,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     [title, originalTitle, summary, publicSourceName(source.name), ...displayTags(tags), ...(analysis?.subjects ?? [])].filter(Boolean).join(" "),
   ).toLowerCase();
 
-  // A selected item sits at its reading group's anchor: the earliest public pool member of its fact.
-  let sortAt: Date = article.timeline_at;
-  if (selected && membership?.fact_id) {
-    const [anchor] = await tx<{ t: Date | null }[]>`
-      SELECT min(timeline_at) AS t FROM publications
-      WHERE fact_id = ${membership.fact_id} AND eligible AND visibility = 'public' AND article_id <> ${articleId}`;
-    if (anchor?.t && anchor.t < sortAt) sortAt = anchor.t;
-  }
+  // 精选轨 clock is the listing/release time (visible_after). Pool / DayList keep timeline_at.
+  // Group anchors take min(visible_after) at read time; each row stores its own listing stamp.
+  const sortAt: Date = selected && visibleAfter ? visibleAfter : article.timeline_at;
 
   const next = {
     source_id: source.id, first_party: source.tier === "T1",

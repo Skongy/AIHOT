@@ -1,5 +1,5 @@
 // Selected news timeline: one card per fact, or per standalone article. Only duplicate reports
-// fold together. Each fact stays at its first appearance; other news in its story never moves it.
+// fold together. Each fact stays at its first listing (visible_after); other news in its story never moves it.
 import type { GroupInfo, TimelineCard, TimelineFilters, TimelineResponse } from "@aihot/contracts/site";
 import { beijingDate, beijingMidnight } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
@@ -55,12 +55,12 @@ async function queryGroupedAnchors(q: TimelineQuery, now: Date) {
   const rows = (
     await sql<{ gk: string; anchor_at: Date }[]>`
       WITH base AS MATERIALIZED (
-        SELECT p.sort_at, CASE WHEN p.fact_id IS NOT NULL AND ${ownFactEvidenceCondition()}
+        SELECT p.visible_after AS listed_at, CASE WHEN p.fact_id IS NOT NULL AND ${ownFactEvidenceCondition()}
           THEN 'f' || p.fact_id::text ELSE 'a' || p.article_id END AS gk
         FROM publications p
         WHERE ${selectedCondition(now)} ${filterSql(q)}
       )
-      SELECT gk, min(sort_at) AS anchor_at FROM base GROUP BY gk ORDER BY anchor_at DESC, gk COLLATE "C" DESC`
+      SELECT gk, min(listed_at) AS anchor_at FROM base GROUP BY gk ORDER BY anchor_at DESC, gk COLLATE "C" DESC`
   ).map((r) => ({ gk: r.gk, anchor: r.anchor_at.getTime() }));
   return rows;
 }

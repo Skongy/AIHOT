@@ -44,8 +44,8 @@ async function queryItems(query: V1ItemsQuery, now: Date): Promise<V1ItemsResult
   const windowMs = query.window === "24h" ? 86400000 : 7 * 86400000;
   const windowStart = new Date(now.getTime() - windowMs);
   const binding = queryBinding({ m: query.mode, w: query.window, b: query.by, c: query.category, q: query.q });
-  // by=timeline is the site's own order: a selected item at its reading-group anchor, anything else at its timeline time.
-  const sortCol = query.by === "published" ? sql`coalesce(p.published_at, p.discovered_at)` : query.mode === "selected" ? sql`p.sort_at` : sql`p.timeline_at`;
+  // by=timeline is the site's own order: selected at listing time (visible_after), all at discovery (timeline_at).
+  const sortCol = query.by === "published" ? sql`coalesce(p.published_at, p.discovered_at)` : query.mode === "selected" ? sql`p.visible_after` : sql`p.timeline_at`;
   let after: { a: number; i: string } | null = null;
   if (query.cursor) {
     const c = decodeCursor<{ a: number; i: string; c: string }>("it3", query.cursor);
@@ -76,7 +76,7 @@ async function queryItems(query: V1ItemsQuery, now: Date): Promise<V1ItemsResult
       mode: query.mode, category: query.category, window: query.window, q: query.q, by: query.by,
       ordering: query.by === "published" ? "publishedAtDesc" : "timelineDesc",
     },
-    // sort_at is the window/order key (selected→p.sort_at, all→p.timeline_at, by=published→published).
+    // sort_at alias is the window/order key (selected→visible_after, all→timeline_at, by=published→published).
     // Expose it as timelineAt so agents can filter "最近 N 小时" against the same clock as the 精选页.
     items: page.map((row) => ({ ...rowToV1(row), timelineAt: row.sort_at.toISOString() })),
     page: {
