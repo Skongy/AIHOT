@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品焦点：Steam 游戏。媒体信源保留；手游/端游 F2P 官源（王者、LoL、米游社原神/星铁、永劫、和平精英、LoL Esports）已 enabled:false；四款种子 Steam 游戏各有一条 store news RSS（app/{appid}），并补上可抓的开发商/发行商一手源（Mega Crit 新闻 RSS、Larian 新闻列表）；另按产品点名启用《无畏契约》国服官网新闻（非 Steam，Riot/腾讯）。仍带标题规则的停用官源配置保留，便于日后重开；平台/Steam/厂商官源不套用该标题规则。热榜（B站热搜、贴吧热议）以 hot_signal 接入，只给已有事件加分。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。已启用英雄联盟、原神、崩坏：星穹铁道官方 JSON，CS2、Dota 2、PUBG、三角洲行动、Apex 等 Steam 官方 RSS，以及 GamesIndustry.biz、Game Developer 等全球行业媒体；低效的巴哈姆特 GNN、网易投资者关系和游戏陀螺默认停用。标题规则只用于单游戏公告源，平台、Steam 和厂商官源不套用。热榜（B站热搜、贴吧热议）以 hot_signal 接入，只给已有事件加分。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -84,8 +84,10 @@
         "媒体",
         "繁体"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 1
     },
     {
       "id": "rss-yystv",
@@ -342,6 +344,64 @@
       "enabled": true
     },
     {
+      "id": "rss-gamesindustry-biz",
+      "name": "GamesIndustry.biz",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.gamesindustry.biz/feed",
+        "allowUrlPrefixes": [
+          "https://www.gamesindustry.biz/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文",
+        "行业"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-game-developer",
+      "name": "Game Developer",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.gamedeveloper.com/feeds/rss.xml",
+        "allowUrlPrefixes": [
+          "https://www.gamedeveloper.com/"
+        ],
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "媒体",
+        "海外",
+        "英文",
+        "开发"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
       "id": "web-gamersky",
       "name": "游民星空",
       "kind": "web_list",
@@ -541,8 +601,10 @@
         "媒体",
         "行业"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 1
     },
     {
       "id": "web-indienova",
@@ -715,7 +777,8 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "fetchPublicContent": true
       },
       "tier": "T1",
       "owner_entity_id": "league-of-legends",
@@ -725,9 +788,10 @@
         "官方",
         "英雄联盟"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true,
+      "seed_revision": 1
     },
     {
       "id": "json-miyoushe-ys",
@@ -780,7 +844,8 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "fetchPublicContent": true
       },
       "tier": "T1",
       "owner_entity_id": "genshin-impact",
@@ -790,9 +855,10 @@
         "官方",
         "原神"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true,
+      "seed_revision": 1
     },
     {
       "id": "json-miyoushe-sr",
@@ -845,7 +911,8 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "fetchPublicContent": true
       },
       "tier": "T1",
       "owner_entity_id": "honkai-star-rail",
@@ -855,9 +922,10 @@
         "官方",
         "崩坏：星穹铁道"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false
+      "enabled": true,
+      "seed_revision": 1
     },
     {
       "id": "web-yjwujian",
@@ -1043,7 +1111,8 @@
         "电竞"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "seed_revision": 1
     },
     {
       "id": "json-val-news",
@@ -1268,7 +1337,98 @@
         "电竞"
       ],
       "site_fulltext": true,
-      "syndicate_fulltext": false
+      "syndicate_fulltext": false,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-steam-pubg",
+      "name": "Steam·PUBG 更新",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/578080/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/578080/"
+        ]
+      },
+      "tier": "T1",
+      "owner_entity_id": "pubg-battlegrounds",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "PUBG",
+        "电竞"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-steam-delta-force",
+      "name": "Steam·三角洲行动更新",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/2507950/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/2507950/"
+        ]
+      },
+      "tier": "T1",
+      "owner_entity_id": "delta-force",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "三角洲行动",
+        "射击"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-steam-apex",
+      "name": "Steam·Apex 英雄更新",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://store.steampowered.com/feeds/news/app/1172470/?l=schinese",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        },
+        "publisherUrlPrefixes": [
+          "https://store.steampowered.com/news/app/1172470/"
+        ]
+      },
+      "tier": "T1",
+      "owner_entity_id": "apex-legends",
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": [
+        "官方",
+        "Steam",
+        "Apex 英雄",
+        "射击"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
     },
     {
       "id": "rss-ps-blog-zh-hant",
@@ -1414,8 +1574,10 @@
         "英文",
         "财报"
       ],
-      "site_fulltext": true,
-      "syndicate_fulltext": false
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false,
+      "seed_revision": 1
     },
     {
       "id": "rss-steam-isaac-rebirth",

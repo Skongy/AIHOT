@@ -19,7 +19,7 @@
 
 ## 先预览，再创建
 
-GAMEHOT 的种子信源包含六家海外媒体（2026-10-16 核验）：
+GAMEHOT 的种子信源包含八家海外媒体（2026-10-18 核验）：
 
 | 信源 | 语言 | 免费订阅入口 | 列表过滤 |
 |---|---|---|---|
@@ -29,12 +29,14 @@ GAMEHOT 的种子信源包含六家海外媒体（2026-10-16 核验）：
 | AUTOMATON | 日文 | `https://automaton-media.com/feed/` | 限 `/articles/`，排除标为 `PR` 的推广稿 |
 | 4Gamer | 日文 | `https://www.4gamer.net/rss/index.xml` | 限本站链接，沿用现有 RDF 解析 |
 | VGC | 英文 | `https://www.videogameschronicle.com/feed/` | 限本站链接，排除 `/guide/` 攻略页，保留新闻与采访 |
+| GamesIndustry.biz | 英文 | `https://www.gamesindustry.biz/feed` | 限本站链接，补充商业、市场与工作室动态 |
+| Game Developer | 英文 | `https://www.gamedeveloper.com/feeds/rss.xml` | 限本站链接，补充开发技术与制作行业内容 |
 
-六家均使用现有 `rss` 采集器、`T2` 媒体分级和 `editorial` 参与方式，每 60 分钟抓取；首次最多回灌近一个月的 8 条。AUTOMATON 仅接日文版，避免同时接英文版带来同站重复。其他导购、硬件与手游内容继续由现有预筛和精选规则判断，不额外改评分门槛。
+八家均使用现有 `rss` 采集器、`T2` 媒体分级和 `editorial` 参与方式，每 60 分钟抓取；首次最多回灌近一个月的 8 条。AUTOMATON 仅接日文版，避免同时接英文版带来同站重复。其他导购、硬件与手游内容继续由现有预筛和精选规则判断，不额外改评分门槛。
 
-合入并部署后，现有 setup 中的 `scripts/seed.ts` 会按新 ID 补入这些源，保留已存在源的后台配置；仅推送功能分支不会触发 main 的自动部署。RSS 订阅本身不需要 API key。当前按站点所有者的新闻正文展示要求，这些源配置 `site_fulltext: true` 和 `fetchPublicContent: true`，正文获取沿用已有直连提取及预算内的 Jina 兜底；`syndicate_fulltext` 仍为 `false`。采集与模型是否运行由生产总开关控制。旧数据库的配置同步和正文补取见 [新闻正文](news-reading.md)。
+合入并部署后，setup 中的 `scripts/seed.ts` 会补入新 ID。默认保留已存在源的后台配置；只有配置明确提高 `seed_revision` 时才会应用一次仓库中的启停或归属更新，后续部署不会重复覆盖管理员操作。RSS 订阅本身不需要 API key。当前按站点所有者的新闻正文展示要求，这些源配置 `site_fulltext: true` 和 `fetchPublicContent: true`，正文获取沿用已有直连提取及预算内的 Jina 兜底；`syndicate_fulltext` 仍为 `false`。采集与模型是否运行由生产总开关控制。旧数据库的正文补取见 [新闻正文](news-reading.md)。
 
-离线测试快照位于 `tests/fixtures/game-sources/rss-{pcgamer,rockpapershotgun,gematsu,automaton-jp,4gamer,vgc}.xml`，保留真实标题、链接、时间和分类，省略正文；测试只读取本地快照，不请求媒体网站。
+离线测试快照位于 `tests/fixtures/game-sources/`，保留真实标题、链接和时间，省略正文；测试只读取本地快照，不请求媒体网站。
 
 进入 `/admin/sources/new`，填写 ID、名称，选择类型，再把[下一节](#每种信源怎么配置)对应的 JSON 填入“采集配置（JSON）”。这里填的是配置对象，不要包上 `kind` 或 `config`。切换类型会重置配置，先选类型再粘贴。
 

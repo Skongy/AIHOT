@@ -21,20 +21,21 @@ import { ENTITIES } from "@aihot/industry/taxonomy";
 
 interface SeedSource {
   id: string; name: string; kind: SourceRow["kind"]; config: Record<string, any>; tier: string; owner_entity_id?: string;
-  participation_mode: string; interval_minutes: number; site_fulltext: boolean; syndicate_fulltext: boolean; enabled?: boolean;
+  participation_mode: string; interval_minutes: number; site_fulltext: boolean; syndicate_fulltext: boolean; enabled?: boolean; seed_revision?: number;
 }
 const { sources } = JSON.parse(readFileSync(path.join(REPO_ROOT, "industry/sources.json"), "utf8")) as { sources: SeedSource[] };
 const byId = new Map(sources.map((s) => [s.id, s]));
 
 const MEDIA = [
   "rss-gcores", "rss-ign-cn", "rss-gnn", "rss-yystv", "rss-chuapp", "rss-youxichaguan", "rss-hltv",
-  "rss-pcgamer", "rss-rockpapershotgun", "rss-gematsu", "rss-automaton-jp", "rss-4gamer", "rss-vgc",
+  "rss-pcgamer", "rss-rockpapershotgun", "rss-gematsu", "rss-automaton-jp", "rss-4gamer", "rss-vgc", "rss-gamesindustry-biz", "rss-game-developer",
   "web-gamersky", "web-3dm", "web-a9vg", "web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-nppa-games",
 ];
 const OFFICIAL = [
-  // disabled (Steam-focus): mobile/F2P single-game + LoL Esports
+  // Single-game and esports official sources.
   "json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports",
-  "rss-steam-cs2", "rss-steam-dota2", "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-netease-ir",
+  "rss-steam-cs2", "rss-steam-dota2", "rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex",
+  "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-netease-ir",
   // Steam seed-game news + developer/publisher first-party
   "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3",
   "rss-megacrit-news", "web-larian-news",
@@ -43,17 +44,24 @@ const OFFICIAL = [
 ];
 /** Community hot lists: heat evidence only (Bilibili / Tieba). */
 const HOT = ["json-bilibili-hotword", "json-tieba-hottopic"];
-/** Disabled mobile/F2P announcement feeds still carry the old shared title rule (kept for re-enable). Steam seed feeds do not. */
+/** Single-game announcement feeds share a strict title rule. Steam feeds do not. */
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
 /** Enabled Valorant CN announcements: same keep/drop idea, with Valorant-specific markers. */
 const VALORANT_TITLE_RULE = ["json-val-news", "json-vct-news"];
-const DISABLED_OFFICIAL = new Set(["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq", "web-lolesports"]);
+const DISABLED_OFFICIAL = new Set(["json-pvp-news", "web-yjwujian", "web-gp-qq", "web-lolesports", "rss-netease-ir"]);
+const DISABLED_LOW_YIELD = new Set(["rss-gnn", "rss-netease-ir", "web-youxituoluo"]);
+const REVISION_SYNCED = new Set([
+  ...DISABLED_LOW_YIELD, "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "rss-steam-dota2",
+  "rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-gamesindustry-biz", "rss-game-developer",
+]);
 /** Listings that print no absolute date: their detail pages (or a later listing) date them. */
 const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-gp-qq", "web-playvalorant-news"]);
 
 test("the seed holds the media list and the official list, nothing else", () => {
   assert.deepEqual(sources.map((s) => s.id).sort(), [...MEDIA, ...OFFICIAL, ...HOT].sort());
   assert.equal(new Set(sources.map((s) => s.id)).size, sources.length);
+  assert.deepEqual(sources.filter((s) => s.seed_revision !== undefined).map((s) => s.id).sort(), [...REVISION_SYNCED].sort());
+  for (const id of REVISION_SYNCED) assert.equal(byId.get(id)!.seed_revision, 1, id);
 });
 
 test("every game source has a supported config and the requested news-reading policy", () => {
@@ -82,13 +90,19 @@ test("every game source has a supported config and the requested news-reading po
   for (const id of MEDIA) assert.equal(byId.get(id)!.tier, id === "web-nppa-games" ? "T1" : "T2", id);
   for (const id of OFFICIAL) assert.equal(byId.get(id)!.tier, id === "rss-steam-news" ? "T1_5" : "T1", id);
   for (const id of DISABLED_OFFICIAL) assert.equal(byId.get(id)!.enabled, false, id);
+  for (const id of DISABLED_LOW_YIELD) assert.equal(byId.get(id)!.enabled, false, id);
+  for (const id of ["json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr"]) {
+    assert.notEqual(byId.get(id)!.enabled, false, id);
+    assert.equal(byId.get(id)!.config.fetchPublicContent, true, id);
+    assert.equal(byId.get(id)!.site_fulltext, true, id);
+  }
   for (const id of HOT) {
     assert.notEqual(byId.get(id)!.enabled, false, id);
     assert.equal(byId.get(id)!.tier, "T2", id);
     assert.equal(byId.get(id)!.participation_mode, "hot_signal", id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
   }
-  for (const id of ["rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
+  for (const id of ["rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
     assert.notEqual(byId.get(id)!.enabled, false, id);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
     const prefixes = byId.get(id)!.config.publisherUrlPrefixes as string[];
@@ -125,7 +139,7 @@ test("the title rule sits on the single-game announcement sources only", () => {
   assert.ok(valRule.keepIfMatches.includes("版本更新") && valRule.keepIfMatches.includes("无畏契约"), "Valorant keep list");
   assert.ok(valRule.dropMarkersTitleOnly.includes("夜市") && valRule.dropMarkersTitleOnly.includes("商城"), "Valorant drop list");
   assert.deepEqual(byId.get("json-vct-news")!.config.ingestNoiseFilter, valRule, "VCT CN shares Valorant title rule");
-  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3", "rss-megacrit-news", "web-larian-news", "web-playvalorant-news"]) {
+  for (const id of ["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-steam-cs2", "rss-steam-dota2", "rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3", "rss-megacrit-news", "web-larian-news", "web-playvalorant-news"]) {
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
   }
 });
