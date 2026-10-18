@@ -16,11 +16,13 @@ export function FeatureRelease({ release, id }: { release: ChangelogRelease; id?
       setEntered(true);
       return;
     }
+    // threshold 0 + no bottom clip: play as soon as any pixel enters (or is already on
+    // the first screen). The old 0.22 / -8% combo left a blank hole while the card peeked in.
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry?.isIntersecting) return;
       setEntered(true);
       observer.disconnect();
-    }, { threshold: 0.22, rootMargin: "0px 0px -8%" });
+    }, { threshold: 0, rootMargin: "8% 0px 0px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
