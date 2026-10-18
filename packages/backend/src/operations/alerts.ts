@@ -74,15 +74,19 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
         since: waiting[0]!.since,
       });
     }
+    // Soft waits (local budget / provider 429·quota) stay in processing_state=new with retry_at; do not
+    // treat them as a stuck pipeline or a hard failure flood — same quiet posture as MODEL_CALLS off.
+    const softWait = sql`coalesce(processing_error, '') ~* '(Budget for .+ exhausted|HTTP 429\\M|rate[_ ]?limit|insufficient(?:[_\\s-])?quota|token plan|额度|配额|限流)'`;
     const [p] = await sql<{ waiting: number; oldest: Date | null; failed: number }[]>`
-      SELECT count(*) FILTER (WHERE processing_state = 'new' AND discovered_at < now() - interval '2 hours')::int AS waiting,
-             min(discovered_at) FILTER (WHERE processing_state = 'new') AS oldest,
-             count(*) FILTER (WHERE processing_state = 'failed' AND discovered_at > now() - interval '3 hours')::int AS failed
+      SELECT count(*) FILTER (WHERE processing_state = 'new' AND discovered_at < now() - interval '2 hours' AND NOT (${softWait}))::int AS waiting,
+             min(discovered_at) FILTER (WHERE processing_state = 'new' AND NOT (${softWait})) AS oldest,
+             count(*) FILTER (WHERE processing_state = 'failed' AND discovered_at > now() - interval '3 hours' AND NOT (${softWait}))::int AS failed
       FROM articles WHERE processing_state IN ('new', 'failed') AND discovered_at > now() - interval '2 days'`;
     if (p!.waiting >= 10 || p!.failed >= 20) {
       const errors = await sql<{ error: string; n: number }[]>`
         SELECT left(coalesce(processing_error, '（无）'), 120) AS error, count(*)::int AS n FROM articles
-        WHERE processing_state IN ('new', 'failed') AND discovered_at > now() - interval '3 hours' AND processing_error IS NOT NULL
+        WHERE processing_state IN ('new', 'failed') AND discovered_at > now() - interval '3 hours'
+          AND processing_error IS NOT NULL AND NOT (${softWait})
         GROUP BY 1 ORDER BY 2 DESC LIMIT 3`;
       out.push({
         key: "content.process",
@@ -245,6 +249,7 @@ async function providerFindings(): Promise<Finding[]> {
     SELECT service, count(*)::int AS n, (array_agg(left(error, 200) ORDER BY started_at DESC))[1] AS last FROM receipt_attempts
     WHERE status = 'failed' AND started_at > now() - interval '1 hour'
       AND error ~* '(HTTP 40[123]\\M|insufficient|balance|arrear|good standing|欠费|余额)'
+      AND error !~* '(HTTP 429\\M|rate[_ ]?limit|Budget for .+ exhausted \\(provider\\)|token plan|额度|配额|限流)'
     GROUP BY 1 HAVING count(*) >= 3`;
   for (const p of refused) {
     out.push({

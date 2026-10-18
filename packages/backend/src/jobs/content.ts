@@ -163,7 +163,7 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
   if (error instanceof AnalysisInterruptedError || shutdownSignal.signal.aborted) throw error;
   const message = String(error instanceof Error ? error.message : error).slice(0, 500);
   if (error instanceof ReceiptBusyError || error instanceof BudgetExceededError) {
-    // Not the article's fault: the same request is in flight, or the budget window is full.
+    // Not the article's fault: in-flight receipt, local budget, or provider 429/quota (assertAccepted).
     const seconds = error instanceof BudgetExceededError ? error.retryAfterSeconds : 60;
     const retryAt = new Date(Date.now() + seconds * 1000);
     await sql`UPDATE articles SET processing_state = 'new', processing_error = ${message}, processing_retry_at = ${retryAt}, processing_queued_at = NULL

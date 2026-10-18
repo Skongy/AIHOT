@@ -45,12 +45,45 @@ export class ProviderRejectedError extends Error {
 }
 
 /**
- * The HTTP rule for every provider: an answer outside 2xx means the request was not taken. Rate limits
- * and server errors may pass; any other status is a refusal the same request would meet again.
+ * Provider rate-limit / quota exhaustion (HTTP 429, or a quota/rate message on 400/402/403/503).
+ * Soft like our own budgets: analysis waits and retries without burning processing_attempts.
  */
-export function assertAccepted(service: string, status: number, body: string): void {
+export function isProviderQuotaError(status: number, body: string): boolean {
+  if (status === 429) return true;
+  if (![400, 402, 403, 503].includes(status)) return false;
+  return /rate[_ ]?limit|quota|tpm|rpm|tokens?\s*per|insufficient(?:[_\s-])?quota|exceeded your|token plan|额度|配额|限流|超过.*限制/i.test(body);
+}
+
+/** Parse Retry-After as seconds; HTTP-date values fall back to undefined. */
+export function parseRetryAfterSeconds(header: string | null | undefined): number | undefined {
+  if (!header) return undefined;
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const n = Number(trimmed);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, 86_400) : undefined;
+  }
+  const when = Date.parse(trimmed);
+  if (!Number.isFinite(when)) return undefined;
+  const seconds = Math.ceil((when - Date.now()) / 1000);
+  return seconds > 0 ? Math.min(seconds, 86_400) : undefined;
+}
+
+/**
+ * The HTTP rule for every provider: an answer outside 2xx means the request was not taken.
+ * Quota / rate-limit answers become BudgetExceededError (quiet wait); other 5xx/429-shaped
+ * refusals stay retryable ProviderRejectedError; the rest are hard refusals.
+ */
+export function assertAccepted(
+  service: string,
+  status: number,
+  body: string,
+  opts?: { retryAfterSeconds?: number },
+): void {
   if (status >= 200 && status < 300) return;
-  throw new ProviderRejectedError(`${service} HTTP ${status}: ${body.slice(0, 500)}`, status, status === 429 || status >= 500);
+  if (isProviderQuotaError(status, body)) {
+    throw new BudgetExceededError(service, "provider", opts?.retryAfterSeconds ?? 600);
+  }
+  throw new ProviderRejectedError(`${service} HTTP ${status}: ${body.slice(0, 500)}`, status, status >= 500);
 }
 
 export interface CallOutcome {
@@ -167,9 +200,12 @@ export async function paidRequest(req: ReceiptRequest, call: () => Promise<CallO
   try {
     outcome = await call();
   } catch (error) {
-    const status = error instanceof ProviderRejectedError ? "failed" : "unknown";
+    // ProviderRejected and BudgetExceeded (incl. provider 429/quota from assertAccepted) are clear
+    // outcomes: mark failed so the same logical key can retry later. Other errors stay unknown.
+    const clear = error instanceof ProviderRejectedError || error instanceof BudgetExceededError;
+    const status = clear ? "failed" : "unknown";
     // "unknown": the request may have reached the provider (timeout, reset): do not re-send automatically.
-    const message = (error instanceof ProviderRejectedError ? error.message : String(error)).slice(0, 2000);
+    const message = (clear && error instanceof Error ? error.message : String(error)).slice(0, 2000);
     await sql.begin(async (tx) => {
       await tx`UPDATE receipts SET status = ${status}, error = ${message}, updated_at = now() WHERE id = ${receiptId}`;
       await tx`UPDATE receipt_attempts SET status = ${status}, error = ${message}, latency_ms = ${Date.now() - started}, finished_at = now() WHERE id = ${attemptId}`;
