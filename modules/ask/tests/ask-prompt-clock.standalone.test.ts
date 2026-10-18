@@ -8,4 +8,6 @@ test("askSystemPrompt injects Beijing now for relative windows", () => {
   assert.match(text, /现在是北京时间 2026-10-12 21:21/);
   assert.match(text, /站内时间/);
   assert.match(text, /get_latest/);
+  assert.match(text, /window 只能是 1h、24h、7d、30d、all/);
+  assert.match(text, /禁止 90d/);
 });

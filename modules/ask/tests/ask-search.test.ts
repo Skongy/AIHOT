@@ -59,6 +59,11 @@ test("get_latest timeline dumps are browsing-only and register no citeable evide
     assert.ok(typeof result.structured.count === "number");
   }
 });
+test("illegal window 90d is coerced to all and still retrieves", async () => {
+  const result = await executeAskTool("search", JSON.stringify({ q: "BG3", window: "90d", mode: "all", limit: 2 }));
+  assert.equal(result.ok, true);
+  if (result.ok) assert.ok((result.structured.count as number) >= 1);
+});
 test("empty named searches return no unrelated evidence", async () => {
   const result=await executeAskTool('search',JSON.stringify({q:'no-such-game-unique-fixture',window:'all'}));
   assert.equal(result.ok,true);

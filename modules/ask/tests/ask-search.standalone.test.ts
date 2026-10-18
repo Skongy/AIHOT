@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { askAliases, askRange } from "../src/tools/search-query.ts";
 import { checkCitations, isAllowedAskHref } from "../src/agent/citations.ts";
-import { executeAskTool, askToolSpecs } from "../src/tools/whitelist.ts";
+import { executeAskTool, askToolSpecs, coerceAskToolArgs } from "../src/tools/whitelist.ts";
 
 const now = new Date("2026-10-16T12:00:00Z");
 test("one-hour queries use an exact backend range", () => {
@@ -48,4 +48,30 @@ test("bad tool ranges fail before any database or model access", async () => {
   if (!result.ok) assert.equal(result.errorCode, "invalid_arguments");
   const specs = askToolSpecs();
   assert.ok(specs.find((s) => s.function.name === "get_article"));
+});
+
+test("illegal search windows are coerced before schema validation", () => {
+  assert.deepEqual(coerceAskToolArgs("search", { q: "无畏契约", window: "90d" }), { q: "无畏契约", window: "all" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "BG3", window: "60d" }), { q: "BG3", window: "all" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "BG3", window: "180d" }), { q: "BG3", window: "all" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "BG3", window: "1y" }), { q: "BG3", window: "all" });
+  assert.deepEqual(coerceAskToolArgs("get_latest", { window: "14d" }), { window: "30d" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: "2w" }), { q: "x", window: "30d" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: "3d" }), { q: "x", window: "7d" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: "2d" }), { q: "x", window: "7d" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: " 90D " }), { q: "x", window: "all" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: "forever" }), { q: "x" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: 90 }), { q: "x" });
+  assert.deepEqual(coerceAskToolArgs("search", { q: "x", window: "7d" }), { q: "x", window: "7d" });
+  assert.deepEqual(coerceAskToolArgs("get_hot_topics", { limit: 3, window: "90d" }), { limit: 3, window: "90d" });
+});
+test("coerced 90d search does not fail argument validation", async () => {
+  const result = await executeAskTool("search", JSON.stringify({ q: "BG3", window: "90d", from: "2026-02-30" }));
+  // window must be coerced; failure should be the invalid date, not enum rejection of 90d
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.errorCode, "invalid_arguments");
+    assert.equal(result.message.includes("90d"), false);
+    assert.match(result.message, /日期|时间|YYYY-MM-DD/);
+  }
 });
