@@ -157,8 +157,8 @@ export const ABOUT = {
     wechat?: ContactCard;
     feishu?: ContactCard;
   },
-  /** 页面底部的版权与下架说明，中间接“反馈页”的链接。 */
-  copyright: [`${SITE.name} 是聚合摘要和阅读索引，原文版权归各来源所有。如果你是来源方，希望更正、下架或调整展示方式，可以通过`, "联系我们。"] as [string, string],
+  /** 页面底部的版权说明。 */
+  copyright: `${SITE.name} 是聚合摘要和阅读索引，原文版权归各来源所有。`,
   /** 页面底部“使用规则”链接的锚点 id（选填）：外部文档写死过这个锚点就填上，以后不要改。 */
   termsAnchor: null as string | null,
 } as const;
