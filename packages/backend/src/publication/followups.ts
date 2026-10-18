@@ -9,18 +9,18 @@ const SHOWN = 8;
 
 type Member = RepresentativeIdentity & {
   fact_id: number; fact_public_id: string; id: string; title: string; source_name: string;
-  body_mode: "full" | "summary"; score: number | null; timeline_at: Date; sort_at: Date;
+  body_mode: "full" | "summary"; score: number | null; timeline_at: Date; visible_after: Date;
 };
 
 /**
  * Each fact of the story with a selected report still evidence of it: its representative, the facts
- * ordered by when they first appeared. Null for an unknown or merged story, or one without any.
+ * ordered by when they were first listed (visible_after). Null for an unknown or merged story, or one without any.
  */
 export async function loadStoryFollowups(storyPublicId: string, now = new Date()): Promise<StoryFollowupsResponse | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storyPublicId)) return null;
   const members = await sql<Member[]>`
     SELECT p.fact_id, f.public_id AS fact_public_id, p.article_id AS id, p.title, s.name AS source_name,
-      p.body_mode, p.score, p.timeline_at, p.sort_at, ${REPRESENTATIVE_COLUMNS}
+      p.body_mode, p.score, p.timeline_at, p.visible_after, ${REPRESENTATIVE_COLUMNS}
     FROM stories st JOIN publications p ON p.story_id = st.id JOIN sources s ON s.id = p.source_id JOIN facts f ON f.id = p.fact_id
     WHERE st.public_id = ${storyPublicId} AND st.merged_into IS NULL AND ${selectedCondition(now)} AND ${ownFactEvidenceCondition()}`;
   const byFact = new Map<number, Member[]>();
@@ -29,7 +29,7 @@ export async function loadStoryFollowups(storyPublicId: string, now = new Date()
   const facts = [...byFact.values()]
     .map((reports) => ({
       factId: reports[0]!.fact_public_id,
-      first: Math.min(...reports.map((r) => r.sort_at.getTime())),
+      first: Math.min(...reports.map((r) => r.visible_after.getTime())),
       representative: pickRepresentative(reports),
     }))
     .sort((a, b) => b.first - a.first || a.factId.localeCompare(b.factId));
