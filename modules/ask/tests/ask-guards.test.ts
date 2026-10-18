@@ -197,7 +197,7 @@ test("friendlyStepSummary for get_latest uses recent-dump wording not 相关资�
     name: "get_latest",
     text: "近期列表……",
     structured: { count: 30, mode: "selected" },
-    evidence: [], // timeline dumps are not citeable 来源
+    evidence: [], // Summary wording depends on returned count, independent of the evidence fixture.
   });
   assert.equal(selected, "拉取近期精选 30 条");
   assert.equal(selected.includes("相关资料"), false);

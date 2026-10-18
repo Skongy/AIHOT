@@ -51,12 +51,15 @@ test("article context reads public summaries and registers a citeable source", a
   assert.equal(result.ok, true);
   if (result.ok) { assert.equal(result.evidence[0]?.objectId, ids[0]); assert.match(result.text, /固定摘要/); }
 });
-test("get_latest timeline dumps are browsing-only and register no citeable evidence", async () => {
+test("get_latest registers each public item so recent-news answers can link original sources", async () => {
   const result = await executeAskTool('get_latest', JSON.stringify({ window:'all', mode:'all', limit:1 }));
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.evidence.length, 0);
-    assert.ok(typeof result.structured.count === "number");
+    assert.equal(result.evidence.length, 1);
+    assert.equal(result.evidence[0]?.objectId, ids[0]);
+    assert.equal(result.evidence[0]?.siteUrl, `/items/${ids[0]}`);
+    assert.match(result.evidence[0]?.originalUrl ?? "", /^https:\/\//);
+    assert.equal(result.structured.count, 1);
   }
 });
 test("illegal window 90d is coerced to all and still retrieves", async () => {
