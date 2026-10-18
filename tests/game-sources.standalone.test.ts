@@ -48,15 +48,16 @@ const HOT = ["json-bilibili-hotword", "json-tieba-hottopic"];
 const SINGLE_GAME = ["json-pvp-news", "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "web-yjwujian", "web-gp-qq"];
 /** Enabled Valorant CN announcements: same keep/drop idea, with Valorant-specific markers. */
 const VALORANT_TITLE_RULE = ["json-val-news", "json-vct-news"];
-/** High-quality editorial keep-list (~12) plus hot_signal; everything else is paused to cut LLM spend. */
+/** High-quality editorial keep-list (~14) plus hot_signal; everything else is paused to cut LLM spend. */
 const ENABLED_KEEP = new Set([
   "rss-gcores", "rss-yystv", "rss-chuapp", "rss-gematsu", "rss-gamesindustry-biz", "web-nppa-games",
+  "web-wanplus", "web-17173",
   "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "json-val-news", "json-vct-news",
   "json-bilibili-hotword", "json-tieba-hottopic",
 ]);
 const DISABLED_OFFICIAL = new Set(["json-pvp-news", "web-yjwujian", "web-gp-qq", "web-lolesports", "rss-netease-ir", "web-playvalorant-news"]);
 const DISABLED_LOW_YIELD = new Set(["rss-gnn", "rss-netease-ir", "web-youxituoluo"]);
-const SEED_REVISION = 2;
+const SEED_REVISION = 3;
 /** Listings that print no absolute date: their detail pages (or a later listing) date them. */
 const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-gp-qq", "web-playvalorant-news"]);
 
