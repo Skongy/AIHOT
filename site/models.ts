@@ -50,6 +50,15 @@ export const PRESETS: Record<string, ModelPreset> = {
     service: "mimo", model: "mimo-v2.6-flash", baseUrlEnv: "XIAOMI_MIMO_BASE_URL", apiKeyEnv: "XIAOMI_MIMO_API_KEY",
     extra: { thinking: { type: "disabled" } }, jsonMode: true,
   },
+  // MiniMax Token Plan / M Plan. Flash-Preview thinks by default; keep effort low for news scoring.
+  "MiniMax-M3.1-Flash-Preview": {
+    service: "minimax", model: "MiniMax-M3.1-Flash-Preview", baseUrlEnv: "MINIMAX_BASE_URL", apiKeyEnv: "MINIMAX_API_KEY",
+    extra: { reasoning_effort: "low" }, jsonMode: true, vision: true,
+  },
+  "MiniMax-M3": {
+    service: "minimax", model: "MiniMax-M3", baseUrlEnv: "MINIMAX_BASE_URL", apiKeyEnv: "MINIMAX_API_KEY",
+    extra: { reasoning_effort: "low" }, jsonMode: true,
+  },
   "qwen3-vl-flash": {
     service: "dashscope", model: "qwen3-vl-flash", baseUrlEnv: "DASHSCOPE_BASE_URL", apiKeyEnv: "DASHSCOPE_API_KEY",
     extra: { enable_thinking: false }, jsonMode: false, vision: true,
