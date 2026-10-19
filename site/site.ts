@@ -128,23 +128,15 @@ interface ContactCard {
   alias?: string;
 }
 
-/** 关于页的文案。数字（信源数、收录数、精选数、日报期数）来自站内实时统计，不用写在这里。 */
+/** 关于页的文案。数字（收录数、事件数、精选数、日报期数）来自站内实时统计，不用写在这里。 */
 export const ABOUT = {
   kicker: `关于 ${SITE.name}`,
   /** 页面描述（搜索结果、分享卡片）。 */
   description: `关于 ${SITE.name}：${SITE.description}`,
   /** 大标题：第一行正常颜色，第二行强调色。 */
   headline: ["游戏圈每天都有新消息，", "值得看的，只有几条。"] as [string, string],
-  /** 标题下面的一段话。{sources} 会换成实时的信源数（两边自动加空格，所以 {sources} 两边不写空格）；统计没取到时换成 sourcesFallback。 */
-  lead: `${SITE.name} 替你盯着{sources}个信源：抓取、归并、打分、精选，${EDITION_WHEN.daily} 出一份日报。免费，不用注册。`,
-  sourcesFallback: "十几",
-  /** 信源河动画下面的四个环节。 */
-  steps: {
-    collect: "官方公告、游戏媒体和玩家社区的信源都在看；更新越勤的源看得越勤，最快 15 分钟看一次。",
-    store: "抓到的都存下来，同一件事的报道归到一起，热点榜就是从这里算出来的。",
-    select: `模型先看是不是游戏相关、有没有实际信息，再写中文标题、摘要和${ITEM_COPY.reasonLabel}；广告软文和重复转发进不来。`,
-    publish: `${EDITION_WHEN.daily} 出日报，${EDITION_WHEN.weekly} 出周报，${EDITION_WHEN.monthly} 出月报。`,
-  },
+  /** 标题下面的一段话。 */
+  lead: `大量游戏动态不断发生。${SITE.name} 把同一件事聚在一起，让真正有价值的消息浮出来，再整理成一份可以快速读完的日报。`,
   /**
    * 作者块（选填），null 就不显示。
    * avatarSourceId：一个 X 账号信源的 id，头像取它的（选填）。
