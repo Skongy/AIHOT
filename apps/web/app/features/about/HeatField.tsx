@@ -390,7 +390,7 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
         </div>
       </div>
 
-      <div ref={rootRef} style={fieldStyle} className="relative h-[870px] overflow-hidden lg:h-[510px]">
+      <div ref={rootRef} style={fieldStyle} className="relative h-[920px] overflow-hidden lg:h-[510px]">
         <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-0" />
 
         <div className="pointer-events-none absolute left-[6%] top-10 z-10 lg:left-[4.3%] lg:top-12">
