@@ -80,17 +80,18 @@ function DailyCard({ items, date, hit, active, cardRef }: { items: PickItem[]; d
   return (
     <article
       ref={cardRef}
-      className={`absolute left-1/2 top-[658px] z-20 w-[210px] -translate-x-1/2 transition-[transform,filter] duration-500 [transition-timing-function:cubic-bezier(.2,.9,.25,1.2)] lg:left-auto lg:right-[2.8%] lg:top-[46px] lg:w-[clamp(250px,22%,310px)] lg:translate-x-0 ${hit ? "-translate-y-1 scale-[1.012] drop-shadow-[0_24px_28px_rgba(139,105,20,0.12)] lg:-translate-y-1" : ""}`}
+      className="absolute left-1/2 top-[658px] z-20 w-[210px] -translate-x-1/2 lg:left-auto lg:right-[2.8%] lg:top-[46px] lg:w-[clamp(250px,22%,310px)] lg:translate-x-0"
     >
       <span aria-hidden="true" className="absolute inset-x-3 -bottom-2 top-3 -z-20 rotate-[1.4deg] rounded-[18px] border border-line bg-surface/55" />
       <span aria-hidden="true" className="absolute inset-x-6 -bottom-3 top-5 -z-30 -rotate-[1.1deg] rounded-[18px] border border-line-soft bg-bg-sunk/70" />
-      <div className="daily-brief__surface relative overflow-hidden rounded-[18px] border border-line-strong bg-surface shadow-[0_24px_60px_rgba(32,36,43,0.14)]">
+      <div className={`daily-brief__surface relative overflow-hidden rounded-[18px] border border-line-strong bg-surface shadow-[0_24px_60px_rgba(32,36,43,0.14)] ${hit ? "is-hit" : ""}`}>
+        <span aria-hidden="true" className="daily-brief__glow pointer-events-none absolute inset-0 z-0" />
         <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-[linear-gradient(to_bottom,var(--accent),color-mix(in_srgb,var(--accent)_38%,transparent))]" />
-        <div className="flex items-center justify-between border-b border-line-soft bg-bg-sunk/55 px-4 py-2.5 pl-5 text-[8px] font-black tracking-[0.16em] text-ink-3">
+        <div className="relative z-[1] flex items-center justify-between border-b border-line-soft bg-bg-sunk/55 px-4 py-2.5 pl-5 text-[8px] font-black tracking-[0.16em] text-ink-3">
           <span className="flex items-center gap-2"><i className="size-1.5 rounded-full bg-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_13%,transparent)]" />今日简报</span>
           <span className="num text-accent">{date}</span>
         </div>
-        <div className="px-4 pb-3.5 pl-5 pt-3.5">
+        <div className="relative z-[1] px-4 pb-3.5 pl-5 pt-3.5">
           <div className="flex items-end justify-between gap-3">
             <div>
               <span className="block text-[8px] font-bold tracking-[0.18em] text-accent">GAMEHOT · DAILY</span>
@@ -150,7 +151,7 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
     if (picks.length > 1) setActive((value) => (value + 1) % picks.length);
     setHit(true);
     if (hitTimer.current) clearTimeout(hitTimer.current);
-    hitTimer.current = setTimeout(() => setHit(false), 620);
+    hitTimer.current = setTimeout(() => setHit(false), 1000);
   }, [picks.length]);
   arriveRef.current = onArrive;
 
