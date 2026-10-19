@@ -117,8 +117,8 @@ test('answers render safe typography, numbered citations open matching sources, 
   }finally{await context.close();}
 });
 test('pipe tables render as readable tables and uncited retrieved reports stay available in degraded answers',async()=>{
-  nextAnswer='## 当前热点\n\n| 排名 | 事件 | 核心动态 |\n|:---|:---|:---|\n| 1 | 街头霸王电影 | 首周末票房表现 |\n| 2 | 手柄专利 | 新专利申请 |';nextStatus='completed_degraded';
   const {context,page,errors}=await visit();try{
+    nextAnswer='## 当前热点\n\n| 排名 | 事件 | 核心动态 |\n|:---|:---|:---|\n| 1 | 街头霸王电影 | 首周末票房表现 |\n| 2 | 手柄专利 | 新专利申请 |';nextStatus='completed_degraded';
     await send(page,'最近有哪些游戏热点？');
     await expect(page.locator('.ask-answer table')).toBeVisible();
     await expect(page.locator('.ask-answer tbody tr')).toHaveCount(2);
