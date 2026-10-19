@@ -27,8 +27,8 @@ export async function askItems(query: AskItemsQuery, now = new Date()) {
     until = new Date(c.until);
     before = { at: new Date(c.at), id: c.id };
   }
-  // selected → 上架时钟 (visible_after); all → 发现时钟 (timeline_at). Keep aligned with 精选轨.
-  const sort = query.mode === "selected" ? sql`p.visible_after` : sql`p.timeline_at`;
+  // Both scopes use the article timeline clock, so the same report has one time everywhere.
+  const sort = sql`p.timeline_at`;
   const scope = query.mode === "selected" ? seatedCondition(now) : listedCondition(now);
   const alternatives = query.queries.map((q) => sql`(TRUE ${publicMatchCondition(searchTerms(q))})`);
   const match = alternatives.length ? sql`AND (${alternatives.reduce((a, b) => sql`${a} OR ${b}`)})` : sql``;

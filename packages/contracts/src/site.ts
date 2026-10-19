@@ -113,6 +113,7 @@ export interface GroupInfo {
 
 export interface TimelineCard {
   key: string;
+  /** Grouping and pagination anchor; the displayed time belongs to item.timelineAt. */
   anchorAt: string;
   item: FeedItemSummary;
   group: GroupInfo | null;

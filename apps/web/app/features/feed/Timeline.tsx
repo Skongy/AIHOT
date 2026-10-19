@@ -328,8 +328,8 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
                     const fresh = freshKeys.has(c.key);
                     const delay = fresh ? Math.min(order++, 10) * 40 : 0;
                     return (
-                      <TimelineSlot key={c.key} dataKey={c.key} at={c.anchorAt} fresh={fresh} delay={delay} dimmable={readSet.has(c.item.id)}>
-                        <FeedItem item={c.item} group={c.group} filters={filters} read={readSet.has(c.item.id)} onOpen={markRead} at={c.anchorAt} />
+                      <TimelineSlot key={c.key} dataKey={c.key} at={c.item.timelineAt} fresh={fresh} delay={delay} dimmable={readSet.has(c.item.id)}>
+                        <FeedItem item={c.item} group={c.group} filters={filters} read={readSet.has(c.item.id)} onOpen={markRead} at={c.item.timelineAt} />
                       </TimelineSlot>
                     );
                   })}

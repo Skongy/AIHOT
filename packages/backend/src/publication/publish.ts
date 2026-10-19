@@ -97,7 +97,7 @@ export interface V1ItemPayload {
   links: { aihot: string; original: string };
   publishedAt: string | null;
   discoveredAt: string;
-  /** Selected-rail time (sort_at = visible_after). Matches the 精选页 clock; may differ from publishedAt / timeline_at. */
+  /** Selection release stamp retained for compatibility; public lists render timeline_at. */
   timelineAt?: string;
   category: string | null;
   score: number | null;
@@ -315,8 +315,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     [title, originalTitle, summary, publicSourceName(source.name), ...displayTags(tags), ...(analysis?.subjects ?? [])].filter(Boolean).join(" "),
   ).toLowerCase();
 
-  // 精选轨 clock is the listing/release time (visible_after). Pool / DayList keep timeline_at.
-  // Group anchors take min(visible_after) at read time; each row stores its own listing stamp.
+  // Keep the selection release stamp separate from the public news clock. It still records when an
+  // item became visible, while 精选 and 全部动态 both render timeline_at.
   const sortAt: Date = selected && visibleAfter ? visibleAfter : article.timeline_at;
 
   const next = {
