@@ -409,6 +409,10 @@ export interface SiteContact {
 
 /** Figures and samples for the about page (site-only; not part of v1). */
 export interface SiteStats {
+  /** Enabled sources, kept for operational read-load accounting; the about page does not display them. */
+  sources: number;
+  /** Enabled sources by kind, kept for operational read-load accounting. */
+  sourceKinds: Record<string, number>;
   /** Everything collected and not withdrawn, heat-only sources included. */
   items: number;
   selected: number;
