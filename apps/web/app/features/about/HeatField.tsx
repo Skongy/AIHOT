@@ -27,11 +27,11 @@ const EVENT_LABELS = [
 ] as const;
 
 const EVENT_POSITIONS = [
-  "left-[34%] top-[35%] lg:left-[44%] lg:top-[31%]",
-  "left-[70%] top-[39%] lg:left-[47%] lg:top-[58%]",
-  "left-[38%] top-[51%] lg:left-[39%] lg:top-[79%]",
-  "left-[72%] top-[54%] opacity-60 lg:left-[55%] lg:top-[36%]",
-  "left-[56%] top-[63%] opacity-50 lg:left-[56%] lg:top-[76%]",
+  "left-[34%] top-[35%] lg:left-[18%] lg:top-[43%]",
+  "left-[70%] top-[39%] lg:left-[41%] lg:top-[40%]",
+  "left-[38%] top-[51%] lg:left-[28%] lg:top-[73%]",
+  "left-[72%] top-[54%] opacity-60 lg:left-[51%] lg:top-[61%]",
+  "left-[56%] top-[63%] opacity-50 lg:left-[47%] lg:top-[82%]",
 ] as const;
 
 const fieldStyle = {
@@ -68,7 +68,7 @@ function EventNode({ index, title, note, hot, nodeRef }: { index: number; title:
     <div ref={nodeRef} className={`pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 text-center ${EVENT_POSITIONS[index]}`}>
       <span
         aria-hidden="true"
-        className={`absolute left-1/2 top-1/2 -z-10 size-[86px] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-[radial-gradient(circle,var(--surface),color-mix(in_srgb,var(--surface)_52%,transparent),transparent_72%)] shadow-[0_0_44px_color-mix(in_srgb,var(--ink)_5%,transparent)] ${hot ? "border-accent/30" : "border-line/80"}`}
+        className={`absolute left-1/2 top-1/2 -z-10 size-[86px] -translate-x-1/2 -translate-y-1/2 rounded-full border bg-[radial-gradient(circle,var(--surface),color-mix(in_srgb,var(--surface)_52%,transparent),transparent_72%)] shadow-[0_0_44px_color-mix(in_srgb,var(--ink)_5%,transparent)] lg:size-[76px] ${hot ? "border-accent/30" : "border-line/80"}`}
       />
       <b className={`block text-[11px] leading-snug ${hot ? "text-accent-ink" : "text-ink-2"}`}>{title}</b>
       <span className="mt-0.5 block text-[8px] text-ink-4">{note}</span>
@@ -76,47 +76,55 @@ function EventNode({ index, title, note, hot, nodeRef }: { index: number; title:
   );
 }
 
-function DailyCard({ items, date, hit, cardRef }: { items: PickItem[]; date: string; hit: boolean; cardRef: RefObject<HTMLElement | null> }) {
+function DailyCard({ items, date, hit, active, cardRef }: { items: PickItem[]; date: string; hit: boolean; active: number; cardRef: RefObject<HTMLElement | null> }) {
   return (
     <article
       ref={cardRef}
-      className={`absolute left-1/2 top-[658px] z-20 w-[172px] -translate-x-1/2 overflow-hidden rounded-[12px] border border-line-strong bg-surface shadow-[0_24px_54px_rgba(32,36,43,0.16)] transition-[transform,box-shadow] duration-500 [transition-timing-function:cubic-bezier(.2,.9,.25,1.2)] lg:left-auto lg:right-[3.2%] lg:top-[110px] lg:w-[19%] lg:min-w-[198px] lg:translate-x-0 ${hit ? "-translate-y-1 scale-[1.018] shadow-[0_30px_68px_rgba(32,36,43,0.2)] lg:-translate-y-1" : ""}`}
+      className={`absolute left-1/2 top-[658px] z-20 w-[210px] -translate-x-1/2 transition-[transform,filter] duration-500 [transition-timing-function:cubic-bezier(.2,.9,.25,1.2)] lg:left-auto lg:right-[2.8%] lg:top-[46px] lg:w-[clamp(250px,22%,310px)] lg:translate-x-0 ${hit ? "-translate-y-1 scale-[1.012] drop-shadow-[0_24px_28px_rgba(139,105,20,0.12)] lg:-translate-y-1" : ""}`}
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent" />
-      <div className="relative px-4 pb-3.5 pt-3.5">
-        <div className="flex items-center justify-between text-[8px] font-black tracking-[0.14em] text-accent">
-          <span>GAMEHOT DAILY</span>
-          <span>{date}</span>
+      <span aria-hidden="true" className="absolute inset-x-3 -bottom-2 top-3 -z-20 rotate-[1.4deg] rounded-[18px] border border-line bg-surface/55" />
+      <span aria-hidden="true" className="absolute inset-x-6 -bottom-3 top-5 -z-30 -rotate-[1.1deg] rounded-[18px] border border-line-soft bg-bg-sunk/70" />
+      <div className="daily-brief__surface relative overflow-hidden rounded-[18px] border border-line-strong bg-surface shadow-[0_24px_60px_rgba(32,36,43,0.14)]">
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-[linear-gradient(to_bottom,var(--accent),color-mix(in_srgb,var(--accent)_38%,transparent))]" />
+        <div className="flex items-center justify-between border-b border-line-soft bg-bg-sunk/55 px-4 py-2.5 pl-5 text-[8px] font-black tracking-[0.16em] text-ink-3">
+          <span className="flex items-center gap-2"><i className="size-1.5 rounded-full bg-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_13%,transparent)]" />今日简报</span>
+          <span className="num text-accent">{date}</span>
         </div>
-        <div className="mt-2.5 text-[18px] font-black italic tracking-[0.01em] text-ink">GAMEHOT</div>
-        <div className="my-2 h-0.5 bg-accent" />
-        <h3 className="text-[14px] font-black leading-[1.28] tracking-[-0.02em] text-ink">
-          {items.length > 0 ? <><span>今天值得看的</span><br />{items.length} 件游戏大事</> : "今日精选整理中"}
-        </h3>
-        {items.length > 0 ? (
-          <ol className="mt-2.5 space-y-0.5">
-            {items.map((item, index) => (
-              <li key={item.id}>
+        <div className="px-4 pb-3.5 pl-5 pt-3.5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <span className="block text-[8px] font-bold tracking-[0.18em] text-accent">GAMEHOT · DAILY</span>
+              <h3 className="mt-1.5 text-[16px] font-black leading-[1.25] tracking-[-0.025em] text-ink">
+                {items.length > 0 ? <>今天，先看这<br />{items.length} 件游戏大事</> : "今日精选整理中"}
+              </h3>
+            </div>
+            <span className="num grid size-9 shrink-0 place-items-center rounded-full border border-accent/25 bg-accent-softer text-[12px] font-black text-accent">{String(items.length).padStart(2, "0")}</span>
+          </div>
+          {items.length > 0 ? (
+            <ol className="mt-3 border-y border-line-soft">
+              {items.map((item, index) => (
+                <li key={item.id} className="border-b border-line-soft last:border-b-0">
                 <a
                   href={item.originalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={`阅读原文：${item.title}`}
-                  className="group grid min-h-8 grid-cols-[18px_minmax(0,1fr)_12px] items-center gap-1 rounded-[5px] py-1 text-[8px] leading-[1.35] text-ink-2 transition-[color,background-color,transform] hover:translate-x-0.5 hover:bg-accent-softer hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                  className={`daily-brief__row group relative grid min-h-[46px] grid-cols-[22px_minmax(0,1fr)_14px] items-center gap-1.5 py-1.5 pr-1 text-[9px] leading-[1.4] text-ink-2 transition-[color,background-color] hover:bg-accent-softer hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${hit && active === index ? "is-active" : ""}`}
                 >
-                  <span className="font-black text-accent">0{index + 1}</span>
+                  <span className="num font-black text-accent">0{index + 1}</span>
                   <span className="line-clamp-2">{item.title}</span>
-                  <IconArrowUpRight size={10} className="opacity-40 transition-opacity group-hover:opacity-100" />
+                  <span className="grid size-4 place-items-center rounded-full border border-line text-ink-4 transition-[color,border-color,transform] group-hover:translate-x-0.5 group-hover:border-accent/40 group-hover:text-accent"><IconArrowUpRight size={9} /></span>
                 </a>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-3 text-[9px] leading-relaxed text-ink-4">今天的精选正在整理，稍后回来看看。</p>
-        )}
-        <div className="mt-2.5 flex items-center justify-between border-t border-line-soft pt-2 text-[7px] text-ink-4">
-          <span>08:00</span>
-          <span>点击标题阅读原文</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-3 text-[9px] leading-relaxed text-ink-4">今天的精选正在整理，稍后回来看看。</p>
+          )}
+          <div className="mt-2.5 flex items-center justify-between text-[7.5px] text-ink-4">
+            <span className="flex items-center gap-1.5"><i className="h-px w-4 bg-accent/60" />08:00 成刊</span>
+            <span>标题直达原文</span>
+          </div>
         </div>
       </div>
     </article>
@@ -134,7 +142,6 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
   const [active, setActive] = useState(0);
   const [hit, setHit] = useState(false);
   const picks = stats?.latest.slice(0, 3) ?? [];
-  const highlighted = picks[active % Math.max(1, picks.length)];
 
   const onArrive = useCallback(() => {
     const now = performance.now();
@@ -179,7 +186,7 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
       const box = root.getBoundingClientRect();
       return { x: item.left - box.left + item.width / 2, y: item.top - box.top + item.height / 2 };
     };
-    const mergePoint = () => (portrait ? { x: width * 0.5, y: height * 0.69 } : { x: width * 0.68, y: height * 0.52 });
+    const mergePoint = () => (portrait ? { x: width * 0.5, y: height * 0.69 } : { x: width * 0.64, y: height * 0.58 });
 
     const pointOn = (particle: Particle, progress: number) => {
       const event = events[particle.event]!;
@@ -373,7 +380,7 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
   }, []);
 
   return (
-    <section aria-labelledby="heat-field-title" className="mt-10 overflow-hidden rounded-[22px] border border-line bg-surface/75 shadow-[0_24px_70px_rgba(32,36,43,0.07)] xl:mt-14">
+    <section aria-labelledby="heat-field-title" className="mt-8 overflow-hidden rounded-[22px] border border-line bg-surface/75 shadow-[0_24px_70px_rgba(32,36,43,0.07)] xl:mt-9">
       <div className="flex min-h-14 items-center justify-between border-b border-line-soft px-4 sm:px-5">
         <div className="flex items-center gap-2.5 text-[12px] font-semibold text-ink-2">
           <span className="relative flex size-2" aria-hidden="true">
@@ -390,18 +397,18 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
         </div>
       </div>
 
-      <div ref={rootRef} style={fieldStyle} className="relative h-[920px] overflow-hidden lg:h-[510px]">
+      <div ref={rootRef} style={fieldStyle} className="relative h-[960px] overflow-hidden lg:h-[390px]">
         <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-0" />
 
-        <div className="pointer-events-none absolute left-[6%] top-10 z-10 lg:left-[4.3%] lg:top-12">
+        <div className="pointer-events-none absolute left-[6%] top-10 z-10 lg:left-[4.3%] lg:top-7">
           <b className="num block text-[24px] font-black leading-none tracking-[-0.04em] text-ink lg:text-[28px]">{number(stats?.day.collected ?? 0)}</b>
           <span className="mt-1.5 block text-[10px] text-ink-4">过去 24 小时进入判断</span>
         </div>
-        <div className="pointer-events-none absolute left-[6%] top-[236px] z-10 lg:left-[34%] lg:top-12">
+        <div className="pointer-events-none absolute left-[6%] top-[236px] z-10 lg:left-[31%] lg:top-7">
           <b className="num block text-[24px] font-black leading-none tracking-[-0.04em] text-ink lg:text-[28px]">{number(stats?.formingEvents ?? 0)}</b>
           <span className="mt-1.5 block text-[10px] text-ink-4">个事件正在成形</span>
         </div>
-        <div className="pointer-events-none absolute left-[6%] top-[530px] z-10 lg:left-[65%] lg:top-12">
+        <div className="pointer-events-none absolute left-[6%] top-[530px] z-10 lg:left-[58%] lg:top-7">
           <b className="num block text-[24px] font-black leading-none tracking-[-0.04em] text-ink lg:text-[28px]">{number(stats?.day.selected ?? 0)}</b>
           <span className="mt-1.5 block text-[10px] text-ink-4"><strong className="text-accent">条精选</strong> 通过判断</span>
         </div>
@@ -410,19 +417,11 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
           <EventNode key={title} index={index} title={title} note={note} hot={hot} nodeRef={(node) => { eventRefs.current[index] = node; }} />
         ))}
 
-        <div className="pointer-events-none absolute left-1/2 top-[69%] z-10 flex -translate-x-1/2 items-center gap-2 text-[9px] font-black tracking-[0.13em] text-accent lg:left-[65.8%] lg:top-[54%] lg:-rotate-90">
+        <div className="pointer-events-none absolute left-1/2 top-[69%] z-10 flex -translate-x-1/2 items-center gap-2 text-[9px] font-black tracking-[0.13em] text-accent lg:left-[64%] lg:top-[59%] lg:-rotate-90">
           <i className="h-px w-9 bg-accent/35" />精选线<i className="h-px w-9 bg-accent/35" />
         </div>
 
-        {highlighted && (
-          <a href={highlighted.originalUrl} target="_blank" rel="noopener noreferrer" className="group pointer-events-auto absolute bottom-[62px] left-[69%] z-10 hidden w-[16%] lg:block">
-            <b className="block text-[9px] font-black tracking-[0.12em] text-accent">今日精选</b>
-            <span key={highlighted.id} className="animate-fade-up mt-1.5 line-clamp-2 block text-[11px] font-bold leading-relaxed text-ink-2 transition-colors group-hover:text-accent">{highlighted.title}</span>
-            <small className="mt-1 flex items-center gap-1 text-[8px] text-ink-4">阅读原文 <IconArrowUpRight size={9} /></small>
-          </a>
-        )}
-
-        <DailyCard items={picks} date={date} hit={hit} cardRef={paperRef} />
+        <DailyCard items={picks} date={date} hit={hit} active={active % Math.max(1, picks.length)} cardRef={paperRef} />
 
         <div className="pointer-events-none absolute bottom-5 right-[5%] z-10 grid gap-1.5 text-[9px] text-ink-4 lg:left-[4.3%] lg:right-auto lg:flex lg:gap-4">
           <span className="flex items-center gap-1.5"><i className="h-px w-4 bg-ink-4/60" />普通动态</span>
@@ -431,10 +430,10 @@ export function HeatField({ stats, date }: { stats: SiteStats | null; date: stri
       </div>
 
       <div className="grid border-t border-line bg-surface/55 lg:grid-cols-[1.25fr_.75fr]">
-        <div className="border-b border-line p-5 sm:p-6 lg:border-b-0 lg:border-r">
+        <div className="border-b border-line p-5 sm:p-6 lg:border-b-0 lg:border-r lg:px-6 lg:py-4">
           <span className="text-[10px] font-black tracking-[0.14em] text-accent">从噪声里看见事件</span>
-          <h2 id="heat-field-title" className="mt-2 text-[22px] font-black leading-snug tracking-[-0.025em] text-ink">消息不是排队通过，而是在讨论中逐渐成形。</h2>
-          <p className="mt-2 max-w-[680px] text-[12.5px] leading-[1.75] text-ink-3">灰色粒子代表不断进入的动态，它们围绕同一事件聚合；事实更完整、与玩家更相关的内容变成金色轨迹，穿过精选线，最终汇入日报。</p>
+          <h2 id="heat-field-title" className="mt-2 text-[22px] font-black leading-snug tracking-[-0.025em] text-ink lg:mt-1.5 lg:text-[18px]">消息不是排队通过，而是在讨论中逐渐成形。</h2>
+          <p className="mt-2 max-w-[680px] text-[12.5px] leading-[1.75] text-ink-3 lg:mt-1 lg:text-[11.5px] lg:leading-[1.65]">灰色粒子代表不断进入的动态，它们围绕同一事件聚合；事实更完整、与玩家更相关的内容变成金色轨迹，穿过精选线，最终汇入日报。</p>
         </div>
         <dl className="grid grid-cols-3">
           <div className="grid content-center p-4 sm:p-5"><dt className="order-2 mt-1 text-[9px] text-ink-4">滚动观察窗口</dt><dd className="num text-[20px] font-black text-ink">24h</dd></div>

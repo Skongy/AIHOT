@@ -116,25 +116,25 @@ export default function AboutPage() {
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-14 lg:pt-3">
       <PhoneBar back={{ to: "/more", label: "我的" }} title={`关于 ${SITE.name}`} />
-      <header className="grid items-end gap-8 pt-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,.7fr)] lg:gap-14 lg:pt-0">
+      <header className="grid items-end gap-8 pt-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,.7fr)] lg:gap-12 lg:pt-0">
         <div>
           <Kicker>{ABOUT.kicker}</Kicker>
-          <h1 data-page-title="" className="mt-5 text-[34px] font-black leading-[1.18] tracking-[-0.03em] text-ink [text-wrap:balance] sm:text-[46px] xl:text-[56px] 2xl:text-[64px]">
+          <h1 data-page-title="" className="mt-4 text-[34px] font-black leading-[1.16] tracking-[-0.03em] text-ink [text-wrap:balance] sm:text-[46px] xl:text-[50px] 2xl:text-[56px]">
             {ABOUT.headline[0]}
             <br />
             <span className="text-accent">{ABOUT.headline[1]}</span>
           </h1>
         </div>
         <div className="lg:pb-1">
-          <p className="max-w-[38em] text-[15px] leading-[1.9] text-ink-3 xl:text-[16px]">{ABOUT.lead}</p>
-          <div className="mt-5 flex gap-7 border-t border-line pt-4">
+          <p className="max-w-[38em] text-[15px] leading-[1.75] text-ink-3 xl:text-[15px]">{ABOUT.lead}</p>
+          <div className="mt-4 flex gap-7 border-t border-line pt-3.5">
             {stats && <HeroFigure n={stats.items} label="条动态已整理" />}
             <div>
               <div className="num text-[20px] font-black leading-none tracking-[-0.03em] text-ink">08:00</div>
               <span className="mt-1 block text-[10px] text-ink-4">每天准时成刊</span>
             </div>
           </div>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <IntentLink to="/" className={buttonClass("primary", "lg")}>
               看今天的精选 <IconArrowRight size={15} />
             </IntentLink>

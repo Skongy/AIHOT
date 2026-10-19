@@ -402,6 +402,29 @@
   animation: fade-up 280ms var(--ease-out-quart) both;
 }
 
+/* The about-page daily brief arrives like a fresh editorial card; a selected row
+   warms briefly when a particle reaches it. */
+@keyframes daily-brief-arrive {
+  from { opacity: 0; transform: translate3d(18px, 8px, 0) rotate(0.7deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes daily-brief-row {
+  0% { background: transparent; }
+  42% { background: var(--accent-softer); }
+  100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .daily-brief__surface {
+    animation: daily-brief-arrive 720ms cubic-bezier(.16, 1, .3, 1) 180ms both;
+  }
+
+  .daily-brief__row.is-active {
+    animation: daily-brief-row 620ms ease-out;
+  }
+}
+
 /* A restrained live signal for the home-page hot ranking. */
 .hot-topics__live-dot {
   width: 7px;
