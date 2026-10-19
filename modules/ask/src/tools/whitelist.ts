@@ -262,7 +262,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
           ok: true,
           name: tool,
           text,
-          structured: { publicId: body.story.publicId },
+          structured: { publicId: body.story.publicId, reportCount: Math.min(body.story.reports.length, limit) },
           evidence: [{
             kind: "story",
             objectId: body.story.publicId as string,
@@ -273,7 +273,17 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             originalUrl: null,
             toolName: tool,
             rawRef: { publicId: body.story.publicId },
-          }],
+          }, ...body.story.reports.slice(0, limit).map((report) => ({
+            kind: "item" as const,
+            objectId: report.id,
+            title: report.title,
+            sourceName: report.source.name,
+            publishedAt: report.publishedAt,
+            siteUrl: report.links.aihot,
+            originalUrl: report.links.original,
+            toolName: tool,
+            rawRef: { id: report.id, publicId: body.story.publicId, firstParty: report.source.firstParty },
+          }))],
         };
       }
       case "explain_selection": {

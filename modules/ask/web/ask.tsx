@@ -62,9 +62,9 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
     <div className="ask-response-heading"><span className="ask-avatar" aria-hidden="true"><Glyph name="brief" size={17}/></span><span>GAMEHOT</span>{streaming && <span className="ask-progress" role="status"><span className="ask-progress-label">{label}</span><span className="ask-wait-dots" aria-hidden="true"><i/><i/><i/></span></span>}</div>
     {steps.length > 0 && <ProgressSteps steps={steps} streaming={streaming}/>}
     {message.contentInvalidated ? <p className="ask-turn-note">相关来源已不可用，原回答不再展示。</p>
-      : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming}/>
+      : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming} showRetrievedSources={message.status === "completed_degraded"}/>
       : <p className="ask-turn-note" role="status">{streaming ? "正在查找站内资料，请稍候。" : message.status === "send_failed" ? "消息未确认送达，可重试发送。" : message.status === "failed" ? "这次未能生成回答，请稍后再试。" : message.status === "cancelled" ? "已停止生成。" : "本次没有生成回答。"}</p>}
-    {message.status === "completed_degraded" && <p className="ask-turn-note">部分引用未能关联，请查看原文确认。</p>}
+    {message.status === "completed_degraded" && <p className="ask-turn-note">本次回答未能把所有内容关联到具体新闻，下面提供本次检索资料供核对。</p>}
     {message.status === "cancelled" && message.text && <p className="ask-turn-note">已停止，以上为未完成的回答。</p>}
     {message.status === "limit_reached" && <p className="ask-turn-note">已达到本次查询上限，可缩小范围继续提问。</p>}
     {!streaming && message.text && !message.contentInvalidated && <div className="ask-answer-actions">

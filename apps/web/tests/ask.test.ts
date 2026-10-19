@@ -11,6 +11,7 @@ let sseResponse: import("node:http").ServerResponse | null = null;
 const at = "2026-10-16T08:00:00Z";
 const evidence = [{ id: 1, kind: "item", title: "无畏契约版本更新", siteUrl: "/items/ask-fixture", originalUrl: "https://example.org/news", sourceName: "测试媒体", publishedAt: at }];
 const answer = "## 重点\n**这次有一项版本更新。** [1]\n\n- 地图发生变化。[1]\n- 未提供的数据不能确认。\n\n[伪造链接](https://evil.test/items/ask-fixture)\n<img src=x onerror=alert(1)>";
+let nextAnswer = answer; let nextStatus = "completed";
 function event(type: string, payload: any, seq: number) { return `id: ${seq}\nevent: ${type}\ndata: ${JSON.stringify({payload})}\n\n`; }
 function complete() {
   if (!activeTask) return;
@@ -18,14 +19,14 @@ function complete() {
     {type:'step_start',payload:{stepId:'search-1',tool:'search',labelZh:'检索站内资料'}},
     {type:'step_end',payload:{stepId:'search-1',ok:true,summary:'找到相关报道'}},
   ];
-  activeTask = {...activeTask,status:'completed',finalAnswer:answer,evidence,steps,snapshotSeq:7};
-  savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:answer});
+  activeTask = {...activeTask,status:nextStatus,finalAnswer:nextAnswer,evidence,steps,snapshotSeq:7};
+  savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:nextAnswer});
   sseResponse?.write(event('step_start',steps[0].payload,2));
   sseResponse?.write(event('step_end',steps[1].payload,3));
   sseResponse?.write(event('evidence',{items:evidence},4));
-  sseResponse?.write(event('answer_delta',{text:answer},5));
-  sseResponse?.write(event('answer_done',{text:answer},6));
-  sseResponse?.end(event('task_status',{status:'completed'},7)); sseResponse=null;
+  sseResponse?.write(event('answer_delta',{text:nextAnswer},5));
+  sseResponse?.write(event('answer_done',{text:nextAnswer},6));
+  sseResponse?.end(event('task_status',{status:nextStatus},7)); sseResponse=null;
 }
 const api=createServer(async(req,res)=>{
   const url=new URL(req.url!,'http://local'); const p=url.pathname;
@@ -66,7 +67,7 @@ before(async()=>{
 });
 after(async()=>{sseResponse?.end();if(phoneBrowser&&phoneBrowser!==browser)await phoneBrowser.close();await browser?.close();await web?.stop();});
 async function visit(options:{phone?:boolean;dark?:boolean;article?:boolean;standalone?:boolean}={}){
-  enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;
+  enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;nextAnswer=answer;nextStatus='completed';
   const context=await(options.phone?phoneBrowser:browser).newContext({viewport:options.phone?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
   await context.addInitScript(({dark,standalone})=>{sessionStorage.setItem('gamehot-intro-seen-v1','1');localStorage.setItem('aihot-theme',dark?'dark':'light');if(standalone)Object.defineProperty(navigator,'standalone',{value:true});},{dark:!!options.dark,standalone:!!options.standalone});
   const page=await context.newPage();
@@ -113,6 +114,20 @@ test('answers render safe typography, numbered citations open matching sources, 
     await page.reload();await expect(page.getByRole('button',{name:'查看来源 1：无畏契约版本更新'}).first()).toBeVisible();
     assert.equal(submissions,1);assert.deepEqual(errors,[]);
     if(process.env.ASK_REVIEW_DIR)await page.screenshot({path:process.env.ASK_REVIEW_DIR+'/answer.png',fullPage:true});
+  }finally{await context.close();}
+});
+test('pipe tables render as readable tables and uncited retrieved reports stay available in degraded answers',async()=>{
+  nextAnswer='## 当前热点\n\n| 排名 | 事件 | 核心动态 |\n|:---|:---|:---|\n| 1 | 街头霸王电影 | 首周末票房表现 |\n| 2 | 手柄专利 | 新专利申请 |';nextStatus='completed_degraded';
+  const {context,page,errors}=await visit();try{
+    await send(page,'最近有哪些游戏热点？');
+    await expect(page.locator('.ask-answer table')).toBeVisible();
+    await expect(page.locator('.ask-answer tbody tr')).toHaveCount(2);
+    await expect(page.getByText('街头霸王电影',{exact:true})).toBeVisible();
+    await expect(page.getByText(/未能把所有内容关联到具体新闻/)).toBeVisible();
+    await expect(page.locator('.ask-sources summary')).toContainText('本次检索到的资料');
+    await expect(page.locator('.ask-sources')).toContainText('回答未能逐条匹配到具体来源');
+    await expect(page.locator('.ask-sources a[href="https://example.org/news"]')).toHaveText('查看原文 ↗');
+    assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
 test('retry preserves request id and restores accepted task rather than submitting a duplicate',async()=>{

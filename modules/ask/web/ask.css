@@ -86,6 +86,14 @@
 .ask-answer strong { color:var(--ink); font-weight:650; }
 .ask-answer code { font-size:.87em; background:var(--bg-sunk); padding:2px 5px; border-radius:4px; }
 .ask-answer a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
+.ask-table-wrap { max-width:100%; margin:14px 0 20px; overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:color-mix(in srgb,var(--surface) 78%,var(--bg)); scrollbar-width:thin; }
+.ask-table-wrap table { width:100%; border-collapse:collapse; font-size:13px; line-height:1.65; }
+.ask-table-wrap th,.ask-table-wrap td { min-width:92px; padding:10px 12px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+.ask-table-wrap th { background:color-mix(in srgb,var(--accent-softer) 58%,var(--surface)); color:var(--ink-2); font-size:11px; font-weight:650; white-space:nowrap; }
+.ask-table-wrap tbody tr:last-child td { border-bottom:0; }
+.ask-table-wrap tbody tr:nth-child(even) { background:color-mix(in srgb,var(--bg-sunk) 34%,transparent); }
+.ask-table-wrap td:first-child { color:var(--accent); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ask-table-wrap:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .ask-answer.is-streaming::after { content:""; display:inline-block; width:2px; height:1em; margin-left:4px; border-radius:2px; background:var(--accent); vertical-align:-.12em; animation:ask-caret 1s steps(1,end) infinite; }
 @keyframes ask-caret { 50% { opacity:.2; } }
 .ask-citation { display:inline-grid; place-items:center; min-width:22px; min-height:22px; margin:0 3px; padding:1px 5px; border-radius:5px; background:var(--bg-sunk); color:var(--accent); font-size:11px; line-height:1.2; vertical-align:2px; font-variant-numeric:tabular-nums; }
