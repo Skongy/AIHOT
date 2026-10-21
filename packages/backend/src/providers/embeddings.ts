@@ -21,7 +21,7 @@ export function embeddingsAvailable(): boolean {
   return config.modelCallsEnabled && !!(credential("models", "EMBEDDING_API_KEY") ?? credential("models", "DASHSCOPE_API_KEY"));
 }
 
-async function embedBatch(texts: string[], subject: string): Promise<{ vectors: number[][]; receiptId: number }> {
+async function embedBatch(texts: string[], subject: string): Promise<{ vectors: number[][]; receiptId: number; reused: boolean }> {
   if (!config.modelCallsEnabled) throw new Error("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   const base = own ? credential("models", "EMBEDDING_BASE_URL") ?? "https://api.openai.com/v1" : credential("models", "DASHSCOPE_BASE_URL") ?? "https://dashscope.aliyuncs.com/compatible-mode/v1";
   const key = own ? credential("models", "EMBEDDING_API_KEY") : credential("models", "DASHSCOPE_API_KEY");
@@ -51,11 +51,20 @@ async function embedBatch(texts: string[], subject: string): Promise<{ vectors: 
     })).length(texts.length) }).parse(receipt.response);
     data.sort((a, b) => a.index - b.index);
     if (data.some((item, index) => item.index !== index)) throw new Error("Embedding indices do not match inputs");
-    return { vectors: data.map((item) => item.embedding), receiptId: receipt.receiptId };
+    return { vectors: data.map((item) => item.embedding), receiptId: receipt.receiptId, reused: receipt.reused };
   } catch (error) {
     await rejectReceivedResponse(receipt.receiptId, `unusable embeddings: ${String(error).slice(0, 500)}`);
     throw new ModelOutputError(`Embedding response is unusable for ${subject}: ${String(error).slice(0, 300)}`, receipt.receiptId);
   }
+}
+
+/** Embed one transient search query through the same receipts and budget guard as stored vectors. */
+export async function embedQuery(text: string): Promise<{ vector: number[]; receiptId: number; reused: boolean }> {
+  const normalized = text.normalize("NFKC").replace(/\s+/g, " ").trim().slice(0, 2000);
+  if (!normalized) throw new Error("Embedding query is empty");
+  const result = await embedBatch([normalized], `ask-query:${sha256(normalized).slice(0, 16)}`);
+  await completeReceipt(sql, result.receiptId);
+  return { vector: result.vectors[0]!, receiptId: result.receiptId, reused: result.reused };
 }
 
 // array_send avoids formatting each float as decimal on the database. Its one-dimensional real[]

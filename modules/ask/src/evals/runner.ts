@@ -1,7 +1,8 @@
 import { performance } from "node:perf_hooks";
 import { sql } from "@aihot/backend/db";
+import { askItems, type AskSearchEngine } from "@aihot/backend/publication/ask";
 import { getTask, listEvidence } from "../db/store.ts";
-import { executeAskTool } from "../tools/whitelist.ts";
+import { askAliases, askRange } from "../tools/search-query.ts";
 import {
   answerMetrics,
   citationCaseResult,
@@ -14,7 +15,7 @@ import {
 export interface AskEvalReport {
   meta: {
     createdAt: string;
-    engine: "keyword-v1";
+    engine: AskSearchEngine;
     dataset: string;
     datasetSha256: string;
     split: string;
@@ -49,17 +50,30 @@ async function persistedReplay(taskId: string): Promise<AskEvalReplay> {
   };
 }
 
-export async function evaluateAskCase(row: AskEvalCase): Promise<RetrievalCaseResult> {
+export async function evaluateAskCase(row: AskEvalCase, engine: AskSearchEngine = "keyword-v1"): Promise<RetrievalCaseResult> {
   const started = performance.now();
   try {
-    const result = await executeAskTool("search", JSON.stringify(row.search));
-    if (!result.ok) throw new Error(`${result.errorCode}: ${result.message}`);
+    const range = askRange(row.search, "7d");
+    const result = await askItems({
+      queries: askAliases(row.search.q), mode: row.search.mode, category: row.search.category,
+      limit: row.search.limit, ...range, engine,
+      rangeKey: JSON.stringify([row.search.window, row.search.from ?? null, row.search.until ?? null]),
+    });
+    const receipt = result.retrieval.embeddingReceiptId
+      ? (await sql<{ cost: number | null; currency: string | null }[]>`
+          SELECT cost, currency FROM receipts WHERE id = ${result.retrieval.embeddingReceiptId}`)[0]
+      : null;
     return {
       caseId: row.caseId,
       question: row.question,
-      returnedArticleIds: result.evidence.flatMap((item) => item.objectId ? [item.objectId] : []),
+      returnedArticleIds: result.items.map((item) => item.id),
       relevantArticleIds: row.gold.relevantArticleIds,
       latencyMs: Math.round(performance.now() - started),
+      retrievalMode: result.retrieval.used,
+      fallbackReason: result.retrieval.fallbackReason,
+      embeddingCalls: result.retrieval.embeddingReceiptId && !result.retrieval.embeddingReused ? 1 : 0,
+      embeddingCost: result.retrieval.embeddingReused ? null : receipt?.cost ?? null,
+      embeddingCurrency: result.retrieval.embeddingReused ? null : receipt?.currency ?? null,
       error: null,
     };
   } catch (error) {
@@ -69,6 +83,11 @@ export async function evaluateAskCase(row: AskEvalCase): Promise<RetrievalCaseRe
       returnedArticleIds: [],
       relevantArticleIds: row.gold.relevantArticleIds,
       latencyMs: Math.round(performance.now() - started),
+      retrievalMode: engine,
+      fallbackReason: null,
+      embeddingCalls: 0,
+      embeddingCost: null,
+      embeddingCurrency: null,
       error: String(error).slice(0, 500),
     };
   }
@@ -79,13 +98,15 @@ export async function evaluateAskDataset(input: {
   dataset: string;
   datasetSha256: string;
   split?: string;
+  engine?: AskSearchEngine;
 }): Promise<AskEvalReport> {
   const split = input.split ?? "all";
   const selected = split === "all" ? input.rows : input.rows.filter((row) => row.samplingContext?.split === split);
   if (!selected.length) throw new Error(`evaluation split has no cases: ${split}`);
   // Keep production search capacity predictable and latency measurements readable.
   const retrieval: RetrievalCaseResult[] = [];
-  for (const row of selected) retrieval.push(await evaluateAskCase(row));
+  const engine = input.engine ?? "keyword-v1";
+  for (const row of selected) retrieval.push(await evaluateAskCase(row, engine));
   const replayByCase = new Map<string, ReturnType<typeof citationCaseResult>>();
   for (const row of selected) {
     const replay = row.taskId ? await persistedReplay(row.taskId) : row.replay;
@@ -95,12 +116,14 @@ export async function evaluateAskDataset(input: {
   return {
     meta: {
       createdAt: new Date().toISOString(),
-      engine: "keyword-v1",
+      engine,
       dataset: input.dataset,
       datasetSha256: input.datasetSha256,
       split,
       cases: selected.length,
-      note: "This evaluation performs read-only in-site search. It does not call an LLM or embedding provider.",
+      note: engine === "keyword-v1"
+        ? "This evaluation performs read-only keyword search and does not call an LLM or embedding provider."
+        : "Hybrid retrieval may call the configured embedding provider through receipts; it falls back to bounded lexical recall when unavailable.",
     },
     summary: {
       retrieval: retrievalMetrics(retrieval),
@@ -122,7 +145,7 @@ export function askEvalMarkdown(report: AskEvalReport): string {
     `- 数据集指纹：\`${report.meta.datasetSha256}\``,
     `- 检索引擎：${report.meta.engine}`,
     `- 分组：${report.meta.split}（${report.meta.cases} 个案例）`,
-    "- 外部调用：无模型调用、无 Embedding 调用",
+    `- 外部调用：无 LLM 调用；Embedding 提供方实际调用 ${retrieval.cost.embeddingCalls} 次`,
     "",
     "## 检索基线",
     "",
@@ -132,6 +155,9 @@ export function askEvalMarkdown(report: AskEvalReport): string {
     `- MRR：${retrieval.mrr.toFixed(4)}`,
     `- 延迟：P50 ${retrieval.latencyMs.p50} ms / P95 ${retrieval.latencyMs.p95} ms`,
     `- 执行覆盖：${retrieval.evaluated}/${retrieval.cases}，错误 ${retrieval.errors}`,
+    `- 负例空结果准确率：${percent(retrieval.noResultAccuracy)}（${retrieval.negativeCases} 个负例）`,
+    `- 检索路径：${Object.entries(retrieval.retrievalModes).map(([mode, count]) => `${mode} ${count}`).join(" / ") || "无"}；降级 ${retrieval.fallbackCases} 例`,
+    `- Embedding 成本：${retrieval.cost.knownCases} 个案例有金额，${Object.entries(retrieval.cost.totals).map(([currency, total]) => `${total} ${currency}`).join(" / ") || "提供方未返回金额"}`,
   ];
   const answers = report.summary.answers;
   if (answers) {
@@ -161,6 +187,7 @@ export function askEvalMarkdown(report: AskEvalReport): string {
       `- 返回：${row.returnedArticleIds.length ? row.returnedArticleIds.map((id) => `\`${id}\``).join("、") : "无"}`,
       `- Gold：${row.relevantArticleIds.map((id) => `\`${id}\``).join("、")}`,
       `- 延迟：${row.latencyMs} ms${row.error ? `；错误：${row.error}` : ""}`,
+      `- 路径：${row.retrievalMode}${row.fallbackReason ? `；降级：${row.fallbackReason}` : ""}`,
       "",
     );
   }

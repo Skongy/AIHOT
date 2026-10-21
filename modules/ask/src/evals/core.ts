@@ -17,7 +17,7 @@ const SearchSchema = z.strictObject({
   window: z.enum(["1h", "24h", "7d", "30d", "all"]).default("all"),
   from: z.string().max(40).optional(),
   until: z.string().max(40).optional(),
-  category: z.enum(PUBLIC_API_CATEGORY_KEYS as unknown as [string, ...string[]]).optional(),
+  category: z.enum(PUBLIC_API_CATEGORY_KEYS).optional(),
   limit: z.number().int().min(1).max(30).default(10),
 });
 
@@ -35,7 +35,7 @@ const CaseSchema = z.strictObject({
   question: z.string().min(1).max(2000),
   search: SearchSchema,
   gold: z.strictObject({
-    relevantArticleIds: z.array(z.string().min(1).max(128)).min(1),
+    relevantArticleIds: z.array(z.string().min(1).max(128)),
     /** Citation numbers are task-local and therefore belong to the replay gold. */
     requiredCitationIds: z.array(z.number().int().positive()).default([]),
     claims: z.array(z.strictObject({
@@ -63,6 +63,11 @@ export interface RetrievalCaseResult {
   returnedArticleIds: string[];
   relevantArticleIds: string[];
   latencyMs: number;
+  retrievalMode: string;
+  fallbackReason: string | null;
+  embeddingCalls: number;
+  embeddingCost: number | null;
+  embeddingCurrency: string | null;
   error: string | null;
 }
 
@@ -115,7 +120,9 @@ function percentile(values: number[], percentileValue: number): number {
 
 export function retrievalMetrics(results: RetrievalCaseResult[]) {
   const evaluated = results.filter((result) => result.error === null);
-  const rows = evaluated.map((result) => {
+  const positives = evaluated.filter((result) => result.relevantArticleIds.length > 0);
+  const negatives = evaluated.filter((result) => result.relevantArticleIds.length === 0);
+  const rows = positives.map((result) => {
     const relevant = new Set(result.relevantArticleIds);
     const hits = result.returnedArticleIds.filter((id) => relevant.has(id));
     const firstRank = result.returnedArticleIds.findIndex((id) => relevant.has(id)) + 1;
@@ -127,11 +134,20 @@ export function retrievalMetrics(results: RetrievalCaseResult[]) {
     };
   });
   const latencies = evaluated.map((result) => result.latencyMs);
+  const knownCosts = evaluated.filter((result): result is RetrievalCaseResult & { embeddingCost: number } => result.embeddingCost !== null);
+  const costTotals = new Map<string, number>();
+  for (const result of knownCosts) {
+    const currency = result.embeddingCurrency ?? "unknown";
+    costTotals.set(currency, (costTotals.get(currency) ?? 0) + result.embeddingCost);
+  }
   return {
     cases: results.length,
     evaluated: evaluated.length,
     errors: results.length - evaluated.length,
     coverage: round(ratio(evaluated.length, results.length)),
+    positiveCases: positives.length,
+    negativeCases: negatives.length,
+    noResultAccuracy: round(ratio(negatives.filter((result) => result.returnedArticleIds.length === 0).length, negatives.length, 1)),
     hitRate: round(mean(rows.map((row) => Number(row.hit)))),
     recall: round(mean(rows.map((row) => row.recall))),
     precision: round(mean(rows.map((row) => row.precision))),
@@ -140,6 +156,14 @@ export function retrievalMetrics(results: RetrievalCaseResult[]) {
       mean: Math.round(mean(latencies)),
       p50: Math.round(percentile(latencies, 0.5)),
       p95: Math.round(percentile(latencies, 0.95)),
+    },
+    retrievalModes: Object.fromEntries([...new Set(evaluated.map((result) => result.retrievalMode))].sort()
+      .map((mode) => [mode, evaluated.filter((result) => result.retrievalMode === mode).length])),
+    fallbackCases: evaluated.filter((result) => result.fallbackReason !== null).length,
+    cost: {
+      embeddingCalls: evaluated.reduce((sum, result) => sum + result.embeddingCalls, 0),
+      knownCases: knownCosts.length,
+      totals: Object.fromEntries([...costTotals].map(([currency, total]) => [currency, round(total)])),
     },
   };
 }

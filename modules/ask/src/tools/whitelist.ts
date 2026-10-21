@@ -194,6 +194,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         catch (e) { return { ok: false, name: tool, errorCode: "invalid_arguments", message: String((e as Error).message) }; }
         const queries = tool === "search" ? askAliases(a.q!) : [];
         const base = { queries, category: a.category, limit: a.limit ?? 10, cursor: a.cursor, ...range,
+          engine: tool === "search" ? "hybrid-v1" as const : "keyword-v1" as const,
           rangeKey: JSON.stringify([a.window ?? (tool === "search" ? "7d" : "24h"), a.from ?? null, a.until ?? null]) };
         // A named fact query must not hide a fresh public report merely because it missed
         // the editorial selection threshold while older selected results still match.
@@ -208,7 +209,10 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
           publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original,
           toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty },
         }));
-        const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries };
+        const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries,
+          retrieval: { engine: res.retrieval.used, fallbackReason: res.retrieval.fallbackReason,
+            keywordCandidates: res.retrieval.keywordCandidates, semanticCandidates: res.retrieval.semanticCandidates,
+            vectorCandidates: res.retrieval.vectorCandidates } };
         const text = JSON.stringify({ scope: mode === "selected" ? "精选" : "全部公开动态（含未入选）", ...structured,
           note: "时间范围按站内时间，开始含、结束不含。有 nextCursor 仅为一页，不得冒充完整统计。来源类型不代表事实已核实。空结果仅指本查询范围；具名搜索无结果不得改用无关近期列表凑答案。",
           items: res.items.map((it, i) => ({ evidencePosition: i + 1, article_id: it.id, title: it.title, summary: it.summary,

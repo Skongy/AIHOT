@@ -1,4 +1,4 @@
-import "../../../tests/setup.ts";
+import { stub } from "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
@@ -13,6 +13,8 @@ import { newUuid } from "@aihot/backend/lib/ids";
 import { runAskTask } from "../src/agent/loop.ts";
 import Fastify from "fastify";
 import { config } from "@aihot/backend/config";
+import { EMBEDDING_MODEL } from "@aihot/backend/providers/embeddings";
+import { sha256 } from "@aihot/backend/lib/ids";
 import { registerAskRoutes } from "../src/http/routes.ts";
 import { evaluateAskCase } from "../src/evals/runner.ts";
 import { retrievalMetrics, type AskEvalCase } from "../src/evals/core.ts";
@@ -86,6 +88,39 @@ test("Ask retrieval eval measures the real production search path without a mode
   assert.equal(metrics.hitRate, 1);
   assert.equal(metrics.recall, 1);
   assert.equal(metrics.mrr, 0.5);
+});
+test("hybrid retrieval uses current stored vectors, receipts and stable ranked pagination", async () => {
+  const vector = (x: number, y: number) => [x, y, ...Array<number>(1022).fill(0)];
+  const provider = await stub((_hit, req) => ({ data: (JSON.parse(req.body).input as string[]).map((_text, index) => ({ index, embedding: vector(1, 0) })) }));
+  const previous = config.modelCallsEnabled;
+  process.env.DASHSCOPE_BASE_URL = `${provider.url}/v1`;
+  process.env.DASHSCOPE_API_KEY = "test-key";
+  try {
+    config.modelCallsEnabled = true;
+    for (let i = 0; i < ids.length; i++) {
+      const text = `博德之门3 测试更新 ${i}。固定摘要，不是真实报道`;
+      const stored = i === 0 ? vector(1, 0) : i === 1 ? vector(0.9, 0.1) : vector(0, 1);
+      await sql`INSERT INTO embeddings (kind, ref_id, model, text_hash, vector)
+        VALUES ('article', ${ids[i]!}, ${EMBEDDING_MODEL}, ${sha256(text)}, ${stored})
+        ON CONFLICT (kind, ref_id, model) DO UPDATE SET text_hash=EXCLUDED.text_hash, vector=EXCLUDED.vector`;
+    }
+    const input = { ...query({ queries: ["角色扮演近期补丁"], limit: 1 }), engine: "hybrid-v1" as const };
+    const first = await askItems(input);
+    assert.equal(first.retrieval.used, "hybrid-embedding-v1");
+    assert.equal(first.retrieval.embeddingReused, false);
+    assert.deepEqual(first.items.map((item) => item.id), [ids[0]]);
+    assert.ok(first.nextCursor);
+    const second = await askItems({ ...input, cursor: first.nextCursor! });
+    assert.deepEqual(second.items.map((item) => item.id), [ids[1]]);
+    assert.equal(second.retrieval.embeddingReused, true);
+    const [receipt] = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE id=${first.retrieval.embeddingReceiptId!}`;
+    assert.equal(receipt?.status, "completed");
+  } finally {
+    config.modelCallsEnabled = previous;
+    delete process.env.DASHSCOPE_BASE_URL;
+    delete process.env.DASHSCOPE_API_KEY;
+    await provider.close();
+  }
 });
 test("illegal window 90d is coerced to all and still retrieves", async () => {
   const result = await executeAskTool("search", JSON.stringify({ q: "BG3", window: "90d", mode: "all", limit: 2 }));

@@ -8,7 +8,7 @@
 
 ## 分阶段实施
 
-### 第一阶段：可重复的评测基线
+### 第一阶段：可重复的评测基线（已完成）
 
 功能范围：
 
@@ -16,25 +16,45 @@
 - 复用生产 `search` 工具执行只读检索，计算 Hit Rate、Recall、Precision、MRR 与 P50/P95 延迟。
 - 可选回放已完成回答，或通过 `taskId` 读取真实持久化任务，计算任务完成率、无降级完成率、引用合法性、人工标注主张的证据支持率、必要证据覆盖率、延迟与已知成本。
 - 每次运行输出带数据集 SHA-256 指纹的 JSON 和 Markdown，供后续分支做同集对比。
-- 评测器不调用 LLM 或 Embedding，不产生模型费用，也不写业务数据。
+- 评测器不调用 LLM，也不写业务数据。`keyword-v1` 不调用 Embedding；`hybrid-v1` 可能通过现有预算与回执调用配置好的 Embedding，并在报告中记录实际调用和已知成本。
 
 验收标准：解析器拒绝未知字段与重复案例；指标有确定性单元测试；集成测试证明评测走真实 Ask 搜索路径；Typecheck 和 Ask 相关测试通过。
 
-运行：
+当前仓库同时保留格式示例和一份人工核对的真实数据基线：
+
+- `modules/ask/evals/ask-gold.example.jsonl`：仅说明格式。
+- `modules/ask/evals/ask-gold.2026-10-21.jsonl`：25 个检索案例，关联 2026-10-14 至 2026-10-21 的冻结公开快照。
+- `modules/ask/evals/fixtures/gamehot-public-2026-10-21.json.gz`：1117 条公开资讯；只用于隔离测试数据库。
+
+先把快照导入名称以 `_test` 或 `_ci` 结尾的数据库，再运行同集对比：
 
 ```bash
-npm run eval:ask -- --cases modules/ask/evals/ask-gold.jsonl --split development
+DATABASE_URL=postgres://127.0.0.1:5432/gamehot_eval_test npm run db:migrate
+DATABASE_URL=postgres://127.0.0.1:5432/gamehot_eval_test npm run eval:ask:import -- modules/ask/evals/fixtures/gamehot-public-2026-10-21.json.gz
+DATABASE_URL=postgres://127.0.0.1:5432/gamehot_eval_test npm run eval:ask -- --cases modules/ask/evals/ask-gold.2026-10-21.jsonl --engine keyword-v1
+DATABASE_URL=postgres://127.0.0.1:5432/gamehot_eval_test npm run eval:ask -- --cases modules/ask/evals/ask-gold.2026-10-21.jsonl --engine hybrid-v1
 ```
 
-示例文件 `modules/ask/evals/ask-gold.example.jsonl` 只说明格式。正式 Gold 必须由人核对文章后填写，不能用标题包含关系自动生成“正确答案”。
+导入脚本会拒绝非测试数据库。正式 Gold 必须由人核对文章后填写，不能用标题包含关系自动生成“正确答案”。当前基准、样本构成和验证边界见 [Ask 检索基准报告](evals/ask-retrieval-baseline-2026-10-21.md)。
 
 回答指标有两种数据来源：案例内放 `replay` 可评测一份离线回放；放 `taskId` 则从 `ask_tasks`、`ask_evidence` 和对应回执读取真实状态、答案、延迟及成本。两者不能同时出现。成本按回执币种分别汇总，不跨币种相加。
 
-### 第二阶段：Hybrid Search + Rerank
+### 第二阶段：Hybrid Search + Rerank（当前实现）
 
-在公开可见、时间范围受限的候选池中并行取得关键词结果与语义结果，使用可解释的融合分数重排。优先复用现有 Embedding 服务和 `real[]` 存储；在数据规模证明需要前不引入 pgvector。Embedding 不可用、预算触发或超时时自动退回关键词路径。
+Ask 的 `search` 工具已默认使用 `hybrid-v1`，其他公开读取调用继续默认使用 `keyword-v1`。实现严格复用公开可见性、精选范围、分类与时间条件，并冻结第一页的时间边界以保持分页一致。
+
+当前边界：
+
+- 关键词候选最多 60 条，时间范围内的语义候选池最多 300 条，融合后最多保留 120 条。
+- 有当前模型且文本哈希有效的文章向量时，查询只生成一次 Embedding，并经过现有预算、回执及重用机制；不会在读请求中批量补算历史文章向量。
+- 关键词排名与语义排名使用 Reciprocal Rank Fusion 合并；部分文章有向量时，其余文章使用有界字符 bigram 召回。
+- Embedding 关闭、缺少有效文章向量或调用失败时，自动使用有界词法召回；具名游戏查询使用实体别名锚点，防止通用词把其他游戏混入结果。
+- Hybrid 使用独立版本游标，游标绑定查询、范围和页大小；旧关键词游标与 Hybrid 游标不能混用。
+- 当前没有引入 pgvector。候选池规模和 P95 证明需要数据库向量索引前，继续复用现有 `real[]` 存储。
 
 验收标准：固定 Gold 集的 Recall 与 MRR 提升，P95 和单次成本在预算内；搜索范围、可见性与时间语义不退化；普通问答无需改用新界面。
+
+真实快照上的当前结果是词法降级路径：相对 `keyword-v1`，Hit Rate 从 72.7% 提升到 100%，Recall 从 57.6% 提升到 88.6%，MRR 从 0.6742 提升到 0.9697；Precision 从 68.2% 降到 62.4%，P95 从 17 ms 增至 25 ms。向量路径已通过本地假 Embedding 服务的数据库集成测试，但因本地没有真实提供方凭据，尚未在同一 Gold 集上获得真实语义召回、延迟和成本数据。
 
 ### 第三阶段：持久化 Plan & Execute 与深度研究界面
 
