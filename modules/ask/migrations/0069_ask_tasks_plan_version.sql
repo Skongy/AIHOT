@@ -1,0 +1,1 @@
+ALTER TABLE ask_tasks ADD COLUMN IF NOT EXISTS plan_version integer NOT NULL DEFAULT 0;

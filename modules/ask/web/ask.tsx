@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Screen } from "../../../apps/web/app/components/shell/screens";
 import { pageMeta } from "../../../apps/web/app/lib/seo";
 import { copyText } from "../../../apps/web/app/lib/clipboard";
 import { Answer } from "./answer";
+import { DEEP_STARTERS, STARTERS } from "./starters";
 import { useAsk } from "./use-ask";
-import { TERMINAL, type Message } from "./types";
+import { TERMINAL, type AskMode, type Message } from "./types";
 import "./ask.css";
 
 export const handle: Screen = { tab: "me", name: "AI 问答" };
 export function meta() { return pageMeta({ title: "AI 问答", path: "/ask", description: "快速补课、追踪游戏、看懂事件。基于 GAMEHOT 公开资讯，附报道出处。", noindex: true }); }
-const STARTERS = [
-  { name: "快速补课", description: "几分钟，抓住游戏圈重点", question: "用一分钟告诉我，最近7天有哪些值得关注的游戏消息？", icon: "brief" },
-  { name: "追踪游戏", description: "看看你关心的游戏有何变化", question: "《无畏契约》最近两周有什么重要变化？", icon: "track" },
-  { name: "看懂事件", description: "梳理来龙去脉，分清消息出处", question: "最近有哪些游戏热点？帮我梳理一个事件的来龙去脉，并区分官方消息和媒体报道。", icon: "story" },
-];
+const RESEARCH_STATUS = { pending: "等待", running: "进行中", done: "完成", skipped: "跳过", failed: "未完成" } as const;
 function Glyph({ name, size = 22 }: { name: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === "brief" ? <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h4"/>
@@ -50,6 +47,16 @@ function ProgressSteps({ steps, streaming }: { steps: NonNullable<Message["steps
     </li>)}</ol></div></div>
   </section>;
 }
+function ResearchProcess({ plan, streaming }: { plan: NonNullable<Message["plan"]>; streaming: boolean }) {
+  const done = plan.steps.filter((step) => step.status === "done" || step.status === "skipped").length;
+  return <section className={`ask-research${streaming ? " is-live" : ""}`} aria-label="研究过程">
+    <div className="ask-research-head"><span>研究计划 · 第 {plan.version} 版</span><span>{done}/{plan.steps.length}</span></div>
+    <ol>{plan.steps.map((step) => <li key={step.index} className={step.status === "running" ? "is-current" : ""} aria-current={step.status === "running" ? "step" : undefined}>
+      <span className={`ask-step-dot ${step.status === "done" || step.status === "skipped" ? "ok" : step.status === "failed" ? "fail" : step.status}`}/>
+      <div><p className="ask-research-goal">{step.goal}</p><p className="ask-research-meta">{RESEARCH_STATUS[step.status]}{step.toolLabel ? ` · ${step.toolLabel}` : ""}{step.summary ? ` · ${step.summary}` : ""}</p></div>
+    </li>)}</ol>
+  </section>;
+}
 function AssistantMessage({ message, busy, onPick }: { message: Message; busy: boolean; onPick: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -57,9 +64,16 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
   const steps = message.steps ?? [];
   const streaming = !!message.status && !TERMINAL.has(message.status) && message.status !== "send_failed";
   const active = steps.filter((s) => s.status === "running");
-  const label = active.length ? active.map((s) => s.labelZh).join("、") : steps.length ? "正在整理回答" : message.status === "queued" ? "正在排队" : "正在理解问题";
+  const current = message.plan?.steps.find((step) => step.status === "running");
+  const label = current?.goal
+    ?? (message.status === "queued" ? "正在排队"
+      : message.mode === "deep" && message.status === "running" && !message.plan ? "正在生成研究计划"
+      : active.length ? active.map((s) => s.labelZh).join("、")
+      : steps.length || message.plan ? "正在整理回答"
+      : "正在理解问题");
   return <article className="ask-response" aria-label="助手回答">
-    <div className="ask-response-heading"><span className="ask-avatar" aria-hidden="true"><Glyph name="brief" size={17}/></span><span>GAMEHOT</span>{streaming && <span className="ask-progress" role="status"><span className="ask-progress-label">{label}</span><span className="ask-wait-dots" aria-hidden="true"><i/><i/><i/></span></span>}</div>
+    <div className="ask-response-heading"><span className="ask-avatar" aria-hidden="true"><Glyph name="brief" size={17}/></span><span>{message.mode === "deep" ? "深度研究" : "GAMEHOT"}</span>{streaming && <span className="ask-progress" role="status"><span className="ask-progress-label">{label}</span><span className="ask-wait-dots" aria-hidden="true"><i/><i/><i/></span></span>}</div>
+    {message.plan && <ResearchProcess plan={message.plan} streaming={streaming}/>}
     {steps.length > 0 && <ProgressSteps steps={steps} streaming={streaming}/>}
     {message.contentInvalidated ? <p className="ask-turn-note">相关来源已不可用，原回答不再展示。</p>
       : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming} showRetrievedSources={message.status === "completed_degraded"}/>
@@ -82,7 +96,7 @@ export default function AskPage() {
   const chat = useAsk(); const [params, setParams] = useSearchParams(); const articleId = params.get("article");
   const [context, setContext] = useState<{ id: string; title: string; sourceName: string } | null>(null);
   const [contextLoading, setContextLoading] = useState(false); const [contextError, setContextError] = useState<string | null>(null);
-  const [input, setInput] = useState(""); const [showLatest, setShowLatest] = useState(false);
+  const [input, setInput] = useState(""); const [mode, setMode] = useState<AskMode>("normal"); const [showLatest, setShowLatest] = useState(false);
   const [scrollFades, setScrollFades] = useState({ top: false, bottom: false });
   const textarea = useRef<HTMLTextAreaElement>(null); const scroll = useRef<HTMLDivElement>(null);
   const follow = useRef(false); const composing = useRef(false); const empty = chat.messages.length === 0;
@@ -148,24 +162,33 @@ export default function AskPage() {
     return () => cancelAnimationFrame(frame);
   }, [chat.messages]);
   const pick = (text: string) => { setInput(text); textarea.current?.focus({ preventScroll: true }); };
+  const switchMode = (next: AskMode) => { setMode(next); };
+  const onModeKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "ArrowRight" || event.key === "ArrowDown" ? "deep" : "normal";
+    switchMode(next);
+    document.getElementById(next === "deep" ? "ask-mode-deep" : "ask-mode-normal")?.focus();
+  };
   const clearContext = () => { const next = new URLSearchParams(params); next.delete("article"); setParams(next, { replace: true }); };
   const tooLong = [...(input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""))].length > 2000;
   const canSend = chat.available === true && !chat.busy && !chat.restoring && !contextLoading && !contextError && !!input.trim() && !tooLong;
   const submit = async (event?: FormEvent) => {
     event?.preventDefault(); if (!canSend) return;
-    const text = input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""); setInput(""); follow.current = true; await chat.send(text);
+    const text = input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""); setInput(""); follow.current = true; await chat.send(text, undefined, mode);
   };
-  return <div className={`ask-page${empty ? " is-empty" : ""}`} data-pull-refresh="disabled">
+  const starters = mode === "deep" ? DEEP_STARTERS : STARTERS;
+  return <div className={`ask-page${empty ? " is-empty" : ""}`} data-pull-refresh="disabled" data-research-mode={mode}>
     <header className="ask-page-header"><Link to="/ask" className="ask-page-name">AI 问答</Link><button type="button" className="ask-new-chat" disabled={chat.busy || chat.restoring} onClick={() => { chat.reset(); setInput(""); follow.current = false; }}><Glyph name="plus" size={16}/>新对话</button></header>
     <div className="ask-scroll-frame">
     <div ref={scroll} className="ask-scroll" role="region" aria-label="问答内容" tabIndex={0} onPointerDown={() => { follow.current = false; }}>
     {empty && !chat.restoring && <section className="ask-intro" aria-labelledby="ask-heading"><div className="ask-intro-mark" aria-hidden="true"><span/><span/><span/></div>
-      <h1 id="ask-heading"><span className="ask-title-line">游戏圈的消息，</span><span className="ask-title-line">帮你理清楚。</span></h1><p>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</p></section>}
+      <h1 id="ask-heading"><span className="ask-title-line">游戏圈的消息，</span><span className="ask-title-line">帮你理清楚。</span></h1><p key={mode}>{mode === "deep" ? <>复杂问题会先拆成步骤，<br className="ask-phone-break"/>再按步骤核对站内报道和热点。</> : <>从一篇报道到一场热议，<br className="ask-phone-break"/>把重点、进展和出处放在一起。</>}</p></section>}
     {chat.restoring && <p className="ask-restore" role="status">正在恢复对话…</p>}
     {!empty && <div className="ask-conversation" aria-label="问答记录"><h1 className="sr-only">AI 问答记录</h1>{chat.messages.map((m, i) => m.role === "user"
       ? <div className="ask-user" key={m.key}><span className="ask-user-label">你</span><p>{m.text.replace(contextSuffix, "")}{m.text.match(contextSuffix)?.[1] && <Link className="ask-user-context" to={m.text.match(contextSuffix)![1]!}>附带资讯</Link>}</p></div>
       : <div key={m.key}><AssistantMessage message={m} busy={chat.busy} onPick={pick}/>{m.status === "send_failed" && <button className="ask-retry" type="button" disabled={chat.busy} onClick={() => { const user = chat.messages[i - 1]; if (user?.requestId) { follow.current = true; void chat.send(user.text, user); } }}>重试发送</button>}</div>)}</div>}
-    {empty && !chat.restoring && <section className="ask-starters" aria-label="试试这样问">{STARTERS.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
+    {empty && !chat.restoring && <section key={mode} className={`ask-starters is-swap${mode === "deep" ? " is-deep" : ""}`} aria-label={mode === "deep" ? "深度研究示例" : "试试这样问"}>{starters.map((s) => <button type="button" key={s.name} onFocus={(event) => finishEntrance(event.currentTarget)} onClick={() => pick(s.question)}><span className="ask-starter-icon"><Glyph name={s.icon}/></span><span><strong>{s.name}</strong><small>{s.description}</small></span></button>)}</section>}
     </div>
     <span className={`ask-scroll-fade is-top${scrollFades.top ? " is-visible" : ""}`} aria-hidden="true"/>
     <span className={`ask-scroll-fade is-bottom${scrollFades.bottom ? " is-visible" : ""}`} aria-hidden="true"/>
@@ -175,15 +198,21 @@ export default function AskPage() {
       {chat.disconnected && <p className="ask-notice" role="status">连接中断，正在恢复。已提交的任务仍会继续，请勿重复发送。</p>}
       {chat.error && <p className="ask-error" role="alert">{chat.error}</p>}
       {chat.available === false && <p className="ask-notice" role="status">问答暂未开放。你仍可<Link to="/">浏览精选</Link>或阅读已有对话。</p>}
-      <form className="ask-composer" onSubmit={(event) => void submit(event)}>
+      <form className={`ask-composer${mode === "deep" ? " is-deep" : ""}`} onSubmit={(event) => void submit(event)}>
+        <div className={`ask-mode-switch${mode === "deep" ? " is-deep" : ""}`} role="radiogroup" aria-label="研究模式" onKeyDown={onModeKey}>
+          <span className="ask-mode-thumb" aria-hidden="true"/>
+          <button id="ask-mode-normal" type="button" role="radio" aria-checked={mode === "normal"} tabIndex={mode === "normal" ? 0 : -1} onClick={() => switchMode("normal")}>普通研究</button>
+          <button id="ask-mode-deep" type="button" role="radio" aria-checked={mode === "deep"} tabIndex={mode === "deep" ? 0 : -1} onClick={() => switchMode("deep")}>深度研究</button>
+        </div>
+        <p className="ask-mode-note" id="ask-mode-note" key={mode}>{mode === "deep" ? "先列出研究计划，再按步骤检索。切换不会开始研究。" : "直接检索并回答。切换模式只改变下一次发送。"}</p>
         {(context || contextLoading || contextError) && <div className="ask-context"><div><span>正在围绕这篇资讯提问</span><p>{contextLoading ? "正在读取资讯…" : contextError ?? context?.title}</p></div><button type="button" aria-label="移除资讯上下文" onClick={clearContext}>×</button></div>}
         <label htmlFor="ask-input" className="sr-only">你的游戏资讯问题</label>
-        <textarea id="ask-input" ref={textarea} value={input} maxLength={2000} rows={2} placeholder={context ? "继续问这篇资讯…" : "想了解哪款游戏，或最近发生了什么？"} onChange={(e) => setInput(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(e) => {
+        <textarea id="ask-input" ref={textarea} value={input} maxLength={2000} rows={2} placeholder={context ? "继续问这篇资讯…" : mode === "deep" ? "想比较两款游戏、梳理时间线，或对照官方和媒体？" : "想了解哪款游戏，或最近发生了什么？"} aria-describedby="ask-mode-note ask-input-note" onChange={(e) => setInput(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !composing.current && e.keyCode !== 229) { e.preventDefault(); if (canSend) void submit(); }
-        }} aria-describedby="ask-input-note"/>
+        }}/>
         <div className="ask-composer-toolbar"><span id="ask-input-note">{tooLong ? "问题与附带资讯合计不能超过2000字" : chat.busy ? "可以先写下一个问题" : "Enter 发送，Shift + Enter 换行"}</span>{chat.busy ? <button type="button" className="ask-send is-stop" onClick={() => void chat.stop()} aria-label="停止生成"><span/>停止</button> : <button type="submit" className="ask-send" disabled={!canSend} aria-label="发送问题"><Glyph name="send" size={20}/></button>}</div>
       </form>
-      <p className="ask-footnote">依据站内公开报道回答，附来源供核对。<span>不搜全网，不提供游戏攻略。</span></p>
+      <p className="ask-footnote">{mode === "deep" ? "深度研究只引用本次检索到的站内资料。" : "依据站内公开报道回答，附来源供核对。"}<span>{mode === "deep" ? "不搜全网，不编造来源。" : "不搜全网，不提供游戏攻略。"}</span></p>
     </div>}
   </div>;
 }

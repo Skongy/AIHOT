@@ -11,6 +11,9 @@ export type TaskStatus =
   | "cancelled"
   | "limit_reached";
 
+export type AskMode = "normal" | "deep";
+export type PlanStepStatus = "pending" | "running" | "done" | "skipped" | "failed";
+
 const RETENTION_DAYS = 7;
 const PLACEHOLDER = {
   unavailable: true,
@@ -50,15 +53,17 @@ export async function hasActiveTask(sessionId: string, excludeId?: string): Prom
 }
 
 const taskCols = sql`
-  id::text, session_id::text, client_request_id, status, user_message, draft_answer, final_answer,
+  id::text, session_id::text, client_request_id, status, mode, user_message, draft_answer, final_answer,
   model_calls, tool_calls, started_at, finished_at, cancel_requested, error_code, error_message,
-  lease_owner, lease_expires_at, round_index, active_receipt_id, content_invalidated, created_at`;
+  lease_owner, lease_expires_at, round_index, active_receipt_id, content_invalidated, plan_version,
+  research_checkpoint, created_at`;
 
 export interface TaskRow {
   id: string;
   session_id: string;
   client_request_id: string;
   status: TaskStatus;
+  mode: AskMode;
   user_message: string;
   draft_answer: string | null;
   final_answer: string | null;
@@ -74,6 +79,8 @@ export interface TaskRow {
   round_index: number;
   active_receipt_id: number | null;
   content_invalidated: boolean;
+  plan_version: number;
+  research_checkpoint: Record<string, unknown> | null;
   created_at: Date;
 }
 
@@ -82,12 +89,14 @@ export async function createTask(input: {
   sessionId: string;
   clientRequestId: string;
   message: string;
+  mode?: AskMode;
 }, tx: Db = sql): Promise<TaskRow> {
   const id = newUuid();
   const msgId = newUuid();
+  const mode = input.mode ?? "normal";
   const [task] = await tx<TaskRow[]>`
-    INSERT INTO ask_tasks (id, session_id, client_request_id, status, user_message)
-    VALUES (${id}::uuid, ${input.sessionId}::uuid, ${input.clientRequestId}, 'queued', ${input.message})
+    INSERT INTO ask_tasks (id, session_id, client_request_id, status, mode, user_message)
+    VALUES (${id}::uuid, ${input.sessionId}::uuid, ${input.clientRequestId}, 'queued', ${mode}, ${input.message})
     RETURNING ${taskCols}`;
   await tx`
     INSERT INTO ask_messages (id, session_id, role, content, task_id)
@@ -237,6 +246,85 @@ export async function listEvidence(taskId: string) {
     FROM ask_evidence WHERE task_id = ${taskId}::uuid ORDER BY id`;
 }
 
+export interface PlanStepRow {
+  task_id: string;
+  step_index: number;
+  goal: string;
+  tool_hint: string | null;
+  depends_on: number[];
+  status: PlanStepStatus;
+  attempt: number;
+  result_summary: string | null;
+  checkpoint: Record<string, unknown> | null;
+  updated_at: Date;
+}
+
+export interface PlanStepWrite {
+  stepIndex: number;
+  goal: string;
+  toolHint: string | null;
+  dependsOn: number[];
+  status?: PlanStepStatus;
+  attempt?: number;
+  resultSummary?: string | null;
+  checkpoint?: Record<string, unknown> | null;
+}
+
+function intArray(db: Db, values: number[]) {
+  return db.array(values, 1007);
+}
+
+export async function listPlanSteps(taskId: string): Promise<PlanStepRow[]> {
+  const rows = await sql<PlanStepRow[]>`
+    SELECT task_id::text, step_index, goal, tool_hint, depends_on, status, attempt, result_summary, checkpoint, updated_at
+    FROM ask_plan_steps WHERE task_id = ${taskId}::uuid ORDER BY step_index`;
+  return rows.map((row) => ({ ...row, depends_on: Array.isArray(row.depends_on) ? row.depends_on.map(Number) : [] }));
+}
+
+export async function saveResearchCheckpoint(taskId: string, checkpoint: Record<string, unknown>, planVersion?: number): Promise<void> {
+  if (planVersion === undefined) {
+    await sql`UPDATE ask_tasks SET research_checkpoint = ${sql.json(checkpoint as never)} WHERE id = ${taskId}::uuid`;
+    return;
+  }
+  await sql`
+    UPDATE ask_tasks SET research_checkpoint = ${sql.json(checkpoint as never)}, plan_version = ${planVersion}
+    WHERE id = ${taskId}::uuid`;
+}
+
+/** Insert steps and drop any still-pending rows. Completed steps stay so recovery does not rerun them. */
+export async function replacePendingPlanSteps(taskId: string, version: number, steps: PlanStepWrite[], checkpoint: Record<string, unknown>): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM ask_plan_steps WHERE task_id = ${taskId}::uuid AND status = 'pending'`;
+    for (const step of steps) {
+      await tx`
+        INSERT INTO ask_plan_steps (task_id, step_index, goal, tool_hint, depends_on, status, attempt, result_summary, checkpoint, updated_at)
+        VALUES (${taskId}::uuid, ${step.stepIndex}, ${step.goal}, ${step.toolHint}, ${intArray(tx, step.dependsOn)},
+          ${step.status ?? "pending"}, ${step.attempt ?? 0}, ${step.resultSummary ?? null},
+          ${step.checkpoint ? tx.json(step.checkpoint as never) : null}, now())`;
+    }
+    await tx`
+      UPDATE ask_tasks SET plan_version = ${version}, research_checkpoint = ${tx.json(checkpoint as never)}
+      WHERE id = ${taskId}::uuid`;
+  });
+}
+
+export async function savePlanStep(taskId: string, step: PlanStepWrite): Promise<void> {
+  await sql`
+    INSERT INTO ask_plan_steps (task_id, step_index, goal, tool_hint, depends_on, status, attempt, result_summary, checkpoint, updated_at)
+    VALUES (${taskId}::uuid, ${step.stepIndex}, ${step.goal}, ${step.toolHint}, ${intArray(sql, step.dependsOn)},
+      ${step.status ?? "pending"}, ${step.attempt ?? 0}, ${step.resultSummary ?? null},
+      ${step.checkpoint ? sql.json(step.checkpoint as never) : null}, now())
+    ON CONFLICT (task_id, step_index) DO UPDATE SET
+      goal = EXCLUDED.goal,
+      tool_hint = EXCLUDED.tool_hint,
+      depends_on = EXCLUDED.depends_on,
+      status = EXCLUDED.status,
+      attempt = EXCLUDED.attempt,
+      result_summary = EXCLUDED.result_summary,
+      checkpoint = EXCLUDED.checkpoint,
+      updated_at = now()`;
+}
+
 export async function listMessages(sessionId: string, limit = 40) {
   return sql<{ id: string; role: string; content: string; task_id: string | null; created_at: Date }[]>`
     SELECT * FROM (
@@ -270,7 +358,7 @@ export function redactedAnswer(task: TaskRow): { draftAnswer: string | null; fin
 
 export function redactEventPayload(task: TaskRow, type: string, payload: Record<string, unknown>): Record<string, unknown> {
   if (!task.content_invalidated) return payload;
-  if (type === "answer_delta" || type === "answer_done" || type.startsWith("step_")) {
+  if (type === "answer_delta" || type === "answer_done" || type.startsWith("step_") || type.startsWith("research_")) {
     return { ...PLACEHOLDER, originalType: type };
   }
   if (type === "evidence") return { items: [], ...PLACEHOLDER };

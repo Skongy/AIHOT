@@ -14,7 +14,9 @@ export const askRunQueue = defineQueue<AskRunJob>({
   options: {
     policy: "short",
     retryLimit: 2,
-    retryDelay: 30,
+    // The task lease is 60s. A retry before it expires cannot claim the row, and that attempt would
+    // still be reported successful, so a crashed worker would never resume its checkpoint.
+    retryDelay: 90,
     expireInSeconds: 600,
   },
   worker: { batchSize: 1, pollingIntervalSeconds: 1 },
