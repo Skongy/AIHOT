@@ -850,13 +850,41 @@
   [data-theme="dark"] .card-spotlight > * { position: relative; z-index: 1; }
 }
 
-/* Sticky day header: hairline shadow while stuck. */
+/* Sticky day header (精选, 全部动态): solid with the page until it pins, then a light frost so the feed shows through. */
 .day-sticky {
   box-shadow: 0 0 0 transparent;
-  transition: box-shadow var(--dur-2);
+  transition: box-shadow var(--dur-2), background-color var(--dur-2);
 }
 .day-sticky.is-stuck {
-  box-shadow: 0 1px 0 var(--line-strong);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, white 78%, transparent),
+    color-mix(in srgb, var(--bg) 46%, transparent)
+  );
+  -webkit-backdrop-filter: blur(18px) saturate(1.65);
+  backdrop-filter: blur(18px) saturate(1.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 1px 0 color-mix(in srgb, var(--line-strong) 55%, transparent);
+}
+[data-theme="dark"] .day-sticky.is-stuck {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 78%, transparent),
+    color-mix(in srgb, var(--bg) 52%, transparent)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.06);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .day-sticky.is-stuck,
+  [data-theme="dark"] .day-sticky.is-stuck {
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 1px 0 var(--line-strong);
+  }
 }
 
 /* Editorial rank for top 3. */
