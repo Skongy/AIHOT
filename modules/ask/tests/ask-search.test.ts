@@ -14,6 +14,8 @@ import { runAskTask } from "../src/agent/loop.ts";
 import Fastify from "fastify";
 import { config } from "@aihot/backend/config";
 import { registerAskRoutes } from "../src/http/routes.ts";
+import { evaluateAskCase } from "../src/evals/runner.ts";
+import { retrievalMetrics, type AskEvalCase } from "../src/evals/core.ts";
 
 const source = `ask-search-${newUuid()}`;
 const clock = new Date();
@@ -69,6 +71,21 @@ test("named search defaults to all public reports instead of hiding a fresh non-
     assert.equal(result.structured.mode, 'all');
     assert.equal(result.evidence[0]?.objectId, ids[0]);
   }
+});
+test("Ask retrieval eval measures the real production search path without a model call", async () => {
+  const row: AskEvalCase = {
+    caseId: "bg3-rank-two",
+    question: "博德之门 3 最近有什么更新？",
+    search: { q: "BG3", window: "all", mode: "all", limit: 2 },
+    gold: { relevantArticleIds: [ids[1]!], requiredCitationIds: [], claims: [] },
+  };
+  const result = await evaluateAskCase(row);
+  assert.equal(result.error, null);
+  assert.deepEqual(result.returnedArticleIds, ids.slice(0, 2));
+  const metrics = retrievalMetrics([result]);
+  assert.equal(metrics.hitRate, 1);
+  assert.equal(metrics.recall, 1);
+  assert.equal(metrics.mrr, 0.5);
 });
 test("illegal window 90d is coerced to all and still retrieves", async () => {
   const result = await executeAskTool("search", JSON.stringify({ q: "BG3", window: "90d", mode: "all", limit: 2 }));
