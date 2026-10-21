@@ -789,6 +789,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll, .spark-draw, .ticker-col > span, .skeleton-shimmer::after { animation: none !important; }
+  .text-shimmer { animation: none; color: var(--ink-3); background: none; }
+  .press:active { transform: none; }
+}
 
 /* ---------------------------------------------------------------------------
    GAMEHOT motion P1 — desktop fade VT, theme circle reveal, card spotlight, sticky day,
@@ -945,9 +948,6 @@
   :root[data-vt="theme"]::view-transition-new(root),
   :root[data-vt="fade"]::view-transition-old(root),
   :root[data-vt="fade"]::view-transition-new(root) { animation: none !important; }
-}
-  .text-shimmer { animation: none; color: var(--ink-3); background: none; }
-  .press:active { transform: none; }
 }
 
 /* ---------------------------------------------------------------------------
