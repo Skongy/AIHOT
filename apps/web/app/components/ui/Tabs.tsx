@@ -59,11 +59,11 @@ const SIZES = {
 /**
  * The site's one switch control: a grey pill track with a white thumb that glides to the chosen
  * option. Boards, categories, sources, report kinds, page sections and language all use it, so every
- * switch looks and moves the same. Scrolls sideways when it runs out of room; `fill` spreads the
- * options evenly across the available width.
+ * switch looks and moves the same. `tone="glass"` is only the category filter on 精选 and 全部动态.
+ * Scrolls sideways when it runs out of room; `fill` spreads the options evenly across the available width.
  */
 export function PillTabs({
-  items, active, onSelect, layoutId, size = "md", label, fill = false, className = "",
+  items, active, onSelect, layoutId, size = "md", label, fill = false, tone = "solid", className = "",
 }: {
   items: TabItem[];
   active: string;
@@ -73,17 +73,22 @@ export function PillTabs({
   size?: keyof typeof SIZES;
   label?: string;
   fill?: boolean;
+  /** `glass` frosts the track. Other switches stay on the solid sunk track. */
+  tone?: "solid" | "glass";
   className?: string;
 }) {
   const links = items.some((t) => t.to);
   const Track = links ? "nav" : "div";
+  const trackTone = tone === "glass"
+    ? "pill-glass"
+    : "bg-bg-sunk ring-1 ring-inset ring-line-soft dark:bg-bg-muted/60";
   return (
     <div className={`scrollbar-none max-w-full overflow-x-auto ${fill ? "w-full" : ""} ${className}`}>
       <Track
         data-pill-track=""
         aria-label={label}
         role={links ? undefined : "tablist"}
-        className={`${fill ? "grid w-full" : "inline-flex w-max"} gap-0.5 rounded-full bg-bg-sunk p-0.5 lg:p-[3px] ring-1 ring-inset ring-line-soft dark:bg-bg-muted/60`}
+        className={`${fill ? "grid w-full" : "inline-flex w-max"} gap-0.5 rounded-full p-0.5 lg:p-[3px] ${trackTone}`}
         style={fill ? { gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` } : undefined}
       >
         {items.map((t) => {
