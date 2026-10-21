@@ -850,7 +850,9 @@
   [data-theme="dark"] .card-spotlight > * { position: relative; z-index: 1; }
 }
 
-/* Sticky day header (精选, 全部动态): solid with the page until it pins, then a light frost so the feed shows through. */
+/* Sticky day header (精选, 全部动态): solid with the page until it pins, then a light frost so the feed shows through.
+   Keep the frost when the OS asks for less transparency. Windows reports that as prefers-reduced-transparency
+   whenever "Transparency effects" is off, which would otherwise paint this bar solid. */
 .day-sticky {
   box-shadow: 0 0 0 transparent;
   transition: box-shadow var(--dur-2), background-color var(--dur-2);
@@ -876,15 +878,6 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 1px 0 rgba(255, 255, 255, 0.06);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .day-sticky.is-stuck,
-  [data-theme="dark"] .day-sticky.is-stuck {
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: 0 1px 0 var(--line-strong);
-  }
 }
 
 /* Editorial rank for top 3. */
