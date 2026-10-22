@@ -346,7 +346,11 @@ test("a crashed verification resumes the same round without another model charge
   const row = await getTask(task.id);
   assert.equal(row!.model_calls, 3);
   assert.equal(row!.status, "completed_degraded");
-  assert.match(row!.final_answer ?? "", /\[1\]/);
+  // The resumed verifier returned no claims. A verified report may cite only a supported fact,
+  // so the collected row stays out of the conclusion and the citation list.
+  assert.match(row!.final_answer ?? "", /现有资料不足以确认具体结论/);
+  assert.match(row!.final_answer ?? "", /没有被已证实结论引用的资料/);
+  assert.doesNotMatch(row!.final_answer ?? "", /\[1\]/);
   assert.doesNotMatch(row!.final_answer ?? "", /草稿认为/);
   let extra = 0;
   await runDeepResearch({ taskId: task.id, workerId: "worker-verify-again", chat: async () => { extra += 1; return fake("不是 JSON"); } });
