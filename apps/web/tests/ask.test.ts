@@ -294,7 +294,8 @@ test('a deep report shows verified sections and refuses a one-point chart',async
     await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
     await expect(page.getByText('官方确认测试服将于 5 月 20 日开启 [1]')).toBeVisible();
     await expect(page.getByText('无畏契约更新公告').first()).toBeVisible();
-    await expect(page.getByText('存在争议')).toBeVisible();
+    await expect(page.getByText('存在争议')).toHaveCount(0);
+    await expect(page.locator('.ask-report-uncertainty')).toHaveCount(0);
     await expect(page.getByText('不能据此断言热度变化的原因。')).toBeVisible();
     await expect(page.locator('.ask-report-chart')).toHaveCount(0);
     await page.locator('.ask-report-citations summary').first().click();

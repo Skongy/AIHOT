@@ -231,7 +231,12 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   if (!items.length || !quote || !items.some((item) => compact(evidenceText(item)).includes(quote))) {
     return { ...base, status: "insufficient", note: items.length ? "引用的证据里没有这句原话，不能据此下结论。" : "没有对应的已登记证据。" };
   }
-  const missingNumber = [...claim.text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]!).find((number) => !hasWholeNumber(claim.quote, number));
+  // Numeric publisher names (e.g. 17173) are attribution, not a factual value
+  // that must occur in the quoted sentence. Keep the strict check for numbers
+  // that are not part of any cited source's identity.
+  const sourceIdentity = compact(items.map((item) => item.sourceName ?? "").join(" "));
+  const missingNumber = [...claim.text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]!)
+    .find((number) => !hasWholeNumber(claim.quote, number) && !hasWholeNumber(sourceIdentity, number));
   if (missingNumber) {
     return { ...base, status: "insufficient", note: `结论中的数字 ${missingNumber} 没有出现在所引原话里。` };
   }
@@ -324,13 +329,6 @@ function timeBits(item: { publishedAt?: string | null; timelineAt?: string | nul
   return bits.join(" · ");
 }
 
-function missesSubject(question: string, evidence: VerifiableEvidence[]): boolean {
-  const names = [...question.matchAll(/《([^》]{1,40})》/g)].map((match) => match[1]!.trim()).filter(Boolean);
-  if (!names.length || !evidence.length) return false;
-  const blob = evidence.map(evidenceText).join("\n");
-  return names.every((name) => !blob.includes(name));
-}
-
 export function buildReport(
   question: string,
   claims: VerifiedClaim[],
@@ -386,17 +384,15 @@ export function buildReport(
     mentioned: mentionedWhen(evidenceText(item)),
     excerpt: (item.excerpt ?? "").trim().slice(0, 160) || null,
   }));
-  const subjectMiss = missesSubject(question, evidence);
   const lead = !evidence.length
     ? "站内公开资料里没有检索到可以引用的报道，所以这次不能给出具体结论。"
     : [
-        supported.length ? opts.incomplete ? "目前只能确认下面这些信息，仍不足以完整回答你的问题。" : "以下回答依据本次查到的来源，来源中的表述不等于事实已被独立证实。" : "现有资料不足以可靠回答这个问题。",
+        supported.length ? opts.incomplete ? "目前只能确认下面这些信息，仍不足以完整回答你的问题。" : "以下结论均可在所列来源中核对。" : "目前检索到的资料不足以可靠回答这个问题。",
         opts.unparsed
-          ? "这次未能完成答案核对，可以缩小问题范围后重试。"
+          ? "这次没能完成资料核对，暂时无法给出可靠结论。"
           : coverage.cited
             ? ""
             : "找到新闻不代表已经找到答案。",
-        subjectMiss ? "问题里的名称没有出现在这些资料的标题或摘要中，不能把它们当成对该问题的回答。" : "",
       ].filter(Boolean).join("");
   const report: ResearchReport = {
     showTimeline,
@@ -419,42 +415,19 @@ export function buildReport(
     lead,
     "",
     "## 核心结论",
-    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : [opts.unparsed ? "核验输出无法解析，暂时无法确认回答。" : "尚无足够证据支持的回答，检索到报道不代表已经找到答案。"]),
+    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : [opts.unparsed ? "这次没能核对出可靠结论。" : "目前没有足够证据支持结论。"]),
     "",
-    ...(showTimeline ? ["## 报道时间",
-    ...(timeline.length
-      ? [
-          ...timeline.map((item) => `- ${timeBits({ ...item, publishedAt: item.at })} · ${item.credibility} · ${item.title} [${item.evidenceId}] · ${item.sourceType}`),
-        ]
-      : [evidence.length ? "这些资料没有可排序的报道发布时间，也不能从正文里读出事件日期。" : "没有检索到带时间的资料。"]),
+    ...(showTimeline && timeline.length ? ["## 报道时间",
+    ...timeline.map((item) => `- ${timeBits({ ...item, publishedAt: item.at })} · ${item.credibility} · ${item.title} [${item.evidenceId}] · ${item.sourceType}`),
     ""] : []),
     ...(showCoverage ? ["## 官方与媒体",
     `这次检索到的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。核心结论引用了其中 ${coverage.cited} 条。来源类型只说明材料出处，不等于事实已经核实。`,
     ""] : []),
-    ...(reported.length ? [
-      "## 来源报道但尚未核实",
-      ...reported.map((item) => {
-        const when = timeBits(item);
-        const clip = item.excerpt ? `\n  摘录：${item.excerpt}` : "";
-        return `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}${when ? ` · ${when}` : ""}${clip}`;
-      }),
-      "这些只是检索到的材料，尚不能据此作出结论。",
-      "",
-    ] : []),
-    ...(comparison.length ? [
-      "## 差异与争议",
-      ...comparison.map((item) => `- ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`),
-      "",
-    ] : []),
+    ...(reported.length ? [`另有 ${reported.length} 条检索结果暂不足以支持结论。`, ""] : []),
     ...(heat.length ? [
       "## 热度观察",
       ...heat.map((item) => `- ${item.label}：${item.value} [${item.evidenceId}]`),
       "这些数字只来自对应证据里的统计，不能据此断言热度变化的原因。",
-      "",
-    ] : []),
-    ...(uncertainty.length ? [
-      "## 尚未确认",
-      ...uncertainty.map((item) => `- ${item.note} ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`),
       "",
     ] : []),
     "## 引用",

@@ -108,6 +108,20 @@ test("missing evidence, empty retrieval text, and a changed number stay insuffic
   assert.equal(parseClaims("不是 JSON"), null);
 });
 
+test("numeric publisher names are attribution, while factual numbers still need a quote", () => {
+  const source: VerifiableEvidence = {
+    id: 11, title: "冠军赛参赛队伍", sourceName: "17173", sourceType: "媒体报道",
+    excerpt: "本届冠军赛有32支队伍参赛。", siteUrl: "/items/teams",
+  };
+  const [attribution, unsupported] = assessClaims([
+    claim("据17173报道，本届冠军赛有32支队伍参赛。", [11], "本届冠军赛有32支队伍参赛。"),
+    claim("据17173报道，本届冠军赛有64支队伍参赛。", [11], "本届冠军赛有32支队伍参赛。"),
+  ], [source]);
+  assert.equal(attribution!.status, "supported");
+  assert.equal(unsupported!.status, "insufficient");
+  assert.match(unsupported!.note, /64/);
+});
+
 test("the report keeps supported facts, real dates, and real heat numbers", () => {
   const claims = assessClaims([
     claim("官方确认测试服将于 5 月 20 日开启", [1], "官方确认测试服将于 5 月 20 日开启"),
@@ -127,8 +141,9 @@ test("the report keeps supported facts, real dates, and real heat numbers", () =
   assert.equal(report.reported.some((item) => item.id === 2), true);
   assert.equal(report.chart, null);
   assert.equal(markdown.includes("## 热度观察"), false);
-  assert.match(markdown, /来源报道但尚未核实/);
-  assert.match(markdown, /以下回答依据本次查到的来源/);
+  assert.match(markdown, /另有 1 条检索结果/);
+  assert.doesNotMatch(markdown, /尚未确认|结论中的数字/);
+  assert.match(markdown, /以下结论均可在所列来源中核对/);
 });
 
 test("two supported observations of the same heat label can be charted, one snapshot cannot", () => {
@@ -144,8 +159,9 @@ test("two supported observations of the same heat label can be charted, one snap
   assert.equal(unverified.report.chart, null);
   assert.equal(unverified.report.timeline.length, 0);
   assert.equal(unverified.report.reported.length, 2);
-  assert.match(unverified.markdown, /来源报道但尚未核实/);
-  assert.match(unverified.markdown, /现有资料不足以可靠回答/);
+  assert.match(unverified.markdown, /另有 2 条检索结果/);
+  assert.doesNotMatch(unverified.markdown, /尚未确认/);
+  assert.match(unverified.markdown, /检索到的资料不足以可靠回答/);
 });
 
 test("a different year stays out of the summary and the timeline", () => {
@@ -189,8 +205,8 @@ test("a timeline line uses the supported sentence, not an unverified headline", 
   const { markdown, report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？梳理时间线", [rejected, supported], [item]);
   assert.equal(report.timeline.length, 1);
   assert.equal(report.timeline[0]!.title, supported.text);
-  assert.doesNotMatch(markdown.split("## 尚未确认")[0]!, /LOUD/);
-  assert.match(markdown, /尚未确认[\s\S]*LOUD/);
+  assert.doesNotMatch(markdown, /尚未确认|结论中的数字/);
+  assert.doesNotMatch(markdown, /结论中的数字 2026/);
   assert.match(markdown, /## 引用[\s\S]*LOUD夺冠/);
 });
 
@@ -295,13 +311,11 @@ test("retrieved reports stay visible when verification cannot support a claim", 
   assert.equal(report.coverage.media, 1);
   assert.equal(report.coverage.cited, 0);
   assert.equal(report.reported[0]!.id, 2);
-  assert.match(markdown, /核验输出无法解析/);
-  assert.match(markdown, /媒体猜测冠军皮肤/);
-  assert.match(markdown, /\[2\]/);
-  assert.match(markdown, /报道发布/);
+  assert.match(markdown, /这次没能完成资料核对/);
+  assert.equal(report.reported[0]!.title, "媒体猜测冠军皮肤");
+  assert.doesNotMatch(markdown, /媒体猜测冠军皮肤|\[2\]|报道发布 2026|来源报道但尚未核实/);
   const conclusion = markdown.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
   assert.doesNotMatch(conclusion, /\[2\]/);
-  assert.match(markdown.split("## 来源报道但尚未核实")[1] ?? "", /\[2\]/);
 });
 
 test("a date in the source is not labeled as the publication time", () => {
@@ -313,8 +327,7 @@ test("a date in the source is not labeled as the publication time", () => {
   };
   const { markdown, report } = buildReport("梳理《无畏契约》最近一个月的重要事件", [], [dated]);
   assert.equal(report.reported[0]!.mentioned, "10月27日");
-  assert.match(markdown, /报道中写到 10月27日，这不是报道发布时间/);
-  assert.match(markdown, /站内时间/);
+  assert.doesNotMatch(markdown, /报道中写到|站内时间/);
   const [kept] = assessClaims([
     claim("新特工将于2026年10月27日加入游戏。", [2], "新特工将于10月27日加入游戏。"),
   ], [dated], "梳理《无畏契约》最近一个月的重要事件");
@@ -369,9 +382,8 @@ test("two unparsed verifications list the retrieved source and drop the draft", 
   await runResearchDriver(driver.run);
   assert.deepEqual(driver.chats, ["ask.research_verify", "ask.research_verify"]);
   assert.equal(driver.box.current.status, "completed_degraded");
-  assert.match(driver.box.current.draft, /核验输出无法解析/);
-  assert.match(driver.box.current.draft, /媒体猜测冠军皮肤/);
-  assert.match(driver.box.current.draft, /\[2\]/);
+  assert.match(driver.box.current.draft, /这次没能完成资料核对/);
+  assert.doesNotMatch(driver.box.current.draft, /媒体猜测冠军皮肤|\[2\]|来源报道但尚未核实/);
   const conclusion = driver.box.current.draft.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
   assert.doesNotMatch(conclusion, /\[2\]/);
   assert.doesNotMatch(driver.box.current.draft, /草稿认为/);

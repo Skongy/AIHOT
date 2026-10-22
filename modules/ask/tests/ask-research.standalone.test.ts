@@ -7,7 +7,7 @@ import { ReceiptBusyError, ReceiptUnknownError } from "@aihot/backend/providers/
 import type { ChatToolCall, ChatToolsStreamOptions, ChatToolsStreamResult } from "@aihot/backend/providers/llm";
 import { decideAskPost } from "../src/http/decide.ts";
 import {
-  actionableResearchPlan, DEEP_LIMITS, directToolArgs, evidenceForResearchStep, fallbackResearchPlan, inferWindow,
+  actionableResearchPlan, deduplicateResearchPlan, DEEP_LIMITS, directToolArgs, evidenceForResearchStep, fallbackResearchPlan, inferWindow,
   nextResearchAction, parseReplan, parseResearchPlan, groundHistoryFollowup, researchClock, runResearchDriver,
   searchQueryFromQuestion, taskCheckpoint,
   parseDirectDecision,
@@ -313,6 +313,19 @@ test("analysis-only plan steps are removed because synthesis owns the comparison
   ]);
 });
 
+test("duplicate search steps collapse without breaking downstream step dependencies", () => {
+  const plan = deduplicateResearchPlan(QUESTION, [
+    { index: 0, goal: "最后综合", tool: null, dependsOn: [2] },
+    { index: 1, goal: "检索《无畏契约》版本更新", tool: "search", dependsOn: [] },
+    { index: 2, goal: "重复检索《无畏契约》版本更新", tool: "search", dependsOn: [] },
+    { index: 3, goal: "读取上一步找到的事件", tool: "get_story", dependsOn: [1, 2] },
+  ]);
+  assert.deepEqual(plan.map((step) => [step.index, step.tool, step.dependsOn]), [
+    [0, "search", []],
+    [1, "get_story", [0]],
+  ]);
+});
+
 test("a choose-one hotspot step registers one candidate instead of the whole unrelated page", () => {
   const candidates = ["one", "two", "three"].map((objectId) => ({
     kind: "story" as const, objectId, title: objectId, sourceName: null, publishedAt: null,
@@ -363,6 +376,8 @@ test("fallback plans match the deep examples and never invent an id tool first",
   assert.equal(searchQueryFromQuestion(DEEP_STARTERS[3]!.question), "原神");
   assert.equal(searchQueryFromQuestion("2026 无畏契约全球冠军赛谁夺冠？"), "无畏契约 2026 全球冠军赛 夺冠");
   assert.equal(searchQueryFromQuestion("不存在的游戏 Nebula Orchard 9 有更新吗？"), "nebula orchard");
+  assert.equal(searchQueryFromQuestion(QUESTION, "检查版本更新和赛季活动"), "无畏契约 版本更新 赛季活动");
+  assert.equal(searchQueryFromQuestion("比较《无畏契约》和《绝地求生》", "检索《绝地求生》的近期报道"), "绝地求生");
 
   const sourceComparison = fallbackResearchPlan("梳理最近一个热点事件里，官方消息和媒体报道有什么不同。");
   assert.deepEqual(sourceComparison.map((item) => item.tool), ["get_hot_topics", "get_story", "search"]);
@@ -578,7 +593,7 @@ test("an empty first pass replans once, then a new direct tool can still finish"
   });
   await runResearchDriver(world.run);
   assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_replan", "ask.research_final", "ask.research_verify"]);
-  assert.deepEqual(world.executed.map((item) => item.name), ["search", "search", "get_hot_topics"]);
+  assert.deepEqual(world.executed.map((item) => item.name), ["search", "get_hot_topics"]);
   assert.equal(world.box.current.planVersion, 2);
   assert.equal(world.box.current.checkpoint.replans, 1);
   assert.equal(world.box.current.steps.some((item) => item.index === 0 && item.status === "done"), true);

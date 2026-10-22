@@ -58,7 +58,6 @@ function ResearchProcess({ plan, streaming }: { plan: NonNullable<Message["plan"
     </li>)}</ol>
   </section>;
 }
-const CLAIM_STATUS: Record<string, string> = { supported: "来源支持", insufficient: "证据不足", disputed: "存在争议", contradicted: "相互矛盾", withdrawn: "已移除" };
 function clockLabel(at: string): string {
   return `${beijingDate(at)} ${beijingTime(at)}`;
 }
@@ -70,38 +69,35 @@ function ReportView({ report }: { report: ResearchReportView }) {
     {report.lead && <p>{report.lead}</p>}
     <section>
       <h3>核心结论</h3>
-      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>尚无足够证据支持的回答，检索到报道不代表已经找到答案。</p>}
+      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>目前没有足够证据支持结论。</p>}
     </section>
-    {report.showTimeline !== false && <section>
+    {report.showTimeline !== false && report.timeline.length > 0 && <section>
       <h3>报道时间</h3>
-      {report.timeline.length ? <ol className="ask-report-timeline">
+      <ol className="ask-report-timeline">
         {report.timeline.map((item) => <li key={`verified-${item.evidenceId}-${item.at}`}>
           <time dateTime={item.at}>报道发布 {clockLabel(item.at)}</time>
           <span>{item.title}</span>
           <small>{item.credibility ?? "来源支持"} · [{item.evidenceId}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
         </li>)}
-      </ol> : <p>没有检索到带时间的资料。</p>}
+      </ol>
     </section>}
     {report.showCoverage !== false && <section>
       <h3>官方与媒体</h3>
       <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span><span>结论引用 {cited}</span></p>
       <p>这些数字是这次检索到的资料，不是已核实的新闻条数。来源类型只说明材料出处，不等于事实已经核实。</p>
     </section>}
-    {reported.length > 0 && <section>
-      <h3>来源报道但尚未核实</h3>
-      <ol className="ask-report-citations">{reported.map((item) => <li key={item.id}>
+    {reported.length > 0 && <details className="ask-report-retrieved">
+      <summary>查看检索到的报道（{reported.length}）</summary>
+      <ol className="ask-report-citations">{reported.slice(0, 8).map((item) => <li key={item.id}>
         <details>
           <summary>[{item.id}] {item.title}</summary>
-          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType} · 来源报道但尚未核实{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}` : ""}</p>
+          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType} · 检索结果，未用于上方结论{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}` : ""}</p>
           {item.excerpt && <p>{item.excerpt}</p>}
           {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
         </details>
       </li>)}</ol>
-    </section>}
-    {(report.comparison.length > 0) && <section>
-      <h3>差异与争议</h3>
-      <ul>{report.comparison.map((item) => <li key={item.text}>{item.text}{item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}</li>)}</ul>
-    </section>}
+      <p>这些报道没有被用于支持上面的结论。</p>
+    </details>}
     {report.heat.length > 0 && <section>
       <h3>热度观察</h3>
       <dl className="ask-report-heat">{report.heat.map((item) => <div key={`${item.evidenceId}-${item.label}`}><dt>{item.label}</dt><dd>{item.value} <small>[{item.evidenceId}]</small></dd></div>)}</dl>
@@ -109,13 +105,6 @@ function ReportView({ report }: { report: ResearchReportView }) {
         <span>{point.label}</span><span className="ask-report-bar"><i style={{ width: `${Math.max(4, Math.round(point.value / max * 100))}%` }}/></span><strong>{point.value}</strong>
       </div>)}</div>}
       <p>这些数字只来自对应证据，不能据此断言热度变化的原因。</p>
-    </section>}
-    {report.uncertainty.length > 0 && <section>
-      <h3>尚未确认</h3>
-      <ul className="ask-report-uncertainty">{report.uncertainty.map((item) => <li key={`${item.status}-${item.text}`}>
-        <b>{CLAIM_STATUS[item.status] ?? item.status}</b>
-        <span>{item.note} {item.text}</span>
-      </li>)}</ul>
     </section>}
     <section>
       <h3>引用</h3>
@@ -125,7 +114,7 @@ function ReportView({ report }: { report: ResearchReportView }) {
           <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType}{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}</p>
           {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
         </details>
-      </li>)}</ol> : <p>{reported.length ? `没有可用于核心结论的资料。上面列出了检索到的 ${reported.length} 条来源报道。` : "没有可用于回答的证据。"}</p>}
+      </li>)}</ol> : <p>{reported.length ? "目前没有足够证据形成结论；可展开查看检索结果。" : "没有检索到可用于回答的证据。"}</p>}
     </section>
   </div>;
 }
