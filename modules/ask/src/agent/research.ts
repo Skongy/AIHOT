@@ -6,17 +6,22 @@ import { chatToolsStream, type ChatToolsStreamOptions, type ChatToolsStreamResul
 import { sql } from "@aihot/backend/db";
 import { checkCitations, extractXmlToolCalls, stripAskModelText } from "./citations.ts";
 import {
-  appendEvent, bumpCounters, claimTask, finishTask, getTask, insertAssistantMessage, insertEvidence, listEvidence,
-  listMessages, listPlanSteps, renewLease, replacePendingPlanSteps, savePlanStep, saveResearchCheckpoint,
+  appendEvent, bumpCounters, claimTask, finishTask, getTask, insertAssistantMessage, insertEvidence, listClaims, listEvidence,
+  listMessages, listPlanSteps, renewLease, replaceClaims, replacePendingPlanSteps, savePlanStep, saveResearchCheckpoint,
   setActiveReceipt, updateDraft, type PlanStepStatus, type TaskStatus,
 } from "../db/store.ts";
 import {
   ASK_TOOL_LABELS_ZH, ASK_TOOL_NAMES, askToolSpecs, executeAskTool, friendlyStepSummary,
   type AskToolName, type EvidenceCandidate, type ToolExecResult,
 } from "../tools/whitelist.ts";
+import {
+  assessClaims, buildReport, parseClaims, sourceTypeOf, supplementQuery,
+  type VerifiableEvidence, type VerifiedClaim,
+} from "./verify.ts";
 
 export const DEEP_LIMITS = {
   MAX_MODEL: 8,
+  MAX_VERIFY: 2,
   MAX_TOOL: 6,
   MAX_WALL_MS: 180_000,
   MAX_STEPS: 4,
@@ -71,6 +76,14 @@ export interface TaskResearchCheckpoint {
   synthesisRound?: number;
   synthesisReceiptId?: number;
   synthesisResumedOnce?: boolean;
+  draftReady?: boolean;
+  verifyPasses?: number;
+  verifyRound?: number;
+  verifyReceiptId?: number;
+  verifyResumedOnce?: boolean;
+  supplements?: number;
+  supplementPhase?: "started" | "done";
+  needsSupplement?: boolean;
 }
 
 export interface ResearchState {
@@ -99,6 +112,9 @@ export type ResearchAction =
   | { type: "fail_step"; index: number; reason: string }
   | { type: "skip_step"; index: number; reason: string }
   | { type: "call_synthesis"; resume: boolean }
+  | { type: "call_verify"; resume: boolean }
+  | { type: "call_supplement" }
+  | { type: "finish_report" }
   | { type: "finish_empty" }
   | { type: "finish_degraded"; reason: "model" };
 
@@ -110,7 +126,8 @@ export interface LoadedResearch {
   toolCalls: number;
   planVersion: number;
   startedMs: number;
-  evidence: Array<{ id: number; title: string | null; kind: string; sourceName: string | null }>;
+  evidence: VerifiableEvidence[];
+  claims: VerifiedClaim[];
   steps: StepState[];
   checkpoint: TaskResearchCheckpoint;
   receiptStatus: Record<number, ReceiptLookup>;
@@ -134,6 +151,7 @@ export interface ResearchRun {
   setPlan: (version: number, steps: StepState[], checkpoint: TaskResearchCheckpoint) => Promise<void>;
   saveStep: (step: StepState) => Promise<void>;
   recordEvidence: (items: EvidenceCandidate[]) => Promise<number[]>;
+  saveClaims: (claims: VerifiedClaim[]) => Promise<void>;
   emit: (type: string, payload: Record<string, unknown>) => Promise<void>;
   saveDraft: (text: string) => Promise<void>;
   finish: (status: TaskStatus, text: string, error?: { code: string; message: string }) => Promise<void>;
@@ -154,6 +172,14 @@ export function taskCheckpoint(value: unknown): TaskResearchCheckpoint {
     synthesisRound: num("synthesisRound"),
     synthesisReceiptId: num("synthesisReceiptId"),
     synthesisResumedOnce: row.synthesisResumedOnce === true,
+    draftReady: row.draftReady === true,
+    verifyPasses: typeof row.verifyPasses === "number" ? row.verifyPasses : 0,
+    verifyRound: num("verifyRound"),
+    verifyReceiptId: num("verifyReceiptId"),
+    verifyResumedOnce: row.verifyResumedOnce === true,
+    supplements: typeof row.supplements === "number" ? row.supplements : 0,
+    supplementPhase: row.supplementPhase === "started" || row.supplementPhase === "done" ? row.supplementPhase : undefined,
+    needsSupplement: row.needsSupplement === true,
   };
 }
 
@@ -308,6 +334,7 @@ function blockedReceipt(state: ResearchState): boolean {
     state.checkpoint.planReceiptId,
     state.checkpoint.replanReceiptId,
     state.checkpoint.synthesisReceiptId,
+    state.checkpoint.verifyReceiptId,
     ...state.steps.map((step) => step.checkpoint?.receiptId),
   ];
   return ids.some((id) => {
@@ -368,8 +395,11 @@ export function nextResearchAction(state: ResearchState): ResearchAction {
   }
   if (state.steps.length === 0 && paidDone(receiptOf(state, state.checkpoint.planReceiptId))) return { type: "call_plan", resume: true };
   if (state.checkpoint.replanPending && paidDone(receiptOf(state, state.checkpoint.replanReceiptId))) return { type: "call_replan", resume: true };
-  if (stepsSettled(state.steps) && state.evidenceCount > 0 && paidDone(receiptOf(state, state.checkpoint.synthesisReceiptId))) {
+  if (stepsSettled(state.steps) && state.evidenceCount > 0 && paidDone(receiptOf(state, state.checkpoint.synthesisReceiptId)) && !state.checkpoint.draftReady) {
     return { type: "call_synthesis", resume: true };
+  }
+  if (state.checkpoint.draftReady && paidDone(receiptOf(state, state.checkpoint.verifyReceiptId))) {
+    return { type: "call_verify", resume: true };
   }
 
   if (state.cancelRequested) return { type: "stop", status: "cancelled", reason: "cancelled" };
@@ -424,12 +454,34 @@ export function nextResearchAction(state: ResearchState): ResearchAction {
     if (stuck) return { type: "skip_step", index: stuck.index, reason: "步骤依赖无法继续" };
   }
   if (state.evidenceCount === 0) return { type: "finish_empty" };
-  if (state.checkpoint.synthesisRound && !state.checkpoint.synthesisReceiptId && state.checkpoint.synthesisResumedOnce) {
-    return { type: "finish_degraded", reason: "model" };
+  if (!state.checkpoint.draftReady) {
+    if (state.checkpoint.synthesisRound && !state.checkpoint.synthesisReceiptId && state.checkpoint.synthesisResumedOnce) {
+      return { type: "finish_degraded", reason: "model" };
+    }
+    if (state.checkpoint.synthesisRound && !state.checkpoint.synthesisReceiptId) return { type: "call_synthesis", resume: true };
+    if (state.modelCalls >= DEEP_LIMITS.MAX_MODEL || overtime) return { type: "finish_degraded", reason: "model" };
+    return { type: "call_synthesis", resume: false };
   }
-  if (state.checkpoint.synthesisRound && !state.checkpoint.synthesisReceiptId) return { type: "call_synthesis", resume: true };
-  if (state.modelCalls >= DEEP_LIMITS.MAX_MODEL || overtime) return { type: "finish_degraded", reason: "model" };
-  return { type: "call_synthesis", resume: false };
+  if (state.checkpoint.supplementPhase === "started") return { type: "call_supplement" };
+  if (overtime && !(state.checkpoint.verifyRound && !state.checkpoint.verifyReceiptId)) {
+    return state.checkpoint.verifyPasses ? { type: "finish_report" } : { type: "finish_degraded", reason: "model" };
+  }
+  if (state.checkpoint.verifyRound && !state.checkpoint.verifyReceiptId) {
+    if (state.checkpoint.verifyResumedOnce) return { type: "finish_degraded", reason: "model" };
+    return { type: "call_verify", resume: true };
+  }
+  const verifyRoom = state.modelCalls < DEEP_LIMITS.MAX_MODEL + DEEP_LIMITS.MAX_VERIFY;
+  if ((state.checkpoint.verifyPasses ?? 0) === 0) {
+    return verifyRoom ? { type: "call_verify", resume: false } : { type: "finish_degraded", reason: "model" };
+  }
+  if (state.checkpoint.needsSupplement && (state.checkpoint.supplements ?? 0) === 0 && state.checkpoint.supplementPhase !== "done") {
+    if (state.toolCalls >= DEEP_LIMITS.MAX_TOOL) return { type: "finish_report" };
+    return { type: "call_supplement" };
+  }
+  if (state.checkpoint.supplementPhase === "done" && (state.checkpoint.verifyPasses ?? 0) === 1) {
+    return verifyRoom ? { type: "call_verify", resume: false } : { type: "finish_report" };
+  }
+  return { type: "finish_report" };
 }
 
 function clockLine(ms: number): string {
@@ -438,7 +490,12 @@ function clockLine(ms: number): string {
 
 function evidenceLines(evidence: LoadedResearch["evidence"]): string {
   if (!evidence.length) return "（还没有可引用资料）";
-  return evidence.map((item) => `[${item.id}] ${item.title ?? item.kind}${item.sourceName ? ` · ${item.sourceName}` : ""}`).join("\n");
+  return evidence.map((item) => {
+    const source = item.sourceName ? ` · ${item.sourceName}` : "";
+    const type = item.sourceType ? ` · ${sourceTypeOf(item.sourceType)}` : "";
+    const excerpt = item.excerpt ? `\n    ${item.excerpt.slice(0, 180)}` : "";
+    return `[${item.id}] ${item.title ?? item.kind ?? "资料"}${source}${type}${excerpt}`;
+  }).join("\n");
 }
 
 function citedFallback(evidence: LoadedResearch["evidence"], lead: string): string {
@@ -578,14 +635,17 @@ export async function runResearchDriver(run: ResearchRun): Promise<void> {
 
 async function applyAction(run: ResearchRun, loaded: LoadedResearch, action: ResearchAction): Promise<boolean> {
   if (action.type === "stop") {
+    const unverified = loaded.checkpoint.draftReady && !(loaded.checkpoint.verifyPasses);
     const lead = action.reason === "cancelled"
-      ? (loaded.draft.trim() || (loaded.evidence.length ? "已停止深度研究。已检索到的资料如下：" : "已停止深度研究，尚未检索到可引用资料。"))
+      ? (unverified || !loaded.draft.trim()
+        ? (loaded.evidence.length ? "已停止深度研究。已检索到的资料如下：" : "已停止深度研究，尚未检索到可引用资料。")
+        : loaded.draft.trim())
       : action.reason === "time" ? "研究时间已到。以下只列出已经检索到的资料："
       : action.reason === "tool" ? "工具调用已达上限。以下只列出已经检索到的资料："
       : action.reason === "model" ? "模型调用已达上限。以下只列出已经检索到的资料："
       : "付费回执结果不明，未自动重试。";
     const status = action.status;
-    await conclude(run, status, action.reason === "cancelled" && loaded.draft.trim() ? loaded.draft : citedFallback(loaded.evidence, lead), {
+    await conclude(run, status, action.reason === "cancelled" && loaded.draft.trim() && !unverified ? loaded.draft : citedFallback(loaded.evidence, lead), {
       code: action.reason === "receipt_unknown" ? "receipt_unknown" : undefined,
       message: action.reason === "receipt_unknown" ? "回执结果不明" : undefined,
       limit: action.reason === "time" || action.reason === "model" || action.reason === "tool" ? action.reason : undefined,
@@ -623,6 +683,9 @@ async function applyAction(run: ResearchRun, loaded: LoadedResearch, action: Res
     return false;
   }
   if (action.type === "call_synthesis") return synthesis(run, loaded, action.resume);
+  if (action.type === "call_verify") return verify(run, loaded, action.resume);
+  if (action.type === "call_supplement") return supplement(run, loaded);
+  if (action.type === "finish_report") return finishReport(run, loaded);
   return false;
 }
 
@@ -864,14 +927,101 @@ async function synthesis(run: ResearchRun, loaded: LoadedResearch, resume: boole
   const answer = result === "fallback"
     ? citedFallback(fresh.evidence, "这次没能整理成完整回答。以下为已登记来源：")
     : (stripAskModelText(result.content) || citedFallback(fresh.evidence, "这次没能整理成完整回答。以下为已登记来源："));
-  const check = checkCitations(answer, fresh.evidence.map((item) => item.id));
+  await run.saveDraft(answer);
+  await run.saveCheckpoint({
+    ...fresh.checkpoint,
+    draftReady: true,
+    synthesisReceiptId: result === "fallback" ? fresh.checkpoint.synthesisReceiptId : result.receiptId,
+  });
+  return false;
+}
+
+async function verify(run: ResearchRun, loaded: LoadedResearch, resume: boolean): Promise<boolean> {
+  const checkpoint = { ...loaded.checkpoint };
+  const round = resume ? checkpoint.verifyRound! : loaded.modelCalls + 1;
+  checkpoint.verifyRound = round;
+  checkpoint.verifyResumedOnce = resume ? true : false;
+  await run.saveCheckpoint(checkpoint);
+  await ensureRound(run, round);
+  const started = (await run.load()).startedMs;
+  const result = await pay(run, {
+    model: "default",
+    purpose: "ask.research_verify",
+    subject: `ask:${run.taskId}:research:verify:r${round}`,
+    promptVersion: PROMPT_VERSION,
+    system: `${clockLine(started)}
+你只核验下面的草稿。只输出 JSON，不要写报告。
+格式：{"claims":[{"text":"一句可核验的事实","kind":"fact 或 inference","evidenceIds":[已有编号],"quote":"从对应证据标题或摘录中逐字复制的原话","conflictsWith":[]}]}
+quote 不能改写。结论里的每个数字都必须原样出现在 quote 里。官方表态只能引用来源类型为官方来源的材料。热度变化不能写成原因。最多 8 条。`,
+    messages: [{ role: "user", content: `问题：${run.question}\n草稿：\n${loaded.draft || "（没有草稿）"}\n可引用资料：\n${evidenceLines(loaded.evidence)}` }],
+    tools: [],
+    taskId: run.taskId,
+    roundIndex: round,
+    enableTools: false,
+    maxTokens: 1200,
+  }, "fallback");
+  if (result === "stopped") return true;
+  const fresh = await run.load();
+  const proposed = result === "fallback" ? null : parseClaims(result.content);
+  const assessed = proposed ? assessClaims(proposed, fresh.evidence) : [];
+  const firstPass = (fresh.checkpoint.verifyPasses ?? 0) === 0;
+  const claims = (firstPass ? assessed : [...assessed, ...fresh.claims.filter((old) => !assessed.some((next) => next.text === old.text))])
+    .map((claim, index) => ({ ...claim, index }));
+  await run.saveClaims(claims);
+  await run.emit("research_claims", { claims });
+  const query = firstPass ? supplementQuery(claims, run.question) : null;
+  await run.saveCheckpoint({
+    ...fresh.checkpoint,
+    draftReady: true,
+    verifyPasses: (fresh.checkpoint.verifyPasses ?? 0) + 1,
+    verifyRound: undefined,
+    verifyReceiptId: undefined,
+    verifyResumedOnce: false,
+    needsSupplement: !!query,
+  });
+  return false;
+}
+
+async function supplement(run: ResearchRun, loaded: LoadedResearch): Promise<boolean> {
+  const resume = loaded.checkpoint.supplementPhase === "started";
+  const query = supplementQuery(loaded.claims, run.question) ?? searchQueryFromQuestion(run.question);
+  const args = JSON.stringify({ q: query, window: inferWindow(run.question), mode: "all", limit: 8 });
+  if (!resume) {
+    await run.saveCheckpoint({ ...loaded.checkpoint, supplementPhase: "started" });
+    await run.bumpTool();
+  }
+  await run.emit("step_start", { stepId: "supplement", tool: "search", labelZh: ASK_TOOL_LABELS_ZH.search, argsSummary: args.slice(0, 200) });
+  let exec: ToolExecResult;
+  try {
+    exec = await run.executeTool("search", args);
+  } catch {
+    exec = { ok: false, name: "search", errorCode: "internal_error", message: "补检失败。" };
+  }
+  if (exec.ok && exec.evidence.length) {
+    const ids = await run.recordEvidence(exec.evidence);
+    if (ids.length) {
+      await run.emit("evidence", { items: exec.evidence.map((item, i) => ({ id: ids[i], kind: item.kind, title: item.title, siteUrl: item.siteUrl, originalUrl: item.originalUrl, sourceName: item.sourceName, publishedAt: item.publishedAt })) });
+    }
+  }
+  await run.emit("step_end", { stepId: "supplement", ok: exec.ok, summary: exec.ok ? friendlyStepSummary(exec) : exec.message, errorCode: exec.ok ? undefined : exec.errorCode });
+  const fresh = await run.load();
+  await run.saveCheckpoint({ ...fresh.checkpoint, supplementPhase: "done", supplements: 1, needsSupplement: false });
+  return false;
+}
+
+async function finishReport(run: ResearchRun, loaded: LoadedResearch): Promise<boolean> {
+  const fresh = await run.load();
+  const { markdown, report } = buildReport(run.question, fresh.claims, fresh.evidence);
+  const check = checkCitations(markdown, fresh.evidence.map((item) => item.id));
   await run.emit("citation_check", { ok: check.ok, issues: check.issues });
-  const status = check.ok ? "completed" : "completed_degraded";
+  await run.emit("research_report", { report });
+  const supported = fresh.claims.some((claim) => claim.status === "supported");
+  const status = check.ok && supported ? "completed" : "completed_degraded";
   if ((await run.load()).cancelRequested) {
-    await conclude(run, "cancelled", answer);
+    await conclude(run, "cancelled", markdown);
     return true;
   }
-  await conclude(run, status, answer);
+  await conclude(run, status, markdown);
   return true;
 }
 
@@ -952,7 +1102,8 @@ export async function runDeepResearch(opts: { taskId: string; workerId: string; 
       const steps = await listPlanSteps(opts.taskId);
       const evidence = await listEvidence(opts.taskId);
       const checkpoint = taskCheckpoint(task.research_checkpoint);
-      const ids = [checkpoint.planReceiptId, checkpoint.replanReceiptId, checkpoint.synthesisReceiptId, task.active_receipt_id, ...steps.map((step) => normalizeStepCheckpoint(step.checkpoint)?.receiptId)].filter((id): id is number => typeof id === "number");
+      const ids = [checkpoint.planReceiptId, checkpoint.replanReceiptId, checkpoint.synthesisReceiptId, checkpoint.verifyReceiptId, task.active_receipt_id, ...steps.map((step) => normalizeStepCheckpoint(step.checkpoint)?.receiptId)].filter((id): id is number => typeof id === "number");
+      const claims = await listClaims(opts.taskId);
       return {
         status: task.status,
         draft: task.draft_answer ?? "",
@@ -961,7 +1112,28 @@ export async function runDeepResearch(opts: { taskId: string; workerId: string; 
         toolCalls: task.tool_calls,
         planVersion: task.plan_version,
         startedMs: task.started_at?.getTime() ?? now(),
-        evidence: evidence.map((item) => ({ id: item.id, title: item.title, kind: item.kind, sourceName: item.source_name })),
+        evidence: evidence.map((item) => {
+          const raw = item.raw_ref ?? {};
+          return {
+            id: item.id,
+            title: item.title,
+            kind: item.kind,
+            sourceName: item.source_name,
+            sourceType: sourceTypeOf(typeof raw.sourceType === "string" ? raw.sourceType : null, raw.firstParty),
+            excerpt: typeof raw.excerpt === "string" ? raw.excerpt : "",
+            publishedAt: item.published_at?.toISOString() ?? null,
+            siteUrl: item.site_url,
+          };
+        }),
+        claims: claims.map((claim) => ({
+          index: claim.claim_index,
+          text: claim.text,
+          kind: claim.kind,
+          status: claim.status,
+          evidenceIds: claim.evidence_ids,
+          quote: claim.quote,
+          note: claim.note,
+        })),
         steps: steps.map((step) => ({
           index: step.step_index,
           goal: step.goal,
@@ -989,6 +1161,7 @@ export async function runDeepResearch(opts: { taskId: string; workerId: string; 
       kind: item.kind, objectId: item.objectId, title: item.title, sourceName: item.sourceName,
       publishedAt: item.publishedAt, siteUrl: item.siteUrl, originalUrl: item.originalUrl, toolName: item.toolName, rawRef: item.rawRef,
     }))),
+    saveClaims: async (claims) => replaceClaims(opts.taskId, claims),
     emit: async (type, payload) => { await appendEvent(opts.taskId, type, payload); },
     saveDraft: async (text) => { await updateDraft(opts.taskId, text); },
     finish: async (status, text, error) => {

@@ -4,7 +4,19 @@ export type AskMode = "normal" | "deep";
 export type ResearchStepStatus = "pending" | "running" | "done" | "skipped" | "failed";
 export type ResearchStepView = { index: number; goal: string; tool: string | null; toolLabel: string | null; status: ResearchStepStatus; dependsOn: number[]; summary?: string };
 export type ResearchPlanView = { version: number; steps: ResearchStepView[] };
-export type Message = { key: string; role: "user" | "assistant"; text: string; taskId?: string; status?: string; steps?: Step[]; evidence?: Evidence[]; contentInvalidated?: boolean; requestId?: string; mode?: AskMode; plan?: ResearchPlanView };
+export type ReportTimelineItem = { at: string; title: string; evidenceId: number; sourceType: string };
+export type ReportHeatItem = { label: string; value: string; evidenceId: number };
+export type ResearchReportView = {
+  summary: string[];
+  timeline: ReportTimelineItem[];
+  coverage: { official: number; media: number; unknown: number };
+  comparison: Array<{ text: string; evidenceIds: number[] }>;
+  heat: ReportHeatItem[];
+  chart: Array<{ label: string; value: number; evidenceId: number }> | null;
+  uncertainty: Array<{ status: string; text: string; note: string; evidenceIds: number[] }>;
+  citations: Array<{ id: number; title: string; sourceName: string | null; sourceType: string; siteUrl: string | null; publishedAt: string | null }>;
+};
+export type Message = { key: string; role: "user" | "assistant"; text: string; taskId?: string; status?: string; steps?: Step[]; evidence?: Evidence[]; contentInvalidated?: boolean; requestId?: string; mode?: AskMode; plan?: ResearchPlanView; report?: ResearchReportView };
 export const TERMINAL = new Set(["completed", "completed_degraded", "failed", "cancelled", "limit_reached"]);
 
 const RESEARCH_STATUS = new Set<ResearchStepStatus>(["pending", "running", "done", "skipped", "failed"]);
@@ -76,8 +88,88 @@ export function applyResearchEvent(plan: ResearchPlanView | undefined, type: str
   return plan;
 }
 
+function textList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function idList(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => Number.isInteger(item) && item > 0) : [];
+}
+
+export function reportFromPayload(payload: Record<string, unknown>): ResearchReportView | undefined {
+  const report = payload.report && typeof payload.report === "object" ? payload.report as Record<string, unknown> : payload;
+  const coverage = report.coverage && typeof report.coverage === "object" ? report.coverage as Record<string, unknown> : {};
+  const timeline = Array.isArray(report.timeline) ? report.timeline.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.at !== "string" || typeof row.title !== "string" || !Number.isInteger(row.evidenceId)) return [];
+    return [{ at: row.at, title: row.title, evidenceId: row.evidenceId as number, sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知" }];
+  }) : [];
+  const heat = Array.isArray(report.heat) ? report.heat.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.label !== "string" || typeof row.value !== "string" || !Number.isInteger(row.evidenceId)) return [];
+    return [{ label: row.label, value: row.value, evidenceId: row.evidenceId as number }];
+  }) : [];
+  const chart = Array.isArray(report.chart) ? report.chart.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.label !== "string" || typeof row.value !== "number" || !Number.isFinite(row.value) || !Number.isInteger(row.evidenceId)) return [];
+    return [{ label: row.label, value: row.value, evidenceId: row.evidenceId as number }];
+  }) : null;
+  const rows = (value: unknown) => Array.isArray(value) ? value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.text !== "string") return [];
+    return [{ text: row.text, evidenceIds: idList(row.evidenceIds) }];
+  }) : [];
+  const uncertainty = Array.isArray(report.uncertainty) ? report.uncertainty.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.text !== "string" || typeof row.note !== "string") return [];
+    return [{ status: typeof row.status === "string" ? row.status : "insufficient", text: row.text, note: row.note, evidenceIds: idList(row.evidenceIds) }];
+  }) : [];
+  const citations = Array.isArray(report.citations) ? report.citations.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (!Number.isInteger(row.id) || typeof row.title !== "string") return [];
+    return [{
+      id: row.id as number,
+      title: row.title,
+      sourceName: typeof row.sourceName === "string" ? row.sourceName : null,
+      sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知",
+      siteUrl: typeof row.siteUrl === "string" ? row.siteUrl : null,
+      publishedAt: typeof row.publishedAt === "string" ? row.publishedAt : null,
+    }];
+  }) : [];
+  if (!textList(report.summary).length && !timeline.length && !citations.length && !uncertainty.length) return undefined;
+  return {
+    summary: textList(report.summary),
+    timeline,
+    coverage: {
+      official: typeof coverage.official === "number" ? coverage.official : 0,
+      media: typeof coverage.media === "number" ? coverage.media : 0,
+      unknown: typeof coverage.unknown === "number" ? coverage.unknown : 0,
+    },
+    comparison: rows(report.comparison),
+    heat,
+    chart: chart && chart.length >= 2 ? chart : null,
+    uncertainty,
+    citations,
+  };
+}
+
+export function snapshotReport(events: Array<{ type: string; payload?: Record<string, unknown> }> = []): ResearchReportView | undefined {
+  let report: ResearchReportView | undefined;
+  for (const event of events) {
+    if (event.type !== "research_report") continue;
+    report = reportFromPayload(event.payload ?? {}) ?? report;
+  }
+  return report;
+}
+
 export function applyAskEvent(message: Message, type: string, payload: Record<string, unknown>): Message {
-  if (payload.unavailable) return { ...message, text: "相关来源已不可用，原回答不再展示", evidence: [], steps: [], plan: undefined, contentInvalidated: true };
+  if (payload.unavailable) return { ...message, text: "相关来源已不可用，原回答不再展示", evidence: [], steps: [], plan: undefined, report: undefined, contentInvalidated: true };
   if (type === "answer_delta") return { ...message, text: message.text + String(payload.text ?? "") };
   if (type === "answer_done") return { ...message, text: String(payload.text ?? message.text) };
   if (type === "task_status") return { ...message, status: String(payload.status ?? message.status) };
@@ -97,6 +189,10 @@ export function applyAskEvent(message: Message, type: string, payload: Record<st
   if (type === "research_plan" || type === "research_step") {
     const plan = applyResearchEvent(message.plan, type, payload);
     return plan ? { ...message, plan } : message;
+  }
+  if (type === "research_report") {
+    const report = reportFromPayload(payload);
+    return report ? { ...message, report } : message;
   }
   return message;
 }

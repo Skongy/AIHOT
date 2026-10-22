@@ -11,7 +11,10 @@ let sseResponse: import("node:http").ServerResponse | null = null;
 const at = "2026-10-16T08:00:00Z";
 const evidence = [{ id: 1, kind: "item", title: "无畏契约版本更新", siteUrl: "/items/ask-fixture", originalUrl: "https://example.org/news", sourceName: "测试媒体", publishedAt: at }];
 const answer = "## 重点\n**这次有一项版本更新。** [1]\n\n- 地图发生变化。[1]\n- 未提供的数据不能确认。\n\n[伪造链接](https://evil.test/items/ask-fixture)\n<img src=x onerror=alert(1)>";
-let nextAnswer = answer; let nextStatus = "completed";
+let nextAnswer = answer; let nextStatus = "completed"; let useDeepReport = false;
+const deepMarkdown = "# 《无畏契约》测试服什么时候开启？\n\n## 核心结论\n- 官方确认测试服将于 5 月 20 日开启 [1]\n";
+const deepPlan = { version: 1, steps: [{ index: 0, goal: "检索报道", tool: "search", toolLabel: "检索", status: "done", dependsOn: [], summary: "收集到 1 条可引用资料" }] };
+const deepReport = { summary: ["官方确认测试服将于 5 月 20 日开启 [1]"], timeline: [{ at: "2026-05-01T02:00:00.000Z", title: "无畏契约更新公告", evidenceId: 1, sourceType: "官方来源" }], coverage: { official: 1, media: 1, unknown: 0 }, comparison: [{ text: "官方确认冠军皮肤将在下月推出", evidenceIds: [2] }], heat: [{ label: "热榜名次", value: "4", evidenceId: 1 }], chart: null, uncertainty: [{ status: "disputed", text: "官方确认冠军皮肤将在下月推出", note: "结论写成了官方表态，但所引证据没有官方来源。", evidenceIds: [2] }], citations: [{ id: 1, title: "无畏契约更新公告", sourceName: "拳头游戏", sourceType: "官方来源", siteUrl: "/items/ask-fixture", publishedAt: "2026-05-01T02:00:00.000Z" }, { id: 2, title: "媒体猜测冠军皮肤", sourceName: "游戏媒体", sourceType: "媒体报道", siteUrl: "/items/media-fixture", publishedAt: "2026-05-03T08:00:00.000Z" }] };
 function event(type: string, payload: any, seq: number) { return `id: ${seq}\nevent: ${type}\ndata: ${JSON.stringify({payload})}\n\n`; }
 function complete() {
   if (!activeTask) return;
@@ -19,6 +22,14 @@ function complete() {
     {type:'step_start',payload:{stepId:'search-1',tool:'search',labelZh:'检索站内资料'}},
     {type:'step_end',payload:{stepId:'search-1',ok:true,summary:'找到相关报道'}},
   ];
+  if (useDeepReport) {
+    activeTask = {...activeTask,mode:'deep',status:'completed',finalAnswer:deepMarkdown,evidence,steps,research:[{type:'research_plan',payload:deepPlan},{type:'research_report',payload:{report:deepReport}}],snapshotSeq:6};
+    savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:deepMarkdown});
+    sseResponse?.write(event('research_report',{report:deepReport},2));
+    sseResponse?.write(event('answer_done',{text:deepMarkdown},3));
+    sseResponse?.end(event('task_status',{status:'completed'},6)); sseResponse=null;
+    return;
+  }
   activeTask = {...activeTask,status:nextStatus,finalAnswer:nextAnswer,evidence,steps,snapshotSeq:7};
   savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:nextAnswer});
   sseResponse?.write(event('step_start',steps[0].payload,2));
@@ -43,7 +54,7 @@ const api=createServer(async(req,res)=>{
     if(expiredOnce){expiredOnce=false;res.statusCode=404;return res.end(JSON.stringify({detail:'会话已过期'}));}
     if(failOnce){failOnce=false;res.statusCode=503;return res.end(JSON.stringify({detail:'临时故障'}));}
     if(!activeTask||activeTask.requestId!==request.clientRequestId){
-      activeTask={taskId:'task-'+submissions,requestId:request.clientRequestId,status:'running',draftAnswer:'',finalAnswer:null,evidence:[],steps:[],snapshotSeq:0};
+      activeTask={taskId:'task-'+submissions,requestId:request.clientRequestId,status:'running',mode:request.mode==='deep'?'deep':'normal',draftAnswer:'',finalAnswer:null,evidence:[],steps:[],research:useDeepReport?[{type:'research_plan',payload:deepPlan}]:[],snapshotSeq:useDeepReport?1:0};
       savedMessages.push({id:'user-'+submissions,role:'user',content:request.message,taskId:activeTask.taskId});
     }
     return res.end(JSON.stringify({taskId:activeTask.taskId,status:activeTask.status}));
@@ -67,7 +78,7 @@ before(async()=>{
 });
 after(async()=>{sseResponse?.end();if(phoneBrowser&&phoneBrowser!==browser)await phoneBrowser.close();await browser?.close();await web?.stop();});
 async function visit(options:{phone?:boolean;dark?:boolean;article?:boolean;standalone?:boolean}={}){
-  enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;nextAnswer=answer;nextStatus='completed';
+  enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;nextAnswer=answer;nextStatus='completed';useDeepReport=false;
   const context=await(options.phone?phoneBrowser:browser).newContext({viewport:options.phone?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
   await context.addInitScript(({dark,standalone})=>{sessionStorage.setItem('gamehot-intro-seen-v1','1');localStorage.setItem('aihot-theme',dark?'dark':'light');if(standalone)Object.defineProperty(navigator,'standalone',{value:true});},{dark:!!options.dark,standalone:!!options.standalone});
   const page=await context.newPage();
@@ -232,6 +243,44 @@ test('interrupted event streams reconnect without creating another task',async()
     hold=false;
     await expect(page.getByRole('heading',{name:'重点',exact:true})).toBeVisible({timeout:15000});
     assert.equal(submissions,1);await expect(page.locator('.ask-user')).toHaveCount(1);
+  }finally{await context.close();}
+});
+test('a deep report shows verified sections and refuses a one-point chart',async()=>{
+  const {context,page,errors}=await visit();try{
+    await page.getByRole('radio',{name:'深度研究'}).click();
+    assert.equal(submissions,0);
+    useDeepReport=true;
+    await send(page,'《无畏契约》测试服什么时候开启？');
+    await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
+    await expect(page.getByText('官方确认测试服将于 5 月 20 日开启 [1]')).toBeVisible();
+    await expect(page.getByText('无畏契约更新公告').first()).toBeVisible();
+    await expect(page.getByText('存在争议')).toBeVisible();
+    await expect(page.getByText('不能据此断言热度变化的原因。')).toBeVisible();
+    await expect(page.locator('.ask-report-chart')).toHaveCount(0);
+    await page.locator('.ask-report-citations summary').first().click();
+    await expect(page.getByRole('link',{name:'查看来源'})).toHaveAttribute('href','/items/ask-fixture');
+    await context.grantPermissions(['clipboard-read','clipboard-write']);
+    await page.getByRole('button',{name:'复制回答'}).click();
+    await expect(page.getByRole('button',{name:'已复制'})).toBeVisible();
+    assert.match(await page.evaluate(()=>navigator.clipboard.readText()), /# 《无畏契约》测试服什么时候开启？/);
+    const motion=await page.locator('.ask-report').evaluate((el)=>getComputedStyle(el).transitionDuration);
+    assert.equal(motion,'0s');
+    await page.reload();
+    await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
+    assert.equal(lastRequest.mode,'deep');
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+test('the same deep report fits a phone and stays readable in dark mode',async()=>{
+  const {context,page,errors}=await visit({phone:true,dark:true});try{
+    useDeepReport=true;
+    await page.getByRole('radio',{name:'深度研究'}).click();
+    await send(page,'《无畏契约》测试服什么时候开启？');
+    await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'dark');
+    await expect(page.locator('.ask-report-timeline li')).toBeVisible();
+    assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
 test('disabled model service is announced before submitting and dark theme remains usable',async()=>{

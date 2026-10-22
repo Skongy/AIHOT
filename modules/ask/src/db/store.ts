@@ -333,6 +333,40 @@ export async function listMessages(sessionId: string, limit = 40) {
     ) recent ORDER BY created_at ASC, id ASC`;
 }
 
+export interface ClaimRow {
+  task_id: string;
+  claim_index: number;
+  text: string;
+  status: "supported" | "insufficient" | "disputed" | "contradicted" | "withdrawn";
+  kind: "fact" | "inference";
+  evidence_ids: number[];
+  quote: string;
+  note: string;
+  updated_at: Date;
+}
+
+export async function listClaims(taskId: string): Promise<ClaimRow[]> {
+  const rows = await sql<ClaimRow[]>`
+    SELECT task_id::text, claim_index, text, status, kind, evidence_ids, quote, note, updated_at
+    FROM ask_claims WHERE task_id = ${taskId}::uuid ORDER BY claim_index`;
+  return rows.map((row) => ({ ...row, evidence_ids: Array.isArray(row.evidence_ids) ? row.evidence_ids.map(Number) : [] }));
+}
+
+export async function replaceClaims(taskId: string, claims: Array<{
+  index: number; text: string; status: ClaimRow["status"]; kind: ClaimRow["kind"];
+  evidenceIds: number[]; quote: string; note: string;
+}>): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM ask_claims WHERE task_id = ${taskId}::uuid`;
+    for (const claim of claims) {
+      await tx`
+        INSERT INTO ask_claims (task_id, claim_index, text, status, kind, evidence_ids, quote, note, updated_at)
+        VALUES (${taskId}::uuid, ${claim.index}, ${claim.text}, ${claim.status}, ${claim.kind},
+          ${intArray(tx, claim.evidenceIds)}, ${claim.quote}, ${claim.note}, now())`;
+    }
+  });
+}
+
 export async function insertAssistantMessage(sessionId: string, taskId: string, content: string): Promise<void> {
   await sql`
     INSERT INTO ask_messages (id, session_id, role, content, task_id)

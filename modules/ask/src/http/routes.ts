@@ -124,7 +124,7 @@ export function registerAskRoutes(app: FastifyInstance) {
       .filter((e) => e.type === "step_start" || e.type === "step_end")
       .map((e) => ({ seq: e.seq, type: e.type, payload: redactEventPayload(task, e.type, e.payload) }));
     const research = events
-      .filter((e) => e.type === "research_plan" || e.type === "research_step")
+      .filter((e) => e.type === "research_plan" || e.type === "research_step" || e.type === "research_claims" || e.type === "research_report")
       .map((e) => ({ seq: e.seq, type: e.type, payload: redactEventPayload(task, e.type, e.payload) }));
 
     return reply.header("Cache-Control", "no-store").send({

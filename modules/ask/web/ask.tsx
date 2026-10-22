@@ -6,7 +6,7 @@ import { copyText } from "../../../apps/web/app/lib/clipboard";
 import { Answer } from "./answer";
 import { DEEP_STARTERS, STARTERS } from "./starters";
 import { useAsk } from "./use-ask";
-import { TERMINAL, type AskMode, type Message } from "./types";
+import { TERMINAL, type AskMode, type Message, type ResearchReportView } from "./types";
 import "./ask.css";
 
 export const handle: Screen = { tab: "me", name: "AI 问答" };
@@ -57,6 +57,60 @@ function ResearchProcess({ plan, streaming }: { plan: NonNullable<Message["plan"
     </li>)}</ol>
   </section>;
 }
+const CLAIM_STATUS: Record<string, string> = { supported: "已证实", insufficient: "证据不足", disputed: "存在争议", contradicted: "相互矛盾", withdrawn: "已移除" };
+function ReportView({ report }: { report: ResearchReportView }) {
+  const max = report.chart ? Math.max(...report.chart.map((point) => point.value), 1) : 1;
+  return <div className="ask-report">
+    <section>
+      <h3>核心结论</h3>
+      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>现有资料不足以确认具体结论。</p>}
+    </section>
+    <section>
+      <h3>关键时间线</h3>
+      {report.timeline.length ? <ol className="ask-report-timeline">{report.timeline.map((item) => <li key={`${item.evidenceId}-${item.at}`}>
+        <time dateTime={item.at}>{item.at.slice(0, 16).replace("T", " ")}</time>
+        <span>{item.title}</span>
+        <small>[{item.evidenceId}] · {item.sourceType}</small>
+      </li>)}</ol> : <p>现有证据没有可排序的发布时间。</p>}
+    </section>
+    <section>
+      <h3>官方与媒体</h3>
+      <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span></p>
+      <p>来源类型只说明材料出处，不等于事实已经核实。</p>
+    </section>
+    {(report.comparison.length > 0) && <section>
+      <h3>差异与争议</h3>
+      <ul>{report.comparison.map((item) => <li key={item.text}>{item.text}{item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}</li>)}</ul>
+    </section>}
+    <section>
+      <h3>热度观察</h3>
+      {report.heat.length ? <>
+        <dl className="ask-report-heat">{report.heat.map((item) => <div key={`${item.evidenceId}-${item.label}`}><dt>{item.label}</dt><dd>{item.value} <small>[{item.evidenceId}]</small></dd></div>)}</dl>
+        {report.chart && <div className="ask-report-chart" role="img" aria-label="同一指标的多次统计">{report.chart.map((point) => <div key={`${point.evidenceId}-${point.label}`}>
+          <span>{point.label}</span><span className="ask-report-bar"><i style={{ width: `${Math.max(4, Math.round(point.value / max * 100))}%` }}/></span><strong>{point.value}</strong>
+        </div>)}</div>}
+        <p>这些数字只来自对应证据，不能据此断言热度变化的原因。</p>
+      </> : <p>这次没有可引用的热度统计。</p>}
+    </section>
+    <section>
+      <h3>尚未确认</h3>
+      {report.uncertainty.length ? <ul className="ask-report-uncertainty">{report.uncertainty.map((item) => <li key={`${item.status}-${item.text}`}>
+        <b>{CLAIM_STATUS[item.status] ?? item.status}</b>
+        <span>{item.note} {item.text}</span>
+      </li>)}</ul> : <p>没有需要降级或删除的主张。</p>}
+    </section>
+    <section>
+      <h3>引用</h3>
+      {report.citations.length ? <ol className="ask-report-citations">{report.citations.map((item) => <li key={item.id}>
+        <details>
+          <summary>[{item.id}] {item.title}</summary>
+          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType}{item.publishedAt ? ` · ${item.publishedAt.slice(0, 16).replace("T", " ")}` : ""}</p>
+          {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
+        </details>
+      </li>)}</ol> : <p>没有登记证据。</p>}
+    </section>
+  </div>;
+}
 function AssistantMessage({ message, busy, onPick }: { message: Message; busy: boolean; onPick: (text: string) => void }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -65,9 +119,11 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
   const streaming = !!message.status && !TERMINAL.has(message.status) && message.status !== "send_failed";
   const active = steps.filter((s) => s.status === "running");
   const current = message.plan?.steps.find((step) => step.status === "running");
+  const planSettled = !!message.plan && message.plan.steps.every((step) => step.status === "done" || step.status === "skipped" || step.status === "failed");
   const label = current?.goal
     ?? (message.status === "queued" ? "正在排队"
       : message.mode === "deep" && message.status === "running" && !message.plan ? "正在生成研究计划"
+      : message.mode === "deep" && planSettled && !message.report ? "正在核验证据"
       : active.length ? active.map((s) => s.labelZh).join("、")
       : steps.length || message.plan ? "正在整理回答"
       : "正在理解问题");
@@ -76,6 +132,7 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
     {message.plan && <ResearchProcess plan={message.plan} streaming={streaming}/>}
     {steps.length > 0 && <ProgressSteps steps={steps} streaming={streaming}/>}
     {message.contentInvalidated ? <p className="ask-turn-note">相关来源已不可用，原回答不再展示。</p>
+      : message.report ? <ReportView report={message.report}/>
       : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming} showRetrievedSources={message.status === "completed_degraded"}/>
       : <p className="ask-turn-note" role="status">{streaming ? "正在查找站内资料，请稍候。" : message.status === "send_failed" ? "消息未确认送达，可重试发送。" : message.status === "failed" ? "这次未能生成回答，请稍后再试。" : message.status === "cancelled" ? "已停止生成。" : "本次没有生成回答。"}</p>}
     {message.status === "completed_degraded" && <p className="ask-turn-note">本次回答未能把所有内容关联到具体新闻，下面提供本次检索资料供核对。</p>}

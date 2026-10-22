@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyAskEvent, snapshotResearch, snapshotSteps, TERMINAL, type AskMode, type Message } from "./types";
+import { applyAskEvent, snapshotReport, snapshotResearch, snapshotSteps, TERMINAL, type AskMode, type Message } from "./types";
 
 const SESSION_KEY = "gamehot:ask:sessionId";
 const savedSession = () => { try { return localStorage.getItem(SESSION_KEY); } catch { return null; } };
@@ -21,7 +21,7 @@ async function json(url: string, init?: RequestInit) {
 }
 function fromSnapshot(snap: any, key: string): Message {
   return { key, role: "assistant", taskId: snap.taskId, status: snap.status, mode: snap.mode === "deep" ? "deep" : "normal", steps: snapshotSteps(snap.steps), plan: snapshotResearch(snap.research), evidence: snap.evidence ?? [],
-    text: snap.contentInvalidated ? "相关来源已不可用，原回答不再展示" : snap.finalAnswer ?? snap.draftAnswer ?? "", contentInvalidated: snap.contentInvalidated };
+    text: snap.contentInvalidated ? "相关来源已不可用，原回答不再展示" : snap.finalAnswer ?? snap.draftAnswer ?? "", contentInvalidated: snap.contentInvalidated, report: snapshotReport(snap.research) };
 }
 
 export function useAsk() {
@@ -44,7 +44,7 @@ export function useAsk() {
     let cursor = after;
     es.onopen = () => setDisconnected(false);
     es.onerror = () => { if (stream.current === es) setDisconnected(true); };
-    for (const type of ["answer_delta", "answer_done", "step_start", "step_end", "evidence", "task_status", "error", "limit", "citation_check", "research_plan", "research_step"]) {
+    for (const type of ["answer_delta", "answer_done", "step_start", "step_end", "evidence", "task_status", "error", "limit", "citation_check", "research_plan", "research_step", "research_claims", "research_report"]) {
       es.addEventListener(type, (event) => {
         if (stream.current !== es) return;
         const ev = event as MessageEvent;

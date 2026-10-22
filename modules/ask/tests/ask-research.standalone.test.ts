@@ -64,6 +64,7 @@ function loaded(partial: Partial<LoadedResearch> = {}): LoadedResearch {
     planVersion: 0,
     startedMs: 1_000,
     evidence: [],
+    claims: [],
     steps: [],
     checkpoint: taskCheckpoint({}),
     receiptStatus: {},
@@ -142,9 +143,20 @@ function harness(options: {
     },
     recordEvidence: async (items) => items.map((item) => {
       evidenceId += 1;
-      box.current.evidence.push({ id: evidenceId, title: item.title, kind: item.kind, sourceName: item.sourceName });
+      const raw = item.rawRef ?? {};
+      box.current.evidence.push({
+        id: evidenceId,
+        title: item.title,
+        kind: item.kind,
+        sourceName: item.sourceName,
+        sourceType: typeof raw.sourceType === "string" ? raw.sourceType : undefined,
+        excerpt: typeof raw.excerpt === "string" ? raw.excerpt : undefined,
+        publishedAt: item.publishedAt,
+        siteUrl: item.siteUrl,
+      });
       return evidenceId;
     }),
+    saveClaims: async (claims) => { box.current.claims = structuredClone(claims); },
     emit: async (type, payload) => { events.push({ type, payload: structuredClone(payload) }); },
     saveDraft: async (text) => { box.current.draft = text; },
     finish: async (status, text) => { box.current.status = status; box.current.draft = text; },
@@ -153,7 +165,7 @@ function harness(options: {
 }
 
 test("deep limits stay separate from the normal ask loop", () => {
-  assert.deepEqual(DEEP_LIMITS, { MAX_MODEL: 8, MAX_TOOL: 6, MAX_WALL_MS: 180_000, MAX_STEPS: 4, MAX_REPLANS: 1 });
+  assert.deepEqual(DEEP_LIMITS, { MAX_MODEL: 8, MAX_VERIFY: 2, MAX_TOOL: 6, MAX_WALL_MS: 180_000, MAX_STEPS: 4, MAX_REPLANS: 1 });
   const loop = readFileSync(new URL("../src/agent/loop.ts", import.meta.url), "utf8");
   assert.match(loop, /const MAX_MODEL = 6/);
   assert.match(loop, /const MAX_TOOL = 8/);
@@ -302,20 +314,24 @@ test("a planned search runs directly, an id step asks once, and synthesis cites 
         { goal: "读取事件时间线", tool: "get_story", dependsOn: [0] },
       ] }));
       if (opts.purpose === "ask.research_step") return answer("", [toolCall("get_story", { storyId: "story-1" })]);
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "检索到公开资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [] }] }));
       return answer("根据 [1]，近期有公开报道。");
     },
   });
   await runResearchDriver(world.run);
-  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_step", "ask.research_final"]);
+  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_step", "ask.research_final", "ask.research_verify"]);
   assert.deepEqual(world.executed.map((item) => item.name), ["search", "get_story"]);
   assert.equal(JSON.parse(world.executed[0]!.args).window, "30d");
   assert.equal(world.executed[1]!.args.includes("story-1"), true);
-  assert.equal(world.bumps.model, 3);
+  assert.equal(world.bumps.model, 4);
   assert.equal(world.bumps.tool, 2);
   assert.equal(world.box.current.status, "completed");
+  assert.equal(world.box.current.claims[0]?.status, "supported");
   assert.equal(world.events.some((event) => event.type === "research_plan"), true);
   assert.equal(world.events.some((event) => event.type === "research_step"), true);
+  assert.equal(world.events.some((event) => event.type === "research_report"), true);
   assert.equal(world.box.current.draft.includes("[1]"), true);
+  assert.equal(world.box.current.draft.includes("导致"), false);
 });
 
 test("an empty first pass replans once, then a new direct tool can still finish", async () => {
@@ -329,11 +345,12 @@ test("an empty first pass replans once, then a new direct tool can still finish"
       if (opts.purpose === "ask.research_replan") return answer(JSON.stringify({ steps: [
         { goal: "改查热点榜", tool: "get_hot_topics", dependsOn: [0] },
       ] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "热点榜有对应事件", kind: "fact", evidenceIds: [1], quote: "get_hot_topics 资料", conflictsWith: [] }] }));
       return answer("根据 [1]，热点榜有对应事件。");
     },
   });
   await runResearchDriver(world.run);
-  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_replan", "ask.research_final"]);
+  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_replan", "ask.research_final", "ask.research_verify"]);
   assert.deepEqual(world.executed.map((item) => item.name), ["search", "search", "get_hot_topics"]);
   assert.equal(world.box.current.planVersion, 2);
   assert.equal(world.box.current.checkpoint.replans, 1);
@@ -459,11 +476,13 @@ test("an open tool can finish after the clock, and a committed tool is not run a
       evidence: [{ id: 1, title: "已保存报道", kind: "item", sourceName: "媒体" }],
       steps: [step({ index: 0, goal: "检索", status: "running", tool: "search", checkpoint: { phase: "tool_done", roundIndex: 0, evidenceBefore: 0 } })],
     },
-    script: () => answer("根据 [1]，报道已经保存。"),
+    script: (opts) => opts.purpose === "ask.research_verify"
+      ? answer(JSON.stringify({ claims: [{ text: "报道已经保存", kind: "fact", evidenceIds: [1], quote: "已保存报道", conflictsWith: [] }] }))
+      : answer("根据 [1]，报道已经保存。"),
   });
   await runResearchDriver(done.run);
   assert.deepEqual(done.executed, []);
-  assert.deepEqual(done.chats.map((item) => item.purpose), ["ask.research_final"]);
+  assert.deepEqual(done.chats.map((item) => item.purpose), ["ask.research_final", "ask.research_verify"]);
   assert.equal(done.box.current.status, "completed");
   const again = done.chats.length;
   await runResearchDriver(done.run);
