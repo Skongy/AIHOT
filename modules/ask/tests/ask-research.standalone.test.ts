@@ -213,6 +213,28 @@ test("greetings and capability questions finish without models, tools or a resea
   }
 });
 
+test("out-of-scope creation requests are declined locally in either mode", async () => {
+  const questions = [
+    "给我写一段贪吃蛇代码",
+    "帮我用 Python 写个脚本抓取原神新闻",
+    "帮我写一份简历",
+    "请帮我翻译这段英文",
+    "给我写一首诗",
+    "帮我规划周末去北京旅游",
+    "给我推荐一部电影",
+  ];
+  for (const question of questions) {
+    const direct = conversationAnswer(question);
+    assert.match(direct ?? "", /GAMEHOT 游戏资讯助手/);
+    assert.match(direct ?? "", /不在我的服务范围/);
+    const world = harness({ question, script: () => { throw new Error("out-of-scope requests must not call a model"); } });
+    await runResearchDriver(world.run);
+    assert.equal(world.chats.length, 0, question);
+    assert.equal(world.executed.length, 0, question);
+    assert.equal(world.box.current.status, "completed", question);
+  }
+});
+
 test("the planner can answer or clarify without fabricating news steps", async () => {
   for (const action of ["answer", "clarify"]) {
     const world = harness({ question: "这两种模式应该怎么选？", script: () => answer(JSON.stringify({ action, answer: "简单问题可以直接问，复杂事件可以使用深度模式。" })) });

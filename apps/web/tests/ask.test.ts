@@ -112,6 +112,21 @@ test('three starters only fill the composer; page visits do not create tasks',as
     if(process.env.ASK_REVIEW_DIR)await page.screenshot({path:process.env.ASK_REVIEW_DIR+'/desktop.png',fullPage:true});
   }finally{await context.close();}
 });
+test('mode picker sits immediately left of send and changing it never submits',async()=>{
+  for(const phone of [false,true]){
+    const {context,page,errors}=await visit({phone});try{
+      const picker=page.getByLabel('回答模式');
+      await expect(picker).toHaveValue('normal');
+      await expect(page.locator('.ask-mode-switch')).toHaveCount(0);
+      const pickerBox=await picker.boundingBox();const sendBox=await page.getByRole('button',{name:'发送问题'}).boundingBox();
+      assert.ok(pickerBox&&sendBox&&pickerBox.x<pickerBox.x+pickerBox.width&&pickerBox.x+pickerBox.width<=sendBox.x,'mode picker must sit to the left of send');
+      await picker.selectOption('deep');
+      await expect(picker).toHaveValue('deep');
+      assert.equal(submissions,0);assert.deepEqual(errors,[]);
+      if(phone)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    }finally{await context.close();}
+  }
+});
 test('Chinese IME Enter never sends; Shift+Enter adds a line; deliberate Enter sends once',async()=>{
   const {context,page}=await visit();try{
     const input=page.getByLabel('你的游戏资讯问题');await input.fill('游戏');
@@ -257,7 +272,7 @@ test('interrupted event streams reconnect without creating another task',async()
 });
 test('deep conversational answers render without a research plan or report and survive reload',async()=>{
   const {context,page,errors}=await visit();try{
-    await page.getByRole('radio',{name:'深度研究'}).click();
+    await page.getByLabel('回答模式').selectOption('deep');
     useDirectAnswer=true;nextAnswer='我是 GAMEHOT 游戏资讯助手。简单问题可以直接回答。';
     await send(page,'你好，你能干什么？');
     await expect(page.locator('.ask-answer')).toContainText(nextAnswer);
@@ -272,7 +287,7 @@ test('deep conversational answers render without a research plan or report and s
 
 test('a focused research answer omits unrelated timeline and source counters on refresh too',async()=>{
   const {context,page,errors}=await visit();try{
-    await page.getByRole('radio',{name:'深度研究'}).click();
+    await page.getByLabel('回答模式').selectOption('deep');
     useDeepReport=true;compactReport=true;
     await send(page,'《无畏契约》测试服开放日期？');
     for(const reload of [false,true]){
@@ -287,7 +302,7 @@ test('a focused research answer omits unrelated timeline and source counters on 
 
 test('a deep report shows verified sections and refuses a one-point chart',async()=>{
   const {context,page,errors}=await visit();try{
-    await page.getByRole('radio',{name:'深度研究'}).click();
+    await page.getByLabel('回答模式').selectOption('deep');
     assert.equal(submissions,0);
     useDeepReport=true;
     await send(page,'《无畏契约》测试服什么时候开启？');
@@ -315,7 +330,7 @@ test('a deep report shows verified sections and refuses a one-point chart',async
 test('the same deep report fits a phone and stays readable in dark mode',async()=>{
   const {context,page,errors}=await visit({phone:true,dark:true});try{
     useDeepReport=true;
-    await page.getByRole('radio',{name:'深度研究'}).click();
+    await page.getByLabel('回答模式').selectOption('deep');
     await send(page,'《无畏契约》测试服什么时候开启？');
     await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { Link, useSearchParams } from "react-router";
 import type { Screen } from "../../../apps/web/app/components/shell/screens";
@@ -227,13 +227,6 @@ export default function AskPage() {
   }, [chat.messages]);
   const pick = (text: string) => { setInput(text); textarea.current?.focus({ preventScroll: true }); };
   const switchMode = (next: AskMode) => { setMode(next); };
-  const onModeKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-    event.preventDefault();
-    const next = event.key === "ArrowRight" || event.key === "ArrowDown" ? "deep" : "normal";
-    switchMode(next);
-    document.getElementById(next === "deep" ? "ask-mode-deep" : "ask-mode-normal")?.focus();
-  };
   const clearContext = () => { const next = new URLSearchParams(params); next.delete("article"); setParams(next, { replace: true }); };
   const tooLong = [...(input.trim() + (context ? `\n\n关于这篇站内资讯：/items/${context.id}` : ""))].length > 2000;
   const canSend = chat.available === true && !chat.busy && !chat.restoring && !contextLoading && !contextError && !!input.trim() && !tooLong;
@@ -263,18 +256,12 @@ export default function AskPage() {
       {chat.error && <p className="ask-error" role="alert">{chat.error}</p>}
       {chat.available === false && <p className="ask-notice" role="status">问答暂未开放。你仍可<Link to="/">浏览精选</Link>或阅读已有对话。</p>}
       <form className={`ask-composer${mode === "deep" ? " is-deep" : ""}`} onSubmit={(event) => void submit(event)}>
-        <div className={`ask-mode-switch${mode === "deep" ? " is-deep" : ""}`} role="radiogroup" aria-label="研究模式" onKeyDown={onModeKey}>
-          <span className="ask-mode-thumb" aria-hidden="true"/>
-          <button id="ask-mode-normal" type="button" role="radio" aria-checked={mode === "normal"} tabIndex={mode === "normal" ? 0 : -1} onClick={() => switchMode("normal")}>普通研究</button>
-          <button id="ask-mode-deep" type="button" role="radio" aria-checked={mode === "deep"} tabIndex={mode === "deep" ? 0 : -1} onClick={() => switchMode("deep")}>深度研究</button>
-        </div>
-        <p className="ask-mode-note" id="ask-mode-note" key={mode}>{mode === "deep" ? "简单问题直接回答，复杂问题按需规划、检索与核对。切换只影响下一次发送。" : "按需检索，快速回答。切换模式只改变下一次发送。"}</p>
         {(context || contextLoading || contextError) && <div className="ask-context"><div><span>正在围绕这篇资讯提问</span><p>{contextLoading ? "正在读取资讯…" : contextError ?? context?.title}</p></div><button type="button" aria-label="移除资讯上下文" onClick={clearContext}>×</button></div>}
         <label htmlFor="ask-input" className="sr-only">你的游戏资讯问题</label>
-        <textarea id="ask-input" ref={textarea} value={input} maxLength={2000} rows={2} placeholder={context ? "继续问这篇资讯…" : mode === "deep" ? "想比较两款游戏、梳理时间线，或对照官方和媒体？" : "想了解哪款游戏，或最近发生了什么？"} aria-describedby="ask-mode-note ask-input-note" onChange={(e) => setInput(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(e) => {
+        <textarea id="ask-input" ref={textarea} value={input} maxLength={2000} rows={2} placeholder={context ? "继续问这篇资讯…" : mode === "deep" ? "想比较两款游戏、梳理时间线，或对照官方和媒体？" : "想了解哪款游戏，或最近发生了什么？"} aria-describedby="ask-input-note" onChange={(e) => setInput(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !composing.current && e.keyCode !== 229) { e.preventDefault(); if (canSend) void submit(); }
         }}/>
-        <div className="ask-composer-toolbar"><span id="ask-input-note">{tooLong ? "问题与附带资讯合计不能超过2000字" : chat.busy ? "可以先写下一个问题" : "Enter 发送，Shift + Enter 换行"}</span>{chat.busy ? <button type="button" className="ask-send is-stop" onClick={() => void chat.stop()} aria-label="停止生成"><span/>停止</button> : <button type="submit" className="ask-send" disabled={!canSend} aria-label="发送问题"><Glyph name="send" size={20}/></button>}</div>
+        <div className="ask-composer-toolbar"><span id="ask-input-note">{tooLong ? "问题与附带资讯合计不能超过2000字" : chat.busy ? "可以先写下一个问题" : "Enter 发送，Shift + Enter 换行"}</span><div className="ask-composer-actions"><label className="ask-mode-picker"><span className="sr-only">回答模式</span><select aria-label="回答模式" value={mode} onChange={(event) => switchMode(event.target.value as AskMode)}><option value="normal">普通研究</option><option value="deep">深度研究</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></label>{chat.busy ? <button type="button" className="ask-send is-stop" onClick={() => void chat.stop()} aria-label="停止生成"><span/>停止</button> : <button type="submit" className="ask-send" disabled={!canSend} aria-label="发送问题"><Glyph name="send" size={20}/></button>}</div></div>
       </form>
       <p className="ask-footnote">{mode === "deep" ? "深度研究只引用本次检索到的站内资料。" : "依据站内公开报道回答，附来源供核对。"}<span>{mode === "deep" ? "不搜全网，不编造来源。" : "不搜全网，不提供游戏攻略。"}</span></p>
     </div>}
