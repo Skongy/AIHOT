@@ -28,6 +28,16 @@ export const ASK_TOOL_NAMES = [
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
+function clipExcerpt(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 400) : "";
+}
+
+function sourceKind(firstParty: unknown): "官方来源" | "媒体报道" | "未知" {
+  if (firstParty === true) return "官方来源";
+  if (firstParty === false) return "媒体报道";
+  return "未知";
+}
+
 export const ASK_TOOL_LABELS_ZH: Record<AskToolName, string> = {
   get_latest: "查近期资讯",
   search: "站内搜索",
@@ -194,6 +204,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         catch (e) { return { ok: false, name: tool, errorCode: "invalid_arguments", message: String((e as Error).message) }; }
         const queries = tool === "search" ? askAliases(a.q!) : [];
         const base = { queries, category: a.category, limit: a.limit ?? 10, cursor: a.cursor, ...range,
+          engine: tool === "search" ? "hybrid-v1" as const : "keyword-v1" as const,
           rangeKey: JSON.stringify([a.window ?? (tool === "search" ? "7d" : "24h"), a.from ?? null, a.until ?? null]) };
         // A named fact query must not hide a fresh public report merely because it missed
         // the editorial selection threshold while older selected results still match.
@@ -206,9 +217,12 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         const evidence: EvidenceCandidate[] = res.items.map((it) => ({
           kind: "item" as const, objectId: it.id, title: it.title, sourceName: it.source.name,
           publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original,
-          toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty },
+          toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty, excerpt: clipExcerpt(it.summary), sourceType: sourceKind(it.firstParty) },
         }));
-        const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries };
+        const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries,
+          retrieval: { engine: res.retrieval.used, fallbackReason: res.retrieval.fallbackReason,
+            keywordCandidates: res.retrieval.keywordCandidates, semanticCandidates: res.retrieval.semanticCandidates,
+            vectorCandidates: res.retrieval.vectorCandidates } };
         const text = JSON.stringify({ scope: mode === "selected" ? "精选" : "全部公开动态（含未入选）", ...structured,
           note: "时间范围按站内时间，开始含、结束不含。有 nextCursor 仅为一页，不得冒充完整统计。来源类型不代表事实已核实。空结果仅指本查询范围；具名搜索无结果不得改用无关近期列表凑答案。",
           items: res.items.map((it, i) => ({ evidencePosition: i + 1, article_id: it.id, title: it.title, summary: it.summary,
@@ -220,12 +234,13 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         const detail = await loadItemDetail(article_id);
         if (detail.kind !== "found" || detail.item.readingMode === "summary-only") return { ok: false, name: tool, errorCode: "not_found", message: "这篇资讯已不可用或仅保留来源信息，暂不支持问答。" };
         const it = detail.item;
+        const sourceType = sourceKind(detail.row.source_tier === "T1");
         return { ok: true, name: tool, text: JSON.stringify({ article_id: it.id, title: it.title, summary: it.summary,
-          source: it.source.name, publishedAt: it.publishedAt, story: it.story,
+          source: it.source.name, sourceType, publishedAt: it.publishedAt, story: it.story,
           note: "只有标题与摘要。不得补写未提供的全文细节；媒体转述不等于官方确认。" }),
           structured: { count: 1 }, evidence: [{ kind: "item", objectId: it.id, title: it.title, sourceName: it.source.name,
             publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original, toolName: tool,
-            rawRef: { id: it.id } }] };
+            rawRef: { id: it.id, excerpt: clipExcerpt(it.summary), sourceType } }] };
       }
       case "get_hot_topics": {
         const a = parsed.data as { limit?: number };
@@ -245,7 +260,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: `/story/${publicId}`,
             originalUrl: null,
             toolName: tool,
-            rawRef: { id: t.id, publicId },
+            rawRef: { id: t.id, publicId, excerpt: clipExcerpt(t.title), sourceType: "未知" },
           };
         });
         return { ok: true, name: tool, text, structured: { count: evidence.length }, evidence };
@@ -272,7 +287,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: `/story/${body.story.publicId}`,
             originalUrl: null,
             toolName: tool,
-            rawRef: { publicId: body.story.publicId },
+            rawRef: { publicId: body.story.publicId, excerpt: clipExcerpt(body.story.title), sourceType: "未知" },
           }, ...body.story.reports.slice(0, limit).map((report) => ({
             kind: "item" as const,
             objectId: report.id,
@@ -282,7 +297,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: report.links.aihot,
             originalUrl: report.links.original,
             toolName: tool,
-            rawRef: { id: report.id, publicId: body.story.publicId, firstParty: report.source.firstParty },
+            rawRef: { id: report.id, publicId: body.story.publicId, firstParty: report.source.firstParty, excerpt: clipExcerpt(report.title), sourceType: sourceKind(report.source.firstParty) },
           }))],
         };
       }
@@ -308,7 +323,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: article.links?.site ?? `/items/${article.id}`,
             originalUrl: article.links?.original ?? null,
             toolName: tool,
-            rawRef: { article_id: a.article_id },
+            rawRef: { article_id: a.article_id, excerpt: clipExcerpt(r.text), sourceType: "未知" },
           }],
         };
       }
@@ -334,7 +349,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: story.links?.site ?? `/story/${story.publicId}`,
             originalUrl: null,
             toolName: tool,
-            rawRef: { public_id: a.public_id },
+            rawRef: { public_id: a.public_id, excerpt: clipExcerpt(r.text), sourceType: "未知" },
           }],
         };
       }
@@ -368,7 +383,7 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
             siteUrl: `/daily/${date}`,
             originalUrl: null,
             toolName: tool,
-            rawRef: { date },
+            rawRef: { date, excerpt: clipExcerpt(text), sourceType: "未知" },
           }],
         };
       }

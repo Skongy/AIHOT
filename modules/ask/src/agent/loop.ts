@@ -15,6 +15,7 @@ import { ASK_TOOL_LABELS_ZH, askToolSpecs, executeAskTool, friendlyStepSummary, 
 import { askSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
 import { checkCitations, extractXmlToolCalls, stripAskModelText, stripThinkTagsStreaming } from "./citations.ts";
 import { currentEvidence, historySources } from "./evidence.ts";
+import { runDeepResearch } from "./research.ts";
 
 const MAX_MODEL = 6;
 const MAX_TOOL = 8;
@@ -56,6 +57,10 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
   const existing = await getTask(opts.taskId);
   if (!existing) return;
   if (["completed", "completed_degraded", "failed", "cancelled", "limit_reached"].includes(existing.status)) return;
+  if (existing.mode === "deep") {
+    await runDeepResearch(opts);
+    return;
+  }
 
   // Crash recovery: running with successful receipt → finish without new paid call.
   if (existing.status === "running" && existing.active_receipt_id) {

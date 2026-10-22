@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { snapshotSteps, TERMINAL, type Evidence, type Message } from "./types";
+import { applyAskEvent, snapshotReport, snapshotResearch, snapshotSteps, TERMINAL, type AskMode, type Message } from "./types";
 
 const SESSION_KEY = "gamehot:ask:sessionId";
 const savedSession = () => { try { return localStorage.getItem(SESSION_KEY); } catch { return null; } };
@@ -20,8 +20,8 @@ async function json(url: string, init?: RequestInit) {
   return data;
 }
 function fromSnapshot(snap: any, key: string): Message {
-  return { key, role: "assistant", taskId: snap.taskId, status: snap.status, steps: snapshotSteps(snap.steps), evidence: snap.evidence ?? [],
-    text: snap.contentInvalidated ? "相关来源已不可用，原回答不再展示" : snap.finalAnswer ?? snap.draftAnswer ?? "", contentInvalidated: snap.contentInvalidated };
+  return { key, role: "assistant", taskId: snap.taskId, status: snap.status, mode: snap.mode === "deep" ? "deep" : "normal", steps: snapshotSteps(snap.steps), plan: snapshotResearch(snap.research), evidence: snap.evidence ?? [],
+    text: snap.contentInvalidated ? "相关来源已不可用，原回答不再展示" : snap.finalAnswer ?? snap.draftAnswer ?? "", contentInvalidated: snap.contentInvalidated, report: snapshotReport(snap.research) };
 }
 
 export function useAsk() {
@@ -44,7 +44,7 @@ export function useAsk() {
     let cursor = after;
     es.onopen = () => setDisconnected(false);
     es.onerror = () => { if (stream.current === es) setDisconnected(true); };
-    for (const type of ["answer_delta", "answer_done", "step_start", "step_end", "evidence", "task_status", "error", "limit", "citation_check"]) {
+    for (const type of ["answer_delta", "answer_done", "step_start", "step_end", "evidence", "task_status", "error", "limit", "citation_check", "research_plan", "research_step", "research_claims", "research_report"]) {
       es.addEventListener(type, (event) => {
         if (stream.current !== es) return;
         const ev = event as MessageEvent;
@@ -54,24 +54,7 @@ export function useAsk() {
         try { p = JSON.parse(ev.data).payload ?? {}; } catch { return; }
         if (seq) cursor = seq;
         if (type === "error") setError(String(p.message ?? "生成失败，请稍后重试。"));
-        if (p.unavailable) {
-          setMessages((prev) => prev.map((m) => m.key === key ? { ...m, text: "相关来源已不可用，原回答不再展示", evidence: [], contentInvalidated: true } : m));
-          return;
-        }
-        setMessages((prev) => prev.map((m) => {
-          if (m.key !== key) return m;
-          if (type === "answer_delta") return { ...m, text: m.text + String(p.text ?? "") };
-          if (type === "answer_done") return { ...m, text: String(p.text ?? m.text) };
-          if (type === "task_status") return { ...m, status: String(p.status ?? m.status) };
-          if (type === "evidence") {
-            const evidence = new Map((m.evidence ?? []).map((e) => [e.id, e]));
-            for (const e of (p.items ?? []) as Evidence[]) evidence.set(e.id, e);
-            return { ...m, evidence: [...evidence.values()] };
-          }
-          if (type === "step_start") return { ...m, steps: [...(m.steps ?? []), { stepId: String(p.stepId), tool: String(p.tool), labelZh: String(p.labelZh ?? p.tool), status: "running" }] };
-          if (type === "step_end") return { ...m, steps: (m.steps ?? []).map((s) => s.stepId === p.stepId ? { ...s, status: p.ok ? "ok" : "fail", summary: p.summary } : s) };
-          return m;
-        }));
+        setMessages((prev) => prev.map((m) => m.key === key ? applyAskEvent(m, type, p) : m));
         if (type === "task_status" && TERMINAL.has(String(p.status))) {
           close(); lock.current = false; setBusy(false); setDisconnected(false);
         }
@@ -113,20 +96,20 @@ export function useAsk() {
     return () => { cancelled = true; close(); };
   }, [close, subscribe]);
 
-  const send = async (text: string, retry?: Message) => {
+  const send = async (text: string, retry?: Message, mode: AskMode = retry?.mode ?? "normal") => {
     if (!text.trim() || lock.current || restoring || available !== true) return false;
     lock.current = true; setBusy(true); setError(null); setDisconnected(false);
     const requestId = retry?.requestId ?? newId();
-    const user: Message = retry ?? { key: requestId, role: "user", text: text.trim(), requestId };
+    const user: Message = retry ?? { key: requestId, role: "user", text: text.trim(), requestId, mode };
     const key = `${requestId}:answer`;
-    setMessages((prev) => retry ? prev.map((m) => m.key === key ? { key, role: "assistant", text: "", status: "queued" } : m)
-      : [...prev, user, { key, role: "assistant", text: "", status: "queued" }]);
+    setMessages((prev) => retry ? prev.map((m) => m.key === key ? { key, role: "assistant", text: "", status: "queued", mode: user.mode } : m)
+      : [...prev, user, { key, role: "assistant", text: "", status: "queued", mode: user.mode }]);
     try {
       if (!session.current) {
         const data = await json("/api/ask/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
         session.current = data.sessionId; saveSession(data.sessionId);
       }
-      const post = () => json(`/api/ask/sessions/${session.current}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: user.text, clientRequestId: requestId }) });
+      const post = () => json(`/api/ask/sessions/${session.current}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: user.text, clientRequestId: requestId, mode: user.mode ?? "normal" }) });
       let data;
       try { data = await post(); }
       catch (e) {

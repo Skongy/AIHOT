@@ -1,0 +1,1 @@
+ALTER TABLE ask_tasks ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'normal';

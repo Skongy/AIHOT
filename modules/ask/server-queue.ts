@@ -14,8 +14,13 @@ export const askRunQueue = defineQueue<AskRunJob>({
   options: {
     policy: "short",
     retryLimit: 2,
-    retryDelay: 30,
+    // The task lease is 60s. A retry that arrives before it expires cannot claim the row, and that
+    // attempt is still completed, so the checkpoint would never run again. Keep the delay above the lease.
+    // Heartbeats fail a dead process on the supervisor's pass. Without them the job stayed active until
+    // expireInSeconds, and 600s plus this delay was the 12 minute wait seen on 2026-10-22.
+    retryDelay: 90,
     expireInSeconds: 600,
+    heartbeatSeconds: 30,
   },
   worker: { batchSize: 1, pollingIntervalSeconds: 1 },
   run: async (jobs) => {

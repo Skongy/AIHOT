@@ -10,6 +10,7 @@ import {
 import { sendAskProblem } from "./problem.ts";
 import { attachAskSse } from "./sse.ts";
 import { currentEvidence } from "../agent/evidence.ts";
+import { decideAskPost } from "./decide.ts";
 import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { config } from "@aihot/backend/config";
 
@@ -67,40 +68,33 @@ export function registerAskRoutes(app: FastifyInstance) {
 
     if (!config.modelCallsEnabled) return sendAskProblem(req, reply, { status: 503, code: "service_disabled", detail: "问答暂未开放，仍可浏览站内资讯与历史对话。" });
 
-    const body = (req.body ?? {}) as { message?: string; clientRequestId?: string };
-    const message = (body.message ?? "").trim();
-    const clientRequestId = (body.clientRequestId ?? "").trim();
-    if (!clientRequestId || !isUuid(clientRequestId)) {
-      return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "clientRequestId 必须是 uuid" });
-    }
-    const len = [...message].length;
-    if (len < 1 || len > 2000) {
-      return sendAskProblem(req, reply, { status: 400, code: "invalid_request", detail: "message 长度须为 1–2000 字" });
-    }
-
-    const existing = await findTaskByClientRequest(sessionId, clientRequestId);
-    if (existing) {
-      return reply.header("Cache-Control", "no-store").send({
-        taskId: existing.id,
-        status: existing.status === "running" ? "running" : existing.status === "queued" ? "queued" : existing.status,
-        resumeFromSeq: 0,
-      });
-    }
-
-    if (await hasActiveTask(sessionId)) {
-      return sendAskProblem(req, reply, { status: 409, code: "task_conflict", detail: "当前会话已有执行中的任务" });
+    const body = (req.body ?? {}) as { message?: string; clientRequestId?: string; mode?: unknown };
+    const existing = body.clientRequestId ? await findTaskByClientRequest(sessionId, body.clientRequestId.trim()) : null;
+    const decision = decideAskPost({
+      message: body.message ?? "",
+      clientRequestId: body.clientRequestId ?? "",
+      mode: body.mode,
+      existing,
+      active: existing ? false : await hasActiveTask(sessionId),
+    });
+    if (decision.kind === "problem") return sendAskProblem(req, reply, decision);
+    if (decision.kind === "replay") {
+      return reply.header("Cache-Control", "no-store").send({ taskId: decision.taskId, status: decision.status, resumeFromSeq: 0 });
     }
 
     let task;
     try {
       task = await sql.begin(async (tx) => {
-        const t = await createTask({ sessionId, clientRequestId, message }, tx);
-        await enqueueOn(askRunQueue, { taskId: t.id }, {}, tx);
+        const t = await createTask({ sessionId, clientRequestId: decision.clientRequestId, message: decision.message, mode: decision.mode }, tx);
+        // ask.run uses policy "short": created jobs that share a singleton key collapse to one row.
+        // An empty key made two sessions enqueue as the same job, and the loser stayed queued with no job.
+        const jobId = await enqueueOn(askRunQueue, { taskId: t.id }, { singletonKey: t.id }, tx);
+        if (!jobId) throw new Error("ask.run enqueue returned no job");
         return t;
       });
     } catch (e) {
       // Compensation if create somehow left a queued row without job.
-      const orphan = await findTaskByClientRequest(sessionId, clientRequestId);
+      const orphan = await findTaskByClientRequest(sessionId, decision.clientRequestId);
       if (orphan?.status === "queued") await markTaskEnqueueFailed(orphan.id, String(e).slice(0, 300));
       return sendAskProblem(req, reply, { status: 500, code: "internal_error", detail: "创建任务失败" });
     }
@@ -132,10 +126,15 @@ export function registerAskRoutes(app: FastifyInstance) {
     const steps = events
       .filter((e) => e.type === "step_start" || e.type === "step_end")
       .map((e) => ({ seq: e.seq, type: e.type, payload: redactEventPayload(task, e.type, e.payload) }));
+    const research = events
+      .filter((e) => e.type === "research_plan" || e.type === "research_step" || e.type === "research_claims" || e.type === "research_report")
+      .map((e) => ({ seq: e.seq, type: e.type, payload: redactEventPayload(task, e.type, e.payload) }));
 
     return reply.header("Cache-Control", "no-store").send({
       taskId: task.id,
       sessionId: task.session_id,
+      mode: task.mode,
+      planVersion: task.plan_version,
       status: task.status,
       modelCalls: task.model_calls,
       toolCalls: task.tool_calls,
@@ -145,6 +144,7 @@ export function registerAskRoutes(app: FastifyInstance) {
       finalAnswer: answers.finalAnswer,
       contentInvalidated: answers.contentInvalidated,
       steps,
+      research,
       evidence: evidenceView,
       snapshotSeq,
       receiptIds: task.active_receipt_id ? [task.active_receipt_id] : [],
