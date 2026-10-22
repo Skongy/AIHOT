@@ -121,6 +121,10 @@ export async function ensureQueue(name: string, options: QueueOptions = QUEUE_OP
   const b = await getBoss();
   const existing = await b.getQueue(name);
   if (!existing) await b.createQueue(name, options);
+  else if (options.heartbeatSeconds && existing.heartbeatSeconds !== options.heartbeatSeconds) {
+    // createQueue does not change a queue that already exists. Ask jobs inherit this column at send.
+    await b.updateQueue(name, { heartbeatSeconds: options.heartbeatSeconds });
+  }
   ensured.add(name);
 }
 

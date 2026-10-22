@@ -91,18 +91,94 @@ test("the report keeps supported facts, real dates, and real heat numbers", () =
   assert.equal(markdown.includes("热度上升导致停服"), true);
   assert.match(markdown, /不能写成因果关系|已从结论中移除/);
   assert.equal(report.summary.some((line) => line.includes("导致")), false);
-  assert.deepEqual(report.timeline.map((item) => item.evidenceId), [1, 2]);
-  assert.deepEqual(report.coverage, { official: 1, media: 1, unknown: 1 });
-  assert.equal(report.heat.find((item) => item.label === "热榜名次")?.value, "4");
+  assert.deepEqual(report.timeline.map((item) => item.evidenceId), [1]);
+  assert.deepEqual(report.coverage, { official: 1, media: 0, unknown: 0 });
+  assert.equal(report.heat.find((item) => item.label === "热榜名次"), undefined);
+  assert.equal(report.citations.some((item) => item.id === 2), false);
   assert.equal(report.chart, null);
-  assert.match(markdown, /不能据此断言热度变化的原因/);
+  assert.match(markdown, /这次没有可引用的热度统计/);
 });
 
-test("two observations of the same heat label can be charted, one snapshot cannot", () => {
+test("two supported observations of the same heat label can be charted, one snapshot cannot", () => {
   const later: VerifiableEvidence = { ...heat, id: 4, excerpt: "当前热榜第 2 名", publishedAt: "2026-05-04T00:00:00.000Z" };
-  const { report } = buildReport("热度", [], [heat, later]);
+  const supported = (text: string, id: number) => ({
+    index: id, text, kind: "fact" as const, status: "supported" as const, evidenceIds: [id], quote: text, note: "",
+  });
+  const { markdown, report } = buildReport("热度", [supported("当前热榜第 4 名", 3), supported("当前热榜第 2 名", 4)], [heat, later]);
   assert.equal(report.chart?.length, 2);
   assert.deepEqual(report.chart?.map((point) => point.value), [4, 2]);
+  assert.match(markdown, /不能据此断言热度变化的原因/);
+  const unverified = buildReport("热度", [], [heat, later]);
+  assert.equal(unverified.report.chart, null);
+  assert.equal(unverified.report.timeline.length, 0);
+});
+
+test("a different year stays out of the summary and the timeline", () => {
+  const old: VerifiableEvidence = {
+    id: 8, title: "2023 全球冠军赛回顾", sourceName: "游戏媒体", sourceType: "媒体报道",
+    excerpt: "Evil Geniuses曾在2023年夺得全球冠军赛冠军。", publishedAt: "2023-08-27T00:00:00.000Z", siteUrl: "/items/eg",
+  };
+  const current: VerifiableEvidence = {
+    id: 9, title: "LOUD 夺得 2026 冠军", sourceName: "触乐", sourceType: "媒体报道",
+    excerpt: "2026年巴西战队LOUD夺得冠军。", publishedAt: "2026-10-19T00:00:00.000Z", siteUrl: "/items/loud",
+  };
+  const rows = assessClaims([
+    claim("Evil Geniuses曾在2023年夺得全球冠军赛冠军。", [8], "Evil Geniuses曾在2023年夺得全球冠军赛冠军。"),
+    claim("2026年巴西战队LOUD夺得冠军。", [9], "2026年巴西战队LOUD夺得冠军。"),
+    claim("LOUD夺得冠军。", [8], "Evil Geniuses曾在2023年夺得全球冠军赛冠军。"),
+  ], [old, current], "2026 无畏契约全球冠军赛谁夺冠？");
+  assert.deepEqual(rows.map((row) => row.status), ["insufficient", "supported", "insufficient"]);
+  const { report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？", rows, [old, current]);
+  assert.equal(report.summary.length, 1);
+  assert.match(report.summary[0]!, /LOUD/);
+  assert.deepEqual(report.timeline.map((item) => item.evidenceId), [9]);
+  assert.equal(report.timeline[0]!.title, "2026年巴西战队LOUD夺得冠军。");
+});
+
+test("a timeline line uses the supported sentence, not an unverified headline", () => {
+  const item: VerifiableEvidence = {
+    id: 9, title: "2026《无畏契约》全球冠军赛在上海落幕，巴西战队LOUD夺冠",
+    sourceName: "触乐", sourceType: "媒体报道",
+    excerpt: "全球四大赛区16支队伍争夺225万美元总奖金。",
+    publishedAt: "2026-10-19T07:33:00.000Z", siteUrl: "/items/loud",
+  };
+  const supported = {
+    index: 1, text: "全球四大赛区16支队伍争夺225万美元总奖金", kind: "fact" as const,
+    status: "supported" as const, evidenceIds: [9], quote: item.excerpt!, note: "",
+  };
+  const rejected = {
+    index: 0, text: "2026《无畏契约》全球冠军赛的冠军是巴西战队LOUD", kind: "fact" as const,
+    status: "insufficient" as const, evidenceIds: [9], quote: "巴西战队LOUD夺得冠军",
+    note: "结论中的数字 2026 没有出现在所引原话里。",
+  };
+  const { markdown, report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？", [rejected, supported], [item]);
+  assert.equal(report.timeline.length, 1);
+  assert.equal(report.timeline[0]!.title, supported.text);
+  assert.doesNotMatch(markdown.split("## 官方与媒体")[0]!, /LOUD/);
+  assert.match(markdown, /尚未确认[\s\S]*LOUD/);
+  assert.match(markdown, /## 引用[\s\S]*LOUD夺冠/);
+});
+
+test("an older publication date is not an answer to a later year", () => {
+  const old: VerifiableEvidence = {
+    id: 10, title: "旧闻", sourceType: "媒体报道", excerpt: "巴西战队LOUD夺得冠军。", publishedAt: "2023-08-27T00:00:00.000Z",
+  };
+  const [row] = assessClaims([
+    claim("巴西战队LOUD夺得冠军。", [10], "巴西战队LOUD夺得冠军。"),
+  ], [old], "2026 无畏契约全球冠军赛谁夺冠？");
+  assert.equal(row!.status, "insufficient");
+  assert.match(row!.note, /年份/);
+});
+
+test("a question with no year can still cite an older sentence", () => {
+  const old: VerifiableEvidence = {
+    id: 8, title: "2023 全球冠军赛回顾", sourceName: "游戏媒体", sourceType: "媒体报道",
+    excerpt: "Evil Geniuses曾在2023年夺得全球冠军赛冠军。", publishedAt: "2023-08-27T00:00:00.000Z",
+  };
+  const [row] = assessClaims([
+    claim("Evil Geniuses曾在2023年夺得全球冠军赛冠军。", [8], "Evil Geniuses曾在2023年夺得全球冠军赛冠军。"),
+  ], [old], "无畏契约全球冠军赛的历史冠军是谁？");
+  assert.equal(row!.status, "supported");
 });
 
 function step(partial: Partial<StepState> & Pick<StepState, "index" | "goal" | "status">): StepState {

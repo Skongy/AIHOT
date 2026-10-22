@@ -6,7 +6,7 @@ import { decodeCursor, encodeCursor, InvalidCursorError, queryBinding } from "..
 import { sha256 } from "../lib/ids.ts";
 import { EMBEDDING_MODEL, embedQuery, embeddingsAvailable } from "../providers/embeddings.ts";
 import { API_ITEM_COLUMNS, API_ITEM_FROM, publicCategoryCondition, type ApiItemRow } from "./items.ts";
-import { publicMatchCondition, searchTerms, withSearchCapacity } from "./pool.ts";
+import { searchTerms, withSearchCapacity } from "./pool.ts";
 import { listedCondition, seatedCondition } from "./scope.ts";
 import { rowToV1 } from "./v1.ts";
 
@@ -46,8 +46,34 @@ function scopeFor(mode: AskItemsQuery["mode"], now: Date) {
   return mode === "selected" ? seatedCondition(now) : listedCondition(now);
 }
 
+// One query token and its aliases. Groups stay AND-ed, so a game name still has to match.
+const ASK_TERM_ALIASES: readonly (readonly string[])[] = [
+  ["联动", "联名"],
+  ["宾利", "bentley"],
+];
+
+/** Whitespace terms, with a closed alias list OR-ed inside a single term. */
+export function askSearchGroups(q: string): string[][] {
+  return searchTerms(q).map((term) => {
+    const aliases = ASK_TERM_ALIASES.find((group) => group.includes(term));
+    return aliases ? [...aliases] : [term];
+  });
+}
+
+function oneTerm(term: string) {
+  return sql`(p.search_text LIKE ${"%" + term + "%"} OR EXISTS (
+      SELECT 1 FROM pool_search ps WHERE ps.article_id = p.article_id AND ps.body LIKE ${"%" + term + "%"} OFFSET 0))`;
+}
+
+function askMatchCondition(groups: string[][]) {
+  return groups.reduce((acc, group) => {
+    const any = group.map(oneTerm).reduce((left, right) => sql`${left} OR ${right}`);
+    return sql`${acc} AND (${any})`;
+  }, sql``);
+}
+
 function matchFor(queries: string[]) {
-  const alternatives = queries.map((q) => sql`(TRUE ${publicMatchCondition(searchTerms(q))})`);
+  const alternatives = queries.map((q) => sql`(TRUE ${askMatchCondition(askSearchGroups(q))})`);
   return alternatives.length ? sql`AND (${alternatives.reduce((a, b) => sql`${a} OR ${b}`)})` : sql``;
 }
 

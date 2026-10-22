@@ -130,8 +130,26 @@ export function parseClaims(text: string): ProposedClaim[] | null {
   return claims;
 }
 
-export function assessClaims(proposed: ProposedClaim[], evidence: VerifiableEvidence[]): VerifiedClaim[] {
-  const preliminary = proposed.map((claim, index) => assessOne(claim, index, evidence));
+function yearsIn(text: string): Set<string> {
+  return new Set(text.match(/20\d{2}/g) ?? []);
+}
+
+/** A supported sentence about another year is not an answer to this question. */
+function missesAskedYear(question: string, claim: ProposedClaim, items: VerifiableEvidence[]): boolean {
+  const asked = yearsIn(question);
+  if (!asked.size) return false;
+  const stated = yearsIn(`${claim.text}\n${claim.quote}`);
+  if ([...stated].some((year) => asked.has(year))) return false;
+  if ([...stated].some((year) => !asked.has(year))) return true;
+  const published = new Set(items.flatMap((item) => {
+    const year = item.publishedAt?.match(/20\d{2}/)?.[0];
+    return year ? [year] : [];
+  }));
+  return published.size > 0 && ![...published].some((year) => asked.has(year));
+}
+
+export function assessClaims(proposed: ProposedClaim[], evidence: VerifiableEvidence[], question = ""): VerifiedClaim[] {
+  const preliminary = proposed.map((claim, index) => assessOne(claim, index, evidence, question));
   for (const claim of preliminary) {
     const rivals = claim.index >= 0
       ? proposed[claim.index]?.conflictsWith.filter((other) => other !== claim.index && preliminary[other]) ?? []
@@ -164,7 +182,7 @@ function boundClaim(claim: ProposedClaim, evidence: VerifiableEvidence[]): Propo
   return hits.length === 1 ? { ...claim, evidenceIds: [hits[0]!.id] } : claim;
 }
 
-function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvidence[]): VerifiedClaim {
+function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvidence[], question: string): VerifiedClaim {
   claim = boundClaim(claim, evidence);
   const items = citedItems(claim, evidence);
   const text = items.map(evidenceText).join("\n");
@@ -176,6 +194,9 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   const missingNumber = [...claim.text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]!).find((number) => !hasWholeNumber(claim.quote, number));
   if (missingNumber) {
     return { ...base, status: "insufficient", note: `结论中的数字 ${missingNumber} 没有出现在所引原话里。` };
+  }
+  if (missesAskedYear(question, claim, items)) {
+    return { ...base, status: "insufficient", note: "这条结论对不上问题里的年份，不能写入已证实结论。" };
   }
   if (CAUSAL.test(claim.text)) {
     return { ...base, kind: "inference", status: "withdrawn", note: "热度或时间上的同时出现不能写成因果关系，这条已从结论中移除。" };
@@ -236,11 +257,18 @@ function chartOf(heat: ReportHeatItem[]): ResearchReport["chart"] {
 
 export function buildReport(question: string, claims: VerifiedClaim[], evidence: VerifiableEvidence[]): { markdown: string; report: ResearchReport } {
   const supported = claims.filter((claim) => claim.status === "supported" && claim.kind === "fact");
-  const citedIds = new Set(claims.flatMap((claim) => claim.evidenceIds));
-  const shown = citedIds.size ? evidence.filter((item) => citedIds.has(item.id)) : evidence;
+  const shownIds = new Set(supported.flatMap((claim) => claim.evidenceIds));
+  const shown = evidence.filter((item) => shownIds.has(item.id));
   const timeline = shown
-    .filter((item) => item.publishedAt && item.title)
-    .map((item) => ({ at: item.publishedAt!, title: item.title!, evidenceId: item.id, sourceType: sourceTypeOf(item.sourceType) }))
+    .filter((item) => item.publishedAt)
+    .map((item) => ({
+      // The article title can state a fact this pass rejected. The line is only the supported sentences.
+      at: item.publishedAt!,
+      title: supported.filter((claim) => claim.evidenceIds.includes(item.id)).map((claim) => claim.text).join("；"),
+      evidenceId: item.id,
+      sourceType: sourceTypeOf(item.sourceType),
+    }))
+    .filter((item) => item.title)
     .sort((a, b) => a.at.localeCompare(b.at));
   const coverage = { official: 0, media: 0, unknown: 0 };
   for (const item of shown) {
@@ -299,7 +327,9 @@ export function buildReport(question: string, claims: VerifiedClaim[], evidence:
     ...(uncertainty.length ? uncertainty.map((item) => `- ${item.note} ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`) : ["没有需要降级或删除的主张。"]),
     "",
     "## 引用",
-    ...(citations.length ? citations.map((item) => `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}`) : ["没有登记证据。"]),
+    ...(citations.length
+      ? citations.map((item) => `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}`)
+      : [evidence.length ? "没有被已证实结论引用的资料。" : "没有登记证据。"]),
   ];
   return { markdown: lines.join("\n"), report };
 }

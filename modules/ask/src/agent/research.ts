@@ -29,6 +29,9 @@ export const DEEP_LIMITS = {
   MAX_REPLANS: 1,
 } as const;
 
+/** A gap longer than the task lease is time the worker was gone, not research time. */
+export const RESEARCH_CONTINUITY_MS = 60_000;
+
 const PROMPT_VERSION = "ask-research-v1";
 const TERMINAL = new Set<TaskStatus>(["completed", "completed_degraded", "failed", "cancelled", "limit_reached"]);
 const ID_TOOLS = new Set<AskToolName>(["get_story", "get_article", "explain_hot", "explain_selection"]);
@@ -85,6 +88,9 @@ export interface TaskResearchCheckpoint {
   supplements?: number;
   supplementPhase?: "started" | "done";
   needsSupplement?: boolean;
+  /** Time the worker actually held the task. Queue downtime is not included. */
+  activeMs?: number;
+  activeMarkMs?: number;
 }
 
 export interface ResearchState {
@@ -181,7 +187,18 @@ export function taskCheckpoint(value: unknown): TaskResearchCheckpoint {
     supplements: typeof row.supplements === "number" ? row.supplements : 0,
     supplementPhase: row.supplementPhase === "started" || row.supplementPhase === "done" ? row.supplementPhase : undefined,
     needsSupplement: row.needsSupplement === true,
+    activeMs: typeof row.activeMs === "number" && row.activeMs >= 0 ? row.activeMs : 0,
+    activeMarkMs: num("activeMarkMs"),
   };
+}
+
+/** Active research time. The first sample counts from the task start; a later gap past the lease does not. */
+export function researchClock(startedMs: number, nowMs: number, checkpoint: { activeMs?: number; activeMarkMs?: number }): { activeMs: number; activeMarkMs: number } {
+  const hasMark = typeof checkpoint.activeMarkMs === "number";
+  const mark = hasMark ? checkpoint.activeMarkMs! : startedMs;
+  const gap = Math.max(0, nowMs - mark);
+  const count = !hasMark || gap <= RESEARCH_CONTINUITY_MS;
+  return { activeMs: (checkpoint.activeMs ?? 0) + (count ? gap : 0), activeMarkMs: nowMs };
 }
 
 export function quotedNames(text: string): string[] {
@@ -541,7 +558,7 @@ async function ensureRound(run: ResearchRun, round: number): Promise<void> {
   if ((await run.load()).modelCalls < round) await run.bumpModel();
 }
 
-type Paid = ChatToolsStreamResult | "stopped" | "fallback";
+type Paid = ChatToolsStreamResult | "stopped" | "fallback" | "unpaid";
 
 async function pay(run: ResearchRun, opts: ChatToolsStreamOptions, other: "fallback" | "fail-step"): Promise<Paid> {
   try {
@@ -555,12 +572,14 @@ async function pay(run: ResearchRun, opts: ChatToolsStreamOptions, other: "fallb
       await conclude(run, "failed", citedFallback(loaded.evidence, "服务预算不足，以下只保留已经检索到的资料。"), { code: "budget_exhausted", message: "服务预算不足" });
       return "stopped";
     }
-    if (error instanceof ReceiptUnknownError || error instanceof ReceiptBusyError) {
-      if (error instanceof ReceiptUnknownError) await run.noteReceipt(error.receiptId);
+    if (error instanceof ReceiptUnknownError) {
+      await run.noteReceipt(error.receiptId);
       const loaded = await run.load();
       await conclude(run, "failed", citedFallback(loaded.evidence, "付费回执结果不明，未自动重试。"), { code: "receipt_unknown", message: "付费回执结果不明，未自动重试。" });
       return "stopped";
     }
+    // Pending means the provider call was not started again. The caller skips this round.
+    if (error instanceof ReceiptBusyError) return "unpaid";
     if (other === "fallback") return "fallback";
     throw error;
   }
@@ -609,14 +628,19 @@ export async function runResearchDriver(run: ResearchRun): Promise<void> {
       await run.renew();
       const loaded = await run.load();
       if (TERMINAL.has(loaded.status)) return;
+      const nowMs = run.now();
+      const clock = researchClock(loaded.startedMs, nowMs, loaded.checkpoint);
+      const markMoved = clock.activeMs !== loaded.checkpoint.activeMs || clock.activeMarkMs !== loaded.checkpoint.activeMarkMs;
+      loaded.checkpoint = { ...loaded.checkpoint, activeMs: clock.activeMs, activeMarkMs: clock.activeMarkMs };
+      if (markMoved) await run.saveCheckpoint(loaded.checkpoint);
       const action = nextResearchAction({
         question: run.question,
         cancelRequested: loaded.cancelRequested,
         modelCalls: loaded.modelCalls,
         toolCalls: loaded.toolCalls,
         planVersion: loaded.planVersion,
-        startedMs: loaded.startedMs,
-        nowMs: run.now(),
+        startedMs: nowMs - clock.activeMs,
+        nowMs,
         evidenceCount: loaded.evidence.length,
         steps: loaded.steps,
         checkpoint: loaded.checkpoint,
@@ -715,6 +739,10 @@ async function plan(run: ResearchRun, loaded: LoadedResearch, resume: boolean): 
     maxTokens: 800,
   }, "fallback");
   if (result === "stopped") return true;
+  if (result === "unpaid") {
+    await run.saveCheckpoint({ ...(await run.load()).checkpoint, planResumedOnce: true });
+    return false;
+  }
   const current = await run.load();
   const nextCheckpoint = { ...current.checkpoint, planReceiptId: result === "fallback" ? current.checkpoint.planReceiptId : result.receiptId };
   const parsed = result === "fallback" ? null : parseResearchPlan(result.content);
@@ -750,6 +778,10 @@ async function replan(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     maxTokens: 800,
   }, "fallback");
   if (result === "stopped") return true;
+  if (result === "unpaid") {
+    await run.saveCheckpoint({ ...(await run.load()).checkpoint, replanPending: false, replanResumedOnce: true, replans: Math.max(loaded.checkpoint.replans, 1) });
+    return false;
+  }
   const current = await run.load();
   const parsed = result === "fallback" ? null : parseReplan(result.content, done.map((step) => step.index), nextIndex);
   const nextCheckpoint = {
@@ -812,6 +844,13 @@ get_story、get_article、explain_hot、explain_selection 的 ID 必须出现在
     return false;
   }
   if (result === "stopped") return true;
+  if (result === "unpaid") {
+    const failed = { ...step, status: "failed" as const, summary: "这一步的模型调用没有完成，未再次付费" };
+    await run.saveStep(failed);
+    await emitStep(run, failed);
+    await rememberReplan(run, failed);
+    return false;
+  }
   const allowed = result === "fallback" ? null : firstAllowedTool(result);
   const done: StepState = {
     ...step,
@@ -922,6 +961,10 @@ async function synthesis(run: ResearchRun, loaded: LoadedResearch, resume: boole
     maxTokens: 2048,
   }, "fallback");
   if (result === "stopped") return true;
+  if (result === "unpaid") {
+    await run.saveCheckpoint({ ...(await run.load()).checkpoint, synthesisResumedOnce: true });
+    return false;
+  }
   const fresh = await run.load();
   const answer = result === "fallback"
     ? citedFallback(fresh.evidence, "这次没能整理成完整回答。以下为已登记来源：")
@@ -960,9 +1003,13 @@ quote 不能改写。结论里的每个数字都必须原样出现在 quote 里�
     maxTokens: 1200,
   }, "fallback");
   if (result === "stopped") return true;
+  if (result === "unpaid") {
+    await run.saveCheckpoint({ ...(await run.load()).checkpoint, verifyResumedOnce: true });
+    return false;
+  }
   const fresh = await run.load();
   const proposed = result === "fallback" ? null : parseClaims(result.content);
-  const assessed = proposed ? assessClaims(proposed, fresh.evidence) : [];
+  const assessed = proposed ? assessClaims(proposed, fresh.evidence, run.question) : [];
   const firstPass = (fresh.checkpoint.verifyPasses ?? 0) === 0;
   const claims = (firstPass ? assessed : [...assessed, ...fresh.claims.filter((old) => !assessed.some((next) => next.text === old.text))])
     .map((claim, index) => ({ ...claim, index }));

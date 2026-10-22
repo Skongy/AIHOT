@@ -3,12 +3,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { ReceiptUnknownError } from "@aihot/backend/providers/receipts";
+import { ReceiptBusyError, ReceiptUnknownError } from "@aihot/backend/providers/receipts";
 import type { ChatToolCall, ChatToolsStreamOptions, ChatToolsStreamResult } from "@aihot/backend/providers/llm";
 import { decideAskPost } from "../src/http/decide.ts";
 import {
   DEEP_LIMITS, directToolArgs, fallbackResearchPlan, inferWindow, nextResearchAction, parseReplan, parseResearchPlan,
-  runResearchDriver, searchQueryFromQuestion, taskCheckpoint,
+  researchClock, runResearchDriver, searchQueryFromQuestion, taskCheckpoint,
   type LoadedResearch, type ResearchRun, type ResearchState, type StepState,
 } from "../src/agent/research.ts";
 import { ASK_TOOL_NAMES, type AskToolName, type ToolExecResult } from "../src/tools/whitelist.ts";
@@ -174,6 +174,26 @@ test("deep limits stay separate from the normal ask loop", () => {
   const queue = readFileSync(new URL("../server-queue.ts", import.meta.url), "utf8");
   assert.match(queue, /retryDelay: 90/);
   assert.match(queue, /expireInSeconds: 600/);
+  assert.match(queue, /heartbeatSeconds: 30/);
+});
+
+test("queue downtime does not spend the research clock", () => {
+  const started = 1_000;
+  const fresh = researchClock(started, started + 1_000, {});
+  assert.equal(fresh.activeMs, 1_000);
+  const now = started + 12 * 60_000;
+  const crashed = researchClock(started, now, { activeMs: 8_000, activeMarkMs: started + 8_000 });
+  assert.equal(crashed.activeMs, 8_000);
+  const action = nextResearchAction(state({
+    startedMs: now - crashed.activeMs,
+    nowMs: now,
+    evidenceCount: 1,
+    steps: [step({ index: 0, goal: "检索", status: "pending", tool: "search" })],
+  }));
+  assert.equal(action.type, "call_tool");
+  const marked = taskCheckpoint({ activeMs: 8_000, activeMarkMs: started + 8_000 });
+  assert.equal(marked.activeMs, 8_000);
+  assert.equal(marked.activeMarkMs, started + 8_000);
 });
 
 test("plan parser keeps only known tools, earlier dependencies, and four steps", () => {
@@ -409,6 +429,29 @@ test("resuming a paid step reuses its round, and cancel does not start the next 
   assert.equal(world.bumps.model, 0);
   assert.deepEqual(world.executed, []);
   assert.equal(world.box.current.status, "cancelled");
+});
+
+test("a busy step receipt is not paid again", async () => {
+  const world = harness({
+    script: () => { throw new ReceiptBusyError("busy"); },
+    seed: {
+      status: "running",
+      modelCalls: 1,
+      planVersion: 1,
+      steps: [step({
+        index: 0, goal: "读取事件", status: "running", tool: "get_story",
+        checkpoint: { phase: "model_started", roundIndex: 1 },
+      })],
+      checkpoint: taskCheckpoint({ replans: 1 }),
+    },
+  });
+  await runResearchDriver(world.run);
+  assert.equal(world.chats.filter((item) => item.purpose === "ask.research_step").length, 1);
+  assert.equal(world.box.current.steps[0]?.status, "failed");
+  assert.equal(world.box.current.status, "completed");
+  const calls = world.chats.length;
+  await runResearchDriver(world.run);
+  assert.equal(world.chats.length, calls);
 });
 
 test("a second resume of an unfinished model step fails without another chat", async () => {
