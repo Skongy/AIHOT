@@ -362,13 +362,13 @@ test("a crashed verification resumes the same round without another model charge
   assert.equal(row!.model_calls, 4);
   assert.equal(row!.status, "completed_degraded");
   // The resumed round is not charged twice. One repair still cannot parse claims, so the
-  // retrieved row is listed as an unverified report and stays out of the verified conclusion.
+  // user-facing answer stays concise while the retrieved row remains in the persisted report.
   assert.match(row!.final_answer ?? "", /没能核对出可靠结论/);
-  assert.match(row!.final_answer ?? "", /来源报道但尚未核实/);
-  assert.match(row!.final_answer ?? "", /无畏契约 测试更新/);
+  assert.match(row!.final_answer ?? "", /另有 1 条检索结果/);
+  assert.equal((await listEvidence(task.id)).some((item) => item.title === "无畏契约 测试更新"), true);
+  assert.doesNotMatch(row!.final_answer ?? "", /无畏契约 测试更新/);
   const conclusion = row!.final_answer?.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
   assert.doesNotMatch(conclusion, /\[1\]/);
-  assert.match(row!.final_answer ?? "", /\[1\]/);
   assert.doesNotMatch(row!.final_answer ?? "", /草稿认为/);
   let extra = 0;
   await runDeepResearch({ taskId: task.id, workerId: "worker-verify-again", chat: async () => { extra += 1; return fake("不是 JSON"); } });
