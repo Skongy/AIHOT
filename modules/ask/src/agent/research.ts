@@ -85,6 +85,10 @@ export interface TaskResearchCheckpoint {
   verifyRound?: number;
   verifyReceiptId?: number;
   verifyResumedOnce?: boolean;
+  /** One extra verify call after the model returned no parseable claims. */
+  verifyRepairUsed?: boolean;
+  /** The last verify pass produced no claims. The report must say so. */
+  verifyUnparsed?: boolean;
   supplements?: number;
   supplementPhase?: "started" | "done";
   needsSupplement?: boolean;
@@ -184,6 +188,8 @@ export function taskCheckpoint(value: unknown): TaskResearchCheckpoint {
     verifyRound: num("verifyRound"),
     verifyReceiptId: num("verifyReceiptId"),
     verifyResumedOnce: row.verifyResumedOnce === true,
+    verifyRepairUsed: row.verifyRepairUsed === true,
+    verifyUnparsed: row.verifyUnparsed === true,
     supplements: typeof row.supplements === "number" ? row.supplements : 0,
     supplementPhase: row.supplementPhase === "started" || row.supplementPhase === "done" ? row.supplementPhase : undefined,
     needsSupplement: row.needsSupplement === true,
@@ -506,11 +512,13 @@ function clockLine(ms: number): string {
 
 function evidenceLines(evidence: LoadedResearch["evidence"]): string {
   if (!evidence.length) return "（还没有可引用资料）";
+  const at = (label: string, value: string | null | undefined) => value ? ` · ${label} ${beijingDate(value)} ${beijingTime(value)}` : "";
   return evidence.map((item) => {
     const source = item.sourceName ? ` · ${item.sourceName}` : "";
     const type = item.sourceType ? ` · ${sourceTypeOf(item.sourceType)}` : "";
-    const excerpt = item.excerpt ? `\n    ${item.excerpt.slice(0, 180)}` : "";
-    return `[${item.id}] ${item.title ?? item.kind ?? "资料"}${source}${type}${excerpt}`;
+    const excerpt = item.excerpt ? `\n    摘要：${item.excerpt.slice(0, 400)}` : "";
+    const body = item.bodyExcerpt ? `\n    公开正文：${item.bodyExcerpt.slice(0, 800)}` : "";
+    return `[${item.id}] ${item.title ?? item.kind ?? "资料"}${source}${type}${at("报道发布", item.publishedAt)}${at("站内时间", item.timelineAt)}${excerpt}${body}`;
   }).join("\n");
 }
 
@@ -993,8 +1001,8 @@ async function verify(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     promptVersion: PROMPT_VERSION,
     system: `${clockLine(started)}
 你只核验下面的草稿。只输出 JSON，不要写报告。
-格式：{"claims":[{"text":"一句可核验的事实","kind":"fact 或 inference","evidenceIds":[已有编号],"quote":"从对应证据标题或摘录中逐字复制的原话","conflictsWith":[]}]}
-quote 不能改写。结论里的每个数字都必须原样出现在 quote 里。官方表态只能引用来源类型为官方来源的材料。热度变化不能写成原因。最多 8 条。`,
+格式：{"claims":[{"text":"一句可核验的事实","kind":"fact 或 inference","evidenceIds":[已有编号],"quote":"从对应证据标题、摘要或公开正文中逐字复制的原话","conflictsWith":[]}]}
+quote 不能改写。结论里的每个数字都必须原样出现在 quote 里。官方表态只能引用来源类型为官方来源的材料。热度变化不能写成原因。报道发布时间和站内时间不是事件发生时间。最多 8 条。${checkpoint.verifyRepairUsed ? "\n上一次没有输出可解析的 claims。这次只输出一个 JSON 对象。" : ""}`,
     messages: [{ role: "user", content: `问题：${run.question}\n草稿：\n${loaded.draft || "（没有草稿）"}\n可引用资料：\n${evidenceLines(loaded.evidence)}` }],
     tools: [],
     taskId: run.taskId,
@@ -1009,6 +1017,17 @@ quote 不能改写。结论里的每个数字都必须原样出现在 quote 里�
   }
   const fresh = await run.load();
   const proposed = result === "fallback" ? null : parseClaims(result.content);
+  const unusable = !proposed || proposed.length === 0;
+  if (unusable && fresh.checkpoint.verifyRepairUsed !== true && fresh.modelCalls < DEEP_LIMITS.MAX_MODEL + DEEP_LIMITS.MAX_VERIFY) {
+    await run.saveCheckpoint({
+      ...fresh.checkpoint,
+      verifyRepairUsed: true,
+      verifyRound: undefined,
+      verifyReceiptId: undefined,
+      verifyResumedOnce: false,
+    });
+    return false;
+  }
   const assessed = proposed ? assessClaims(proposed, fresh.evidence, run.question) : [];
   const firstPass = (fresh.checkpoint.verifyPasses ?? 0) === 0;
   const claims = (firstPass ? assessed : [...assessed, ...fresh.claims.filter((old) => !assessed.some((next) => next.text === old.text))])
@@ -1023,6 +1042,7 @@ quote 不能改写。结论里的每个数字都必须原样出现在 quote 里�
     verifyRound: undefined,
     verifyReceiptId: undefined,
     verifyResumedOnce: false,
+    verifyUnparsed: unusable,
     needsSupplement: !!query,
   });
   return false;
@@ -1057,7 +1077,7 @@ async function supplement(run: ResearchRun, loaded: LoadedResearch): Promise<boo
 
 async function finishReport(run: ResearchRun, loaded: LoadedResearch): Promise<boolean> {
   const fresh = await run.load();
-  const { markdown, report } = buildReport(run.question, fresh.claims, fresh.evidence);
+  const { markdown, report } = buildReport(run.question, fresh.claims, fresh.evidence, { unparsed: fresh.checkpoint.verifyUnparsed === true });
   const check = checkCitations(markdown, fresh.evidence.map((item) => item.id));
   await run.emit("citation_check", { ok: check.ok, issues: check.issues });
   await run.emit("research_report", { report });
@@ -1167,7 +1187,9 @@ export async function runDeepResearch(opts: { taskId: string; workerId: string; 
             sourceName: item.source_name,
             sourceType: sourceTypeOf(typeof raw.sourceType === "string" ? raw.sourceType : null, raw.firstParty),
             excerpt: typeof raw.excerpt === "string" ? raw.excerpt : "",
+            bodyExcerpt: typeof raw.bodyExcerpt === "string" ? raw.bodyExcerpt : "",
             publishedAt: item.published_at?.toISOString() ?? null,
+            timelineAt: typeof raw.timelineAt === "string" ? raw.timelineAt : null,
             siteUrl: item.site_url,
           };
         }),

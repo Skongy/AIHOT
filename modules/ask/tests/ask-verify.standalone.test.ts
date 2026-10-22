@@ -92,11 +92,15 @@ test("the report keeps supported facts, real dates, and real heat numbers", () =
   assert.match(markdown, /不能写成因果关系|已从结论中移除/);
   assert.equal(report.summary.some((line) => line.includes("导致")), false);
   assert.deepEqual(report.timeline.map((item) => item.evidenceId), [1]);
-  assert.deepEqual(report.coverage, { official: 1, media: 0, unknown: 0 });
+  assert.equal(report.timeline[0]!.credibility, "已证实");
+  assert.deepEqual(report.coverage, { official: 1, media: 1, unknown: 1, cited: 1 });
   assert.equal(report.heat.find((item) => item.label === "热榜名次"), undefined);
   assert.equal(report.citations.some((item) => item.id === 2), false);
+  assert.equal(report.reported.some((item) => item.id === 2), true);
   assert.equal(report.chart, null);
-  assert.match(markdown, /这次没有可引用的热度统计/);
+  assert.equal(markdown.includes("## 热度观察"), false);
+  assert.match(markdown, /来源报道但尚未核实/);
+  assert.match(markdown, /这次检索到 3 条/);
 });
 
 test("two supported observations of the same heat label can be charted, one snapshot cannot", () => {
@@ -111,6 +115,9 @@ test("two supported observations of the same heat label can be charted, one snap
   const unverified = buildReport("热度", [], [heat, later]);
   assert.equal(unverified.report.chart, null);
   assert.equal(unverified.report.timeline.length, 0);
+  assert.equal(unverified.report.reported.length, 2);
+  assert.match(unverified.markdown, /来源报道但尚未核实/);
+  assert.match(unverified.markdown, /不能把来源报道写成已证实事实/);
 });
 
 test("a different year stays out of the summary and the timeline", () => {
@@ -253,6 +260,39 @@ function reply(content: string): ChatToolsStreamResult {
   return { content, toolCalls: [], finishReason: "stop", receiptId: 1, reused: false, model: "fake", usage: null, jsonModeForced: false };
 }
 
+test("retrieved reports stay visible when verification cannot support a claim", () => {
+  const { markdown, report } = buildReport("梳理《无畏契约》最近一个月的重要事件和发展时间线", [], [media], { unparsed: true });
+  assert.equal(report.summary.length, 0);
+  assert.equal(report.coverage.media, 1);
+  assert.equal(report.coverage.cited, 0);
+  assert.equal(report.reported[0]!.id, 2);
+  assert.match(markdown, /核验输出无法解析/);
+  assert.match(markdown, /媒体猜测冠军皮肤/);
+  assert.match(markdown, /\[2\]/);
+  assert.match(markdown, /报道发布/);
+  const conclusion = markdown.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
+  assert.doesNotMatch(conclusion, /\[2\]/);
+  assert.match(markdown.split("## 来源报道但尚未核实")[1] ?? "", /\[2\]/);
+});
+
+test("a date in the source is not labeled as the publication time", () => {
+  const dated: VerifiableEvidence = {
+    ...media,
+    excerpt: "新特工将于10月27日加入游戏。",
+    publishedAt: "2026-10-21T03:31:38.000Z",
+    timelineAt: "2026-10-21T04:05:32.827Z",
+  };
+  const { markdown, report } = buildReport("梳理《无畏契约》最近一个月的重要事件", [], [dated]);
+  assert.equal(report.reported[0]!.mentioned, "10月27日");
+  assert.match(markdown, /报道中写到 10月27日，这不是报道发布时间/);
+  assert.match(markdown, /站内时间/);
+  const [kept] = assessClaims([
+    claim("新特工将于2026年10月27日加入游戏。", [2], "新特工将于10月27日加入游戏。"),
+  ], [dated], "梳理《无畏契约》最近一个月的重要事件");
+  assert.equal(kept!.status, "insufficient");
+  assert.match(kept!.note, /2026/);
+});
+
 test("an unsupported fact gets one search, then a matching quote can be kept", async () => {
   let pass = 0;
   const driver = world(() => {
@@ -269,6 +309,35 @@ test("an unsupported fact gets one search, then a matching quote can be kept", a
   assert.equal(driver.box.current.claims.some((item) => item.status === "supported"), true);
   assert.equal(driver.box.current.status, "completed");
   assert.match(driver.box.current.draft, /核心结论/);
+});
+
+test("an unparsed verification is repaired once, then the sources stay labeled", async () => {
+  let pass = 0;
+  const driver = world(() => {
+    pass += 1;
+    if (pass === 1) return reply("我先写一份完整报告，不输出 JSON。");
+    return reply(JSON.stringify({ claims: [claim("有报道猜测冠军皮肤可能在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出")] }));
+  });
+  await runResearchDriver(driver.run);
+  assert.deepEqual(driver.chats, ["ask.research_verify", "ask.research_verify"]);
+  assert.equal(driver.box.current.modelCalls, 4);
+  assert.equal(driver.box.current.status, "completed");
+  assert.match(driver.box.current.draft, /核心结论/);
+  assert.match(driver.box.current.draft, /冠军皮肤/);
+  assert.doesNotMatch(driver.box.current.draft, /草稿认为/);
+});
+
+test("two unparsed verifications list the retrieved source and drop the draft", async () => {
+  const driver = world(() => reply("仍然不是 JSON"));
+  await runResearchDriver(driver.run);
+  assert.deepEqual(driver.chats, ["ask.research_verify", "ask.research_verify"]);
+  assert.equal(driver.box.current.status, "completed_degraded");
+  assert.match(driver.box.current.draft, /核验输出无法解析/);
+  assert.match(driver.box.current.draft, /媒体猜测冠军皮肤/);
+  assert.match(driver.box.current.draft, /\[2\]/);
+  const conclusion = driver.box.current.draft.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
+  assert.doesNotMatch(conclusion, /\[2\]/);
+  assert.doesNotMatch(driver.box.current.draft, /草稿认为/);
 });
 
 test("verifier failure, exhausted verify budget, and cancel do not publish the draft", async () => {
