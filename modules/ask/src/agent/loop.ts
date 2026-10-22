@@ -16,6 +16,7 @@ import { askSystemPrompt, PROMPT_VERSION } from "./prompt.ts";
 import { checkCitations, extractXmlToolCalls, stripAskModelText, stripThinkTagsStreaming } from "./citations.ts";
 import { currentEvidence, historySources } from "./evidence.ts";
 import { runDeepResearch } from "./research.ts";
+import { conversationAnswer } from "./conversation.ts";
 
 const MAX_MODEL = 6;
 const MAX_TOOL = 8;
@@ -90,6 +91,16 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
   if (!task) return;
 
   await appendEvent(opts.taskId, "task_status", { status: "running" });
+
+  const conversational = task.model_calls === 0 && task.tool_calls === 0 ? conversationAnswer(task.user_message) : null;
+  if (conversational && !task.cancel_requested) {
+    await updateDraft(opts.taskId, conversational);
+    await finishTask(opts.taskId, opts.workerId, "completed", { finalAnswer: conversational });
+    await insertAssistantMessage(task.session_id, opts.taskId, conversational);
+    await appendEvent(opts.taskId, "answer_done", { text: conversational, finishReason: "direct" });
+    await appendEvent(opts.taskId, "task_status", { status: "completed" });
+    return;
+  }
 
   const system = askSystemPrompt();
   const history = await listMessages(task.session_id, 20);

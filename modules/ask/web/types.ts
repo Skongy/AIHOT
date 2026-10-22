@@ -8,6 +8,8 @@ export type ReportTimelineItem = { at: string; timelineAt?: string | null; menti
 export type ReportedItem = { id: number; title: string; sourceName: string | null; sourceType: string; siteUrl: string | null; publishedAt: string | null; timelineAt: string | null; mentioned: string | null; excerpt: string | null };
 export type ReportHeatItem = { label: string; value: string; evidenceId: number };
 export type ResearchReportView = {
+  showTimeline?: boolean;
+  showCoverage?: boolean;
   lead?: string;
   summary: string[];
   timeline: ReportTimelineItem[];
@@ -113,7 +115,7 @@ export function reportFromPayload(payload: Record<string, unknown>): ResearchRep
       title: row.title,
       evidenceId: row.evidenceId as number,
       sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知",
-      credibility: typeof row.credibility === "string" ? row.credibility : "已证实",
+      credibility: typeof row.credibility === "string" ? row.credibility : "来源支持",
     }];
   }) : [];
   const heat = Array.isArray(report.heat) ? report.heat.flatMap((item) => {
@@ -172,6 +174,8 @@ export function reportFromPayload(payload: Record<string, unknown>): ResearchRep
   if (!textList(report.summary).length && !timeline.length && !citations.length && !uncertainty.length && !reported.length && typeof report.lead !== "string") return undefined;
   return {
     lead: typeof report.lead === "string" ? report.lead : undefined,
+    showTimeline: typeof report.showTimeline === "boolean" ? report.showTimeline : undefined,
+    showCoverage: typeof report.showCoverage === "boolean" ? report.showCoverage : undefined,
     summary: textList(report.summary),
     timeline,
     reported,

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 
-export const PROMPT_VERSION = "ask-system-v4";
+export const PROMPT_VERSION = "ask-system-v5";
 
 const SYSTEM = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../prompts/system-v1.md"), "utf8");
 

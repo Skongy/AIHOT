@@ -33,6 +33,9 @@ export interface ProposedClaim {
   evidenceIds: number[];
   quote: string;
   conflictsWith: number[];
+  /** Model semantic review, independently constrained by quote/number/source checks below. */
+  relevant?: boolean;
+  entailed?: boolean;
 }
 
 export interface VerifiedClaim {
@@ -53,7 +56,7 @@ export interface ReportTimelineItem {
   title: string;
   evidenceId: number;
   sourceType: SourceType;
-  credibility: "已证实" | "来源报道但尚未核实";
+  credibility: "来源支持" | "来源报道但尚未核实";
 }
 
 export interface ReportedItem {
@@ -75,6 +78,8 @@ export interface ReportHeatItem {
 }
 
 export interface ResearchReport {
+  showTimeline: boolean;
+  showCoverage: boolean;
   lead: string;
   summary: string[];
   timeline: ReportTimelineItem[];
@@ -154,6 +159,8 @@ export function parseClaims(text: string): ProposedClaim[] | null {
       evidenceIds,
       quote,
       conflictsWith,
+      relevant: typeof record.relevant === "boolean" ? record.relevant : undefined,
+      entailed: typeof record.entailed === "boolean" ? record.entailed : undefined,
     });
   }
   return claims;
@@ -191,12 +198,12 @@ export function assessClaims(proposed: ProposedClaim[], evidence: VerifiableEvid
     });
     if (quoteFound && rivalFound) {
       claim.status = "contradicted";
-      claim.note = "与另一条已核到引文的主张互相矛盾，两条都不作为已证实结论。";
+      claim.note = "与另一条已核到引文的主张互相矛盾，两条都不进入核心结论。";
       for (const other of rivals) {
         const rival = preliminary[other];
         if (!rival || (rival.status !== "supported" && rival.status !== "disputed")) continue;
         rival.status = "contradicted";
-        rival.note = "与另一条已核到引文的主张互相矛盾，两条都不作为已证实结论。";
+        rival.note = "与另一条已核到引文的主张互相矛盾，两条都不进入核心结论。";
       }
     }
   }
@@ -214,10 +221,14 @@ function boundClaim(claim: ProposedClaim, evidence: VerifiableEvidence[]): Propo
 function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvidence[], question: string): VerifiedClaim {
   claim = boundClaim(claim, evidence);
   const items = citedItems(claim, evidence);
-  const text = items.map(evidenceText).join("\n");
   const quote = compact(claim.quote);
   const base = { index, text: claim.text, kind: claim.kind, evidenceIds: items.map((item) => item.id), quote: claim.quote };
-  if (!items.length || !quote || !compact(text).includes(quote)) {
+  if (claim.relevant === false) return { ...base, status: "withdrawn", note: "这条内容没有回答本轮问题，已排除。" };
+  if (claim.entailed === false) return { ...base, status: "withdrawn", note: "引文没有支持这条结论的含义，已排除。" };
+  if (claim.relevant !== true || claim.entailed !== true) {
+    return { ...base, status: "insufficient", note: "尚未完成问题相关性与语义支持检查。" };
+  }
+  if (!items.length || !quote || !items.some((item) => compact(evidenceText(item)).includes(quote))) {
     return { ...base, status: "insufficient", note: items.length ? "引用的证据里没有这句原话，不能据此下结论。" : "没有对应的已登记证据。" };
   }
   const missingNumber = [...claim.text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]!).find((number) => !hasWholeNumber(claim.quote, number));
@@ -225,13 +236,13 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
     return { ...base, status: "insufficient", note: `结论中的数字 ${missingNumber} 没有出现在所引原话里。` };
   }
   if (missesAskedYear(question, claim, items)) {
-    return { ...base, status: "insufficient", note: "这条结论对不上问题里的年份，不能写入已证实结论。" };
+    return { ...base, status: "insufficient", note: "这条结论对不上问题里的年份，不能写入来源支持结论。" };
   }
   if (CAUSAL.test(claim.text)) {
     return { ...base, kind: "inference", status: "withdrawn", note: "热度或时间上的同时出现不能写成因果关系，这条已从结论中移除。" };
   }
   if (claim.kind === "inference") {
-    return { ...base, status: "withdrawn", note: "这是推测，不写入已证实结论。" };
+    return { ...base, status: "withdrawn", note: "这是推测，不写入来源支持结论。" };
   }
   if (OFFICIAL_SAY.test(claim.text) && !items.some((item) => sourceTypeOf(item.sourceType) === "官方来源")) {
     return { ...base, status: "disputed", note: "结论写成了官方表态，但所引证据没有官方来源。" };
@@ -240,7 +251,7 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   if (types.has("官方来源") && types.has("媒体报道") && !items.filter((item) => sourceTypeOf(item.sourceType) === "官方来源").some((item) => compact(evidenceText(item)).includes(quote))) {
     return { ...base, status: "disputed", note: "同一主张同时引用了官方和媒体，而这句原话只出现在媒体报道中。" };
   }
-  return { ...base, status: "supported", note: "引文出现在所引证据中，数字和来源类型也相符。" };
+  return { ...base, status: "supported", note: "模型判断切题且有语义支持，引文与数字检查通过；这不等于独立证实新闻事实。" };
 }
 
 export function supplementQuery(claims: VerifiedClaim[], question: string): string | null {
@@ -324,12 +335,14 @@ export function buildReport(
   question: string,
   claims: VerifiedClaim[],
   evidence: VerifiableEvidence[],
-  opts: { unparsed?: boolean } = {},
+  opts: { unparsed?: boolean; incomplete?: boolean } = {},
 ): { markdown: string; report: ResearchReport } {
   const supported = claims.filter((claim) => claim.status === "supported" && claim.kind === "fact");
+  const showTimeline = /时间线|进展|发展|经过|历程|何时|什么时候/.test(question);
+  const showCoverage = /官方|媒体|来源|报道差异/.test(question);
   const shownIds = new Set(supported.flatMap((claim) => claim.evidenceIds));
   const shown = evidence.filter((item) => shownIds.has(item.id));
-  const timeline = shown
+  const timeline = (showTimeline ? shown : [])
     .filter((item) => item.publishedAt)
     .map((item) => ({
       // The article title can state a fact this pass rejected. The line is only the supported sentences.
@@ -339,7 +352,7 @@ export function buildReport(
       title: supported.filter((claim) => claim.evidenceIds.includes(item.id)).map((claim) => claim.text).join("；"),
       evidenceId: item.id,
       sourceType: sourceTypeOf(item.sourceType),
-      credibility: "已证实" as const,
+      credibility: "来源支持" as const,
     }))
     .filter((item) => item.title)
     .sort((a, b) => a.at.localeCompare(b.at));
@@ -349,7 +362,7 @@ export function buildReport(
     .filter((claim) => claim.status === "disputed" || claim.status === "contradicted")
     .map((claim) => ({ text: claim.text, evidenceIds: claim.evidenceIds }));
   const uncertainty = claims
-    .filter((claim) => claim.status !== "supported")
+    .filter((claim) => claim.status !== "supported" && claim.status !== "withdrawn")
     .map((claim) => ({ status: claim.status, text: claim.text, note: claim.note, evidenceIds: claim.evidenceIds }));
   const citations = shown.map((item) => ({
     id: item.id,
@@ -359,7 +372,10 @@ export function buildReport(
     siteUrl: item.siteUrl ?? null,
     publishedAt: item.publishedAt ?? null,
   }));
-  const reported = evidence.filter((item) => !shownIds.has(item.id)).map((item) => ({
+  const rejectedIds = new Set(claims.filter((claim) => claim.status === "withdrawn").flatMap((claim) => claim.evidenceIds));
+  const reviewedIds = new Set(claims.flatMap((claim) => claim.evidenceIds));
+  const reported = evidence.filter((item) => !shownIds.has(item.id) && !rejectedIds.has(item.id)
+    && (!claims.length || reviewedIds.has(item.id))).map((item) => ({
     id: item.id,
     title: item.title ?? item.kind ?? "资料",
     sourceName: item.sourceName ?? null,
@@ -374,15 +390,17 @@ export function buildReport(
   const lead = !evidence.length
     ? "站内公开资料里没有检索到可以引用的报道，所以这次不能给出具体结论。"
     : [
-        `这次检索到 ${evidence.length} 条站内资料：官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。其中 ${coverage.cited} 条被已证实结论引用。`,
+        supported.length ? opts.incomplete ? "目前只能确认下面这些信息，仍不足以完整回答你的问题。" : "以下回答依据本次查到的来源，来源中的表述不等于事实已被独立证实。" : "现有资料不足以可靠回答这个问题。",
         opts.unparsed
-          ? "核验输出无法解析成主张，没有写成已证实结论。"
+          ? "这次未能完成答案核对，可以缩小问题范围后重试。"
           : coverage.cited
-            ? "下面只把通过逐字核验的句子写成已证实事实。"
-            : "没有主张通过逐字核验，不能把来源报道写成已证实事实。",
+            ? ""
+            : "找到新闻不代表已经找到答案。",
         subjectMiss ? "问题里的名称没有出现在这些资料的标题或摘要中，不能把它们当成对该问题的回答。" : "",
       ].filter(Boolean).join("");
   const report: ResearchReport = {
+    showTimeline,
+    showCoverage,
     lead,
     summary: supported.map((claim) => `${claim.text}${claim.evidenceIds.length ? ` [${claim.evidenceIds.join("][")}]` : ""}`),
     timeline,
@@ -395,26 +413,24 @@ export function buildReport(
     citations,
     claims,
   };
-  const reportedTimeline = reported.filter((item) => item.publishedAt || item.mentioned);
   const lines = [
     `# ${question.trim().slice(0, 80) || "深度研究报告"}`,
     "",
     lead,
     "",
     "## 核心结论",
-    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : [opts.unparsed ? "核验输出无法解析，没有已证实事实。" : "没有通过逐字核验的事实。来源报道不能写成已证实结论。"]),
+    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : [opts.unparsed ? "核验输出无法解析，暂时无法确认回答。" : "尚无足够证据支持的回答，检索到报道不代表已经找到答案。"]),
     "",
-    "## 报道时间",
-    ...(timeline.length || reportedTimeline.length
+    ...(showTimeline ? ["## 报道时间",
+    ...(timeline.length
       ? [
-          ...timeline.map((item) => `- ${timeBits(item) || "没有单独的报道发布时间"} · ${item.credibility} · ${item.title} [${item.evidenceId}] · ${item.sourceType}`),
-          ...reportedTimeline.map((item) => `- ${timeBits(item) || "没有单独的报道发布时间"} · 来源报道但尚未核实 · ${item.title} [${item.id}] · ${item.sourceType}`),
+          ...timeline.map((item) => `- ${timeBits({ ...item, publishedAt: item.at })} · ${item.credibility} · ${item.title} [${item.evidenceId}] · ${item.sourceType}`),
         ]
       : [evidence.length ? "这些资料没有可排序的报道发布时间，也不能从正文里读出事件日期。" : "没有检索到带时间的资料。"]),
-    "",
-    "## 官方与媒体",
-    `这次检索到的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。被已证实结论引用 ${coverage.cited} 条。来源类型只说明材料出处，不等于事实已经核实。`,
-    "",
+    ""] : []),
+    ...(showCoverage ? ["## 官方与媒体",
+    `这次检索到的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。核心结论引用了其中 ${coverage.cited} 条。来源类型只说明材料出处，不等于事实已经核实。`,
+    ""] : []),
     ...(reported.length ? [
       "## 来源报道但尚未核实",
       ...reported.map((item) => {
@@ -422,7 +438,7 @@ export function buildReport(
         const clip = item.excerpt ? `\n  摘录：${item.excerpt}` : "";
         return `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}${when ? ` · ${when}` : ""}${clip}`;
       }),
-      "这些只是来源报道，还没有通过逐字核验。",
+      "这些只是检索到的材料，尚不能据此作出结论。",
       "",
     ] : []),
     ...(comparison.length ? [
@@ -444,7 +460,7 @@ export function buildReport(
     "## 引用",
     ...(citations.length
       ? citations.map((item) => `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}`)
-      : [evidence.length ? `没有被已证实结论引用的资料。上面列出了检索到的 ${evidence.length} 条来源报道。` : "没有登记证据。"]),
+      : [evidence.length ? `没有可用于核心结论的资料。上面列出了检索到的 ${evidence.length} 条来源报道。` : "没有可用于回答的证据。"]),
   ];
   return { markdown: lines.join("\n"), report };
 }

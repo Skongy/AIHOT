@@ -58,7 +58,7 @@ function ResearchProcess({ plan, streaming }: { plan: NonNullable<Message["plan"
     </li>)}</ol>
   </section>;
 }
-const CLAIM_STATUS: Record<string, string> = { supported: "已证实", insufficient: "证据不足", disputed: "存在争议", contradicted: "相互矛盾", withdrawn: "已移除" };
+const CLAIM_STATUS: Record<string, string> = { supported: "来源支持", insufficient: "证据不足", disputed: "存在争议", contradicted: "相互矛盾", withdrawn: "已移除" };
 function clockLabel(at: string): string {
   return `${beijingDate(at)} ${beijingTime(at)}`;
 }
@@ -70,28 +70,23 @@ function ReportView({ report }: { report: ResearchReportView }) {
     {report.lead && <p>{report.lead}</p>}
     <section>
       <h3>核心结论</h3>
-      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>没有通过逐字核验的事实。来源报道不能写成已证实结论。</p>}
+      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>尚无足够证据支持的回答，检索到报道不代表已经找到答案。</p>}
     </section>
-    <section>
+    {report.showTimeline !== false && <section>
       <h3>报道时间</h3>
-      {report.timeline.length || reported.some((item) => item.publishedAt || item.mentioned) ? <ol className="ask-report-timeline">
+      {report.timeline.length ? <ol className="ask-report-timeline">
         {report.timeline.map((item) => <li key={`verified-${item.evidenceId}-${item.at}`}>
           <time dateTime={item.at}>报道发布 {clockLabel(item.at)}</time>
           <span>{item.title}</span>
-          <small>{item.credibility ?? "已证实"} · [{item.evidenceId}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
-        </li>)}
-        {reported.filter((item) => item.publishedAt || item.mentioned).map((item) => <li key={`reported-${item.id}`}>
-          <time dateTime={item.publishedAt ?? undefined}>{item.publishedAt ? `报道发布 ${clockLabel(item.publishedAt)}` : "报道中的日期"}</time>
-          <span>{item.title}</span>
-          <small>来源报道但尚未核实 · [{item.id}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
+          <small>{item.credibility ?? "来源支持"} · [{item.evidenceId}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
         </li>)}
       </ol> : <p>没有检索到带时间的资料。</p>}
-    </section>
-    <section>
+    </section>}
+    {report.showCoverage !== false && <section>
       <h3>官方与媒体</h3>
-      <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span><span>已证实引用 {cited}</span></p>
-      <p>这些数字是这次检索到的资料，不是已证实的新闻条数。来源类型只说明材料出处，不等于事实已经核实。</p>
-    </section>
+      <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span><span>结论引用 {cited}</span></p>
+      <p>这些数字是这次检索到的资料，不是已核实的新闻条数。来源类型只说明材料出处，不等于事实已经核实。</p>
+    </section>}
     {reported.length > 0 && <section>
       <h3>来源报道但尚未核实</h3>
       <ol className="ask-report-citations">{reported.map((item) => <li key={item.id}>
@@ -130,7 +125,7 @@ function ReportView({ report }: { report: ResearchReportView }) {
           <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType}{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}</p>
           {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
         </details>
-      </li>)}</ol> : <p>{reported.length ? `没有被已证实结论引用的资料。上面列出了检索到的 ${reported.length} 条来源报道。` : "没有登记证据。"}</p>}
+      </li>)}</ol> : <p>{reported.length ? `没有可用于核心结论的资料。上面列出了检索到的 ${reported.length} 条来源报道。` : "没有可用于回答的证据。"}</p>}
     </section>
   </div>;
 }
@@ -145,8 +140,8 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
   const planSettled = !!message.plan && message.plan.steps.every((step) => step.status === "done" || step.status === "skipped" || step.status === "failed");
   const label = current?.goal
     ?? (message.status === "queued" ? "正在排队"
-      : message.mode === "deep" && message.status === "running" && !message.plan ? "正在生成研究计划"
-      : message.mode === "deep" && planSettled && !message.report ? "正在核验证据"
+      : message.mode === "deep" && message.status === "running" && !message.plan ? "正在理解问题"
+      : message.mode === "deep" && planSettled && !message.report ? "正在整理与核对回答"
       : active.length ? active.map((s) => s.labelZh).join("、")
       : steps.length || message.plan ? "正在整理回答"
       : "正在理解问题");
@@ -157,8 +152,8 @@ function AssistantMessage({ message, busy, onPick }: { message: Message; busy: b
     {message.contentInvalidated ? <p className="ask-turn-note">相关来源已不可用，原回答不再展示。</p>
       : message.report ? <ReportView report={message.report}/>
       : message.text ? <Answer text={message.text} evidence={message.evidence ?? []} streaming={streaming} showRetrievedSources={message.status === "completed_degraded"}/>
-      : <p className="ask-turn-note" role="status">{streaming ? "正在查找站内资料，请稍候。" : message.status === "send_failed" ? "消息未确认送达，可重试发送。" : message.status === "failed" ? "这次未能生成回答，请稍后再试。" : message.status === "cancelled" ? "已停止生成。" : "本次没有生成回答。"}</p>}
-    {message.status === "completed_degraded" && <p className="ask-turn-note">本次回答未能把所有内容关联到具体新闻，下面提供本次检索资料供核对。</p>}
+      : <p className="ask-turn-note" role="status">{streaming ? "正在处理你的问题，请稍候。" : message.status === "send_failed" ? "消息未确认送达，可重试发送。" : message.status === "failed" ? "这次未能生成回答，请稍后再试。" : message.status === "cancelled" ? "已停止生成。" : "本次没有生成回答。"}</p>}
+    {message.status === "completed_degraded" && <p className="ask-turn-note">本次结果不完整，请结合来源和限制阅读，或补充问题范围。</p>}
     {message.status === "cancelled" && message.text && <p className="ask-turn-note">已停止，以上为未完成的回答。</p>}
     {message.status === "limit_reached" && <p className="ask-turn-note">已达到本次查询上限，可缩小范围继续提问。</p>}
     {!streaming && message.text && !message.contentInvalidated && <div className="ask-answer-actions">
@@ -284,7 +279,7 @@ export default function AskPage() {
           <button id="ask-mode-normal" type="button" role="radio" aria-checked={mode === "normal"} tabIndex={mode === "normal" ? 0 : -1} onClick={() => switchMode("normal")}>普通研究</button>
           <button id="ask-mode-deep" type="button" role="radio" aria-checked={mode === "deep"} tabIndex={mode === "deep" ? 0 : -1} onClick={() => switchMode("deep")}>深度研究</button>
         </div>
-        <p className="ask-mode-note" id="ask-mode-note" key={mode}>{mode === "deep" ? "先列出研究计划，再按步骤检索。切换不会开始研究。" : "直接检索并回答。切换模式只改变下一次发送。"}</p>
+        <p className="ask-mode-note" id="ask-mode-note" key={mode}>{mode === "deep" ? "简单问题直接回答，复杂问题按需规划、检索与核对。切换只影响下一次发送。" : "按需检索，快速回答。切换模式只改变下一次发送。"}</p>
         {(context || contextLoading || contextError) && <div className="ask-context"><div><span>正在围绕这篇资讯提问</span><p>{contextLoading ? "正在读取资讯…" : contextError ?? context?.title}</p></div><button type="button" aria-label="移除资讯上下文" onClick={clearContext}>×</button></div>}
         <label htmlFor="ask-input" className="sr-only">你的游戏资讯问题</label>
         <textarea id="ask-input" ref={textarea} value={input} maxLength={2000} rows={2} placeholder={context ? "继续问这篇资讯…" : mode === "deep" ? "想比较两款游戏、梳理时间线，或对照官方和媒体？" : "想了解哪款游戏，或最近发生了什么？"} aria-describedby="ask-mode-note ask-input-note" onChange={(e) => setInput(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(e) => {

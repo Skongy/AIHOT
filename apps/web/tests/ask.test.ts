@@ -12,20 +12,29 @@ const at = "2026-10-16T08:00:00Z";
 const evidence = [{ id: 1, kind: "item", title: "无畏契约版本更新", siteUrl: "/items/ask-fixture", originalUrl: "https://example.org/news", sourceName: "测试媒体", publishedAt: at }];
 const answer = "## 重点\n**这次有一项版本更新。** [1]\n\n- 地图发生变化。[1]\n- 未提供的数据不能确认。\n\n[伪造链接](https://evil.test/items/ask-fixture)\n<img src=x onerror=alert(1)>";
 let nextAnswer = answer; let nextStatus = "completed"; let useDeepReport = false;
+let useDirectAnswer = false; let compactReport = false;
 const deepMarkdown = "# 《无畏契约》测试服什么时候开启？\n\n## 核心结论\n- 官方确认测试服将于 5 月 20 日开启 [1]\n";
 const deepPlan = { version: 1, steps: [{ index: 0, goal: "检索报道", tool: "search", toolLabel: "检索", status: "done", dependsOn: [], summary: "收集到 1 条可引用资料" }] };
 const deepReport = { summary: ["官方确认测试服将于 5 月 20 日开启 [1]"], timeline: [{ at: "2026-05-01T02:00:00.000Z", title: "无畏契约更新公告", evidenceId: 1, sourceType: "官方来源" }], coverage: { official: 1, media: 1, unknown: 0 }, comparison: [{ text: "官方确认冠军皮肤将在下月推出", evidenceIds: [2] }], heat: [{ label: "热榜名次", value: "4", evidenceId: 1 }], chart: null, uncertainty: [{ status: "disputed", text: "官方确认冠军皮肤将在下月推出", note: "结论写成了官方表态，但所引证据没有官方来源。", evidenceIds: [2] }], citations: [{ id: 1, title: "无畏契约更新公告", sourceName: "拳头游戏", sourceType: "官方来源", siteUrl: "/items/ask-fixture", publishedAt: "2026-05-01T02:00:00.000Z" }, { id: 2, title: "媒体猜测冠军皮肤", sourceName: "游戏媒体", sourceType: "媒体报道", siteUrl: "/items/media-fixture", publishedAt: "2026-05-03T08:00:00.000Z" }] };
 function event(type: string, payload: any, seq: number) { return `id: ${seq}\nevent: ${type}\ndata: ${JSON.stringify({payload})}\n\n`; }
 function complete() {
   if (!activeTask) return;
+  if (useDirectAnswer) {
+    activeTask = {...activeTask,status:'completed',finalAnswer:nextAnswer,evidence:[],steps:[],research:[],snapshotSeq:3};
+    savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:nextAnswer});
+    sseResponse?.write(event('answer_done',{text:nextAnswer},2));
+    sseResponse?.end(event('task_status',{status:'completed'},3)); sseResponse=null;
+    return;
+  }
   const steps = [
     {type:'step_start',payload:{stepId:'search-1',tool:'search',labelZh:'检索站内资料'}},
     {type:'step_end',payload:{stepId:'search-1',ok:true,summary:'找到相关报道'}},
   ];
   if (useDeepReport) {
-    activeTask = {...activeTask,mode:'deep',status:'completed',finalAnswer:deepMarkdown,evidence,steps,research:[{type:'research_plan',payload:deepPlan},{type:'research_report',payload:{report:deepReport}}],snapshotSeq:6};
+    const report = {...deepReport,...(compactReport ? {showTimeline:false,showCoverage:false} : {})};
+    activeTask = {...activeTask,mode:'deep',status:'completed',finalAnswer:deepMarkdown,evidence,steps,research:[{type:'research_plan',payload:deepPlan},{type:'research_report',payload:{report}}],snapshotSeq:6};
     savedMessages.push({id:'answer-'+activeTask.taskId,role:'assistant',taskId:activeTask.taskId,content:deepMarkdown});
-    sseResponse?.write(event('research_report',{report:deepReport},2));
+    sseResponse?.write(event('research_report',{report},2));
     sseResponse?.write(event('answer_done',{text:deepMarkdown},3));
     sseResponse?.end(event('task_status',{status:'completed'},6)); sseResponse=null;
     return;
@@ -78,6 +87,7 @@ before(async()=>{
 });
 after(async()=>{sseResponse?.end();if(phoneBrowser&&phoneBrowser!==browser)await phoneBrowser.close();await browser?.close();await web?.stop();});
 async function visit(options:{phone?:boolean;dark?:boolean;article?:boolean;standalone?:boolean}={}){
+  useDirectAnswer=false;compactReport=false;
   enabled=true;submissions=0;failOnce=false;expiredOnce=false;hold=false;activeTask=null;savedMessages=[];sseResponse=null;sessionCreates=0;nextAnswer=answer;nextStatus='completed';useDeepReport=false;
   const context=await(options.phone?phoneBrowser:browser).newContext({viewport:options.phone?{width:390,height:844}:{width:1440,height:1000},reducedMotion:'reduce'});
   await context.addInitScript(({dark,standalone})=>{sessionStorage.setItem('gamehot-intro-seen-v1','1');localStorage.setItem('aihot-theme',dark?'dark':'light');if(standalone)Object.defineProperty(navigator,'standalone',{value:true});},{dark:!!options.dark,standalone:!!options.standalone});
@@ -134,7 +144,7 @@ test('pipe tables render as readable tables and uncited retrieved reports stay a
     await expect(page.locator('.ask-answer table')).toBeVisible();
     await expect(page.locator('.ask-answer tbody tr')).toHaveCount(2);
     await expect(page.getByText('街头霸王电影',{exact:true})).toBeVisible();
-    await expect(page.getByText(/未能把所有内容关联到具体新闻/)).toBeVisible();
+    await expect(page.getByText(/本次结果不完整/)).toBeVisible();
     await expect(page.locator('.ask-sources summary')).toContainText('本次检索到的资料');
     await expect(page.locator('.ask-sources')).toContainText('回答未能逐条匹配到具体来源');
     await expect(page.locator('.ask-sources a[href="https://example.org/news"]')).toHaveText('查看原文 ↗');
@@ -245,6 +255,36 @@ test('interrupted event streams reconnect without creating another task',async()
     assert.equal(submissions,1);await expect(page.locator('.ask-user')).toHaveCount(1);
   }finally{await context.close();}
 });
+test('deep conversational answers render without a research plan or report and survive reload',async()=>{
+  const {context,page,errors}=await visit();try{
+    await page.getByRole('radio',{name:'深度研究'}).click();
+    useDirectAnswer=true;nextAnswer='我是 GAMEHOT 游戏资讯助手。简单问题可以直接回答。';
+    await send(page,'你好，你能干什么？');
+    await expect(page.locator('.ask-answer')).toContainText(nextAnswer);
+    await expect(page.locator('.ask-report')).toHaveCount(0);
+    await expect(page.getByRole('heading',{name:'研究计划'})).toHaveCount(0);
+    await expect(page.locator('.ask-sources')).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.ask-answer')).toContainText(nextAnswer);
+    assert.equal(lastRequest.mode,'deep');assert.equal(submissions,1);assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('a focused research answer omits unrelated timeline and source counters on refresh too',async()=>{
+  const {context,page,errors}=await visit();try{
+    await page.getByRole('radio',{name:'深度研究'}).click();
+    useDeepReport=true;compactReport=true;
+    await send(page,'《无畏契约》测试服开放日期？');
+    for(const reload of [false,true]){
+      if(reload)await page.reload();
+      await expect(page.getByRole('heading',{name:'核心结论'})).toBeVisible();
+      await expect(page.getByRole('heading',{name:'报道时间'})).toHaveCount(0);
+      await expect(page.getByRole('heading',{name:'官方与媒体'})).toHaveCount(0);
+    }
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
 test('a deep report shows verified sections and refuses a one-point chart',async()=>{
   const {context,page,errors}=await visit();try{
     await page.getByRole('radio',{name:'深度研究'}).click();
