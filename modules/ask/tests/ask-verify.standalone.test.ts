@@ -217,6 +217,7 @@ function world(script: (opts: ChatToolsStreamOptions) => ChatToolsStreamResult |
     taskId: "task-verify",
     question: "梳理《无畏契约》最近一个月的重要事件。",
     background: "",
+    historyReferences: [],
     now: () => 2_000,
     chat: async (opts) => {
       chats.push(opts.purpose);

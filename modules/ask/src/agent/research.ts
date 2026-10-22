@@ -19,6 +19,7 @@ import {
   assessClaims, buildReport, parseClaims, sourceTypeOf, supplementQuery,
   type VerifiableEvidence, type VerifiedClaim,
 } from "./verify.ts";
+import { currentEvidence, historySources } from "./evidence.ts";
 
 export const DEEP_LIMITS = {
   MAX_MODEL: 8,
@@ -32,7 +33,7 @@ export const DEEP_LIMITS = {
 /** A gap longer than the task lease is time the worker was gone, not research time. */
 export const RESEARCH_CONTINUITY_MS = 60_000;
 
-const PROMPT_VERSION = "ask-research-v1";
+const PROMPT_VERSION = "ask-research-v2";
 const TERMINAL = new Set<TaskStatus>(["completed", "completed_degraded", "failed", "cancelled", "limit_reached"]);
 const ID_TOOLS = new Set<AskToolName>(["get_story", "get_article", "explain_hot", "explain_selection"]);
 
@@ -148,6 +149,7 @@ export interface ResearchRun {
   taskId: string;
   question: string;
   background: string;
+  historyReferences: HistoryReference[];
   now: () => number;
   chat: (opts: ChatToolsStreamOptions) => Promise<ChatToolsStreamResult>;
   executeTool: (name: string, argsJson: string) => Promise<ToolExecResult>;
@@ -166,6 +168,16 @@ export interface ResearchRun {
   emit: (type: string, payload: Record<string, unknown>) => Promise<void>;
   saveDraft: (text: string) => Promise<void>;
   finish: (status: TaskStatus, text: string, error?: { code: string; message: string }) => Promise<void>;
+}
+
+export interface HistoryReference {
+  previousCitation: number;
+  kind: string;
+  objectId: string | null;
+  title: string | null;
+  siteUrl: string | null;
+  source: string | null;
+  publishedAt: string | null;
 }
 
 export function taskCheckpoint(value: unknown): TaskResearchCheckpoint {
@@ -236,6 +248,61 @@ export function directToolArgs(tool: AskToolName, question: string, goal: string
   if (tool === "get_hot_topics") return JSON.stringify({ limit: 8 });
   if (tool === "get_daily") return JSON.stringify({});
   return null;
+}
+
+function historyCitation(text: string): number | null {
+  const match = /(?:先前|上一轮|上轮|历史)?(?:标注为)?\s*\[(\d+)\]/.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
+function contextualFollowup(question: string): boolean {
+  const text = question.trim();
+  return text.length <= 30 && /什么意思|这(?:篇|条|个|则)|上面|上一轮|上轮|刚才|\[\d+\]/.test(text);
+}
+
+function referencedHistory(question: string, goal: string, references: HistoryReference[]): HistoryReference | null {
+  const citation = historyCitation(`${goal}\n${question}`);
+  if (citation !== null) return references.find((item) => item.previousCitation === citation) ?? null;
+  return contextualFollowup(question) ? references[0] ?? null : null;
+}
+
+function historyReadCall(
+  question: string,
+  goal: string,
+  references: HistoryReference[],
+): { name: AskToolName; args: string; reference: HistoryReference } | null {
+  const reference = referencedHistory(question, goal, references);
+  if (!reference?.objectId) return null;
+  if (reference.kind === "item" || reference.kind === "selection_explain") {
+    return { name: "get_article", args: JSON.stringify({ article_id: reference.objectId }), reference };
+  }
+  if (reference.kind === "story" || reference.kind === "hot_explain") {
+    return { name: "get_story", args: JSON.stringify({ public_id: reference.objectId, limit: 20 }), reference };
+  }
+  return null;
+}
+
+/** A short follow-up such as “什么意思” must stay on the immediately preceding cited object. */
+export function groundHistoryFollowup(
+  question: string,
+  drafts: PlanStepDraft[],
+  references: HistoryReference[],
+): PlanStepDraft[] {
+  if (!references.length || !contextualFollowup(question)) return drafts;
+  const requested = drafts.find((step) => historyCitation(step.goal) !== null) ?? drafts[0];
+  const call = historyReadCall(question, requested?.goal ?? "", references);
+  if (!call) {
+    const title = references[0]?.title?.trim();
+    return title
+      ? [{ index: 0, goal: `按上一轮来源的精确标题检索：《${title}》`, tool: "search", dependsOn: [] }]
+      : drafts;
+  }
+  return [{
+    index: 0,
+    goal: `读取上一轮[${call.reference.previousCitation}]${call.reference.title ? `《${call.reference.title}》` : "对应资料"}并解释追问`,
+    tool: call.name,
+    dependsOn: [],
+  }];
 }
 
 function extractJsonObject(text: string): unknown {
@@ -738,12 +805,14 @@ async function plan(run: ResearchRun, loaded: LoadedResearch, resume: boolean): 
 可用工具只有：${ASK_TOOL_NAMES.join("、")}。
 把问题拆成 2 到 ${DEEP_LIMITS.MAX_STEPS} 步。每步格式：{"goal":"这一步要核对的事实","tool":"search 或上面的工具名或 null","dependsOn":[更早步骤下标]}
 具名游戏、对比和时间线优先用 search。get_story、get_article、explain_hot、explain_selection 只能依赖已经能提供真实 ID 的步骤，不能作为没有任何 ID 的第一步。
+历史出处中 kind=item 或 selection_explain 必须用 get_article(article_id=objectId)；kind=story 或 hot_explain 必须用 get_story(public_id=objectId)。不得用 get_latest 或 get_hot_topics 代替读取一条明确的历史出处。
 不要规划联网搜索、写库或游戏攻略。输出 {"steps":[...]}`,
     messages: [{ role: "user", content: `${run.background ? `先前对话（只供理解指代，不能当作证据）：\n${run.background}\n\n` : ""}研究问题：${run.question}` }],
     tools: [],
     taskId: run.taskId,
     roundIndex: round,
     enableTools: false,
+    json: true,
     maxTokens: 800,
   }, "fallback");
   if (result === "stopped") return true;
@@ -754,7 +823,8 @@ async function plan(run: ResearchRun, loaded: LoadedResearch, resume: boolean): 
   const current = await run.load();
   const nextCheckpoint = { ...current.checkpoint, planReceiptId: result === "fallback" ? current.checkpoint.planReceiptId : result.receiptId };
   const parsed = result === "fallback" ? null : parseResearchPlan(result.content);
-  const steps = draftsToSteps(parsed ?? fallbackResearchPlan(run.question));
+  const grounded = groundHistoryFollowup(run.question, parsed ?? fallbackResearchPlan(run.question), run.historyReferences);
+  const steps = draftsToSteps(grounded);
   await run.setPlan(1, steps, nextCheckpoint);
   await emitPlan(run);
   return false;
@@ -783,6 +853,7 @@ async function replan(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     taskId: run.taskId,
     roundIndex: round,
     enableTools: false,
+    json: true,
     maxTokens: 800,
   }, "fallback");
   if (result === "stopped") return true;
@@ -809,6 +880,28 @@ async function replan(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
 
 async function stepModel(run: ResearchRun, loaded: LoadedResearch, index: number, resume: boolean): Promise<boolean> {
   const current = findStep(loaded, index);
+  const groundedHistory = !resume && current.tool && ID_TOOLS.has(current.tool)
+    ? historyReadCall(run.question, current.goal, run.historyReferences)
+    : null;
+  if (groundedHistory) {
+    const direct: StepState = {
+      ...current,
+      tool: groundedHistory.name,
+      status: "running",
+      attempt: current.attempt + 1,
+      checkpoint: {
+        phase: "model_done",
+        roundIndex: 0,
+        evidenceBefore: loaded.evidence.length,
+        toolName: groundedHistory.name,
+        toolArgs: groundedHistory.args,
+        fallbackUsed: false,
+      },
+    };
+    await run.saveStep(direct);
+    await emitStep(run, direct);
+    return false;
+  }
   const round = resume ? current.checkpoint!.roundIndex : loaded.modelCalls + 1;
   const step: StepState = {
     ...current,
@@ -836,8 +929,9 @@ async function stepModel(run: ResearchRun, loaded: LoadedResearch, index: number
       system: `${clockLine(started)}
 你正在执行研究计划的一步，目标：${step.goal}
 优先工具：${step.tool ?? "由你在白名单里选择"}。只调用一个工具，不要写最终结论。
-get_story、get_article、explain_hot、explain_selection 的 ID 必须出现在已有资料或用户问题里，不能编造。`,
-      messages: [{ role: "user", content: `问题：${run.question}\n已完成：${loaded.steps.filter((item) => item.status === "done").map((item) => `${item.index}. ${item.summary ?? item.goal}`).join("\n") || "无"}\n资料：\n${evidenceLines(loaded.evidence)}` }],
+get_story、get_article、explain_hot、explain_selection 的 ID 必须出现在已有资料、历史出处映射或用户问题里，不能编造。
+若目标是读取一条明确资料，不得改用 get_latest 或 get_hot_topics。`,
+      messages: [{ role: "user", content: `问题：${run.question}\n先前对话：${run.background || "无"}\n历史出处映射：${JSON.stringify(run.historyReferences)}\n已完成：${loaded.steps.filter((item) => item.status === "done").map((item) => `${item.index}. ${item.summary ?? item.goal}`).join("\n") || "无"}\n资料：\n${evidenceLines(loaded.evidence)}` }],
       tools: askToolSpecs(),
       taskId: run.taskId,
       roundIndex: round,
@@ -859,7 +953,8 @@ get_story、get_article、explain_hot、explain_selection 的 ID 必须出现在
     await rememberReplan(run, failed);
     return false;
   }
-  const allowed = result === "fallback" ? null : firstAllowedTool(result);
+  let allowed = result === "fallback" ? null : firstAllowedTool(result);
+  if (step.tool && ID_TOOLS.has(step.tool) && allowed?.name !== step.tool) allowed = null;
   const done: StepState = {
     ...step,
     checkpoint: {
@@ -1008,7 +1103,8 @@ quote 不能改写。结论里的每个数字都必须原样出现在 quote 里�
     taskId: run.taskId,
     roundIndex: round,
     enableTools: false,
-    maxTokens: 1200,
+    json: true,
+    maxTokens: 2800,
   }, "fallback");
   if (result === "stopped") return true;
   if (result === "unpaid") {
@@ -1122,21 +1218,30 @@ function stepToWrite(step: StepState) {
   };
 }
 
-async function briefHistory(sessionId: string, taskId: string): Promise<string> {
+async function briefHistory(sessionId: string, taskId: string): Promise<{ text: string; references: HistoryReference[] }> {
   const messages = await listMessages(sessionId, 12);
   const lines: string[] = [];
+  let references: HistoryReference[] = [];
   for (const message of messages) {
     if (message.task_id === taskId) continue;
     if (message.role === "assistant" && message.task_id) {
       const prior = await getTask(message.task_id);
-      if (prior?.content_invalidated) {
+      const checked = prior ? await currentEvidence(prior) : null;
+      if (prior?.content_invalidated || checked?.invalidated) {
+        references = [];
         lines.push("助手：上轮因来源不可用已失效");
         continue;
       }
+      references = checked ? historySources(checked.evidence) : [];
+      const mapping = references.length
+        ? `\n历史出处映射（编号只属于这一轮，使用前必须重新读取对应工具）：${JSON.stringify(references)}`
+        : "";
+      lines.push(`助手：${message.content.slice(0, 800)}${mapping}`);
+      continue;
     }
     lines.push(`${message.role === "user" ? "用户" : "助手"}：${message.content.slice(0, 500)}`);
   }
-  return lines.slice(-6).join("\n");
+  return { text: lines.slice(-6).join("\n"), references };
 }
 
 async function lookupReceipts(ids: number[]): Promise<Record<number, ReceiptLookup>> {
@@ -1152,13 +1257,14 @@ async function lookupReceipts(ids: number[]): Promise<Record<number, ReceiptLook
 export async function runDeepResearch(opts: { taskId: string; workerId: string; chat?: ResearchRun["chat"]; now?: () => number }): Promise<void> {
   const existing = await getTask(opts.taskId);
   if (!existing || existing.mode !== "deep" || TERMINAL.has(existing.status)) return;
-  const background = await briefHistory(existing.session_id, opts.taskId);
+  const history = await briefHistory(existing.session_id, opts.taskId);
   const chat = opts.chat ?? chatToolsStream;
   const now = opts.now ?? Date.now;
   const run: ResearchRun = {
     taskId: opts.taskId,
     question: existing.user_message,
-    background,
+    background: history.text,
+    historyReferences: history.references,
     now,
     chat,
     executeTool: executeAskTool,

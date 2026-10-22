@@ -8,7 +8,8 @@ import type { ChatToolCall, ChatToolsStreamOptions, ChatToolsStreamResult } from
 import { decideAskPost } from "../src/http/decide.ts";
 import {
   DEEP_LIMITS, directToolArgs, fallbackResearchPlan, inferWindow, nextResearchAction, parseReplan, parseResearchPlan,
-  researchClock, runResearchDriver, searchQueryFromQuestion, taskCheckpoint,
+  groundHistoryFollowup, researchClock, runResearchDriver, searchQueryFromQuestion, taskCheckpoint,
+  type HistoryReference,
   type LoadedResearch, type ResearchRun, type ResearchState, type StepState,
 } from "../src/agent/research.ts";
 import { ASK_TOOL_NAMES, type AskToolName, type ToolExecResult } from "../src/tools/whitelist.ts";
@@ -17,6 +18,15 @@ import { applyAskEvent, snapshotResearch, snapshotSteps, type Message } from "..
 
 const QUESTION = "梳理《无畏契约》最近一个月的重要事件和发展时间线。";
 const UUID = "11111111-1111-4111-8111-111111111111";
+const HISTORY_ITEM: HistoryReference = {
+  previousCitation: 1,
+  kind: "item",
+  objectId: "valorant-champion",
+  title: "无畏契约全球冠军赛结果",
+  siteUrl: "/items/valorant-champion",
+  source: "测试媒体",
+  publishedAt: "2026-10-20T00:00:00.000Z",
+};
 
 function step(partial: Partial<StepState> & Pick<StepState, "index" | "goal" | "status">): StepState {
   return {
@@ -79,6 +89,7 @@ function harness(options: {
   script?: (opts: ChatToolsStreamOptions) => ChatToolsStreamResult | "unknown" | Error;
   evidenceFor?: (name: string) => boolean;
   cancelAfterPlan?: boolean;
+  historyReferences?: HistoryReference[];
 }) {
   const box = { current: loaded({ ...options.seed }) };
   const chats: ChatToolsStreamOptions[] = [];
@@ -91,6 +102,7 @@ function harness(options: {
     taskId: "task-1",
     question: options.question ?? QUESTION,
     background: "",
+    historyReferences: options.historyReferences ?? [],
     now: () => options.nowMs ?? box.current.startedMs + 1_000,
     chat: async (opts) => {
       chats.push(opts);
@@ -216,6 +228,30 @@ test("plan parser keeps only known tools, earlier dependencies, and four steps",
 test("replan keeps finished absolute indexes and shifts new relative indexes", () => {
   const parsed = parseReplan("{\"steps\":[{\"goal\":\"改查热点\",\"tool\":\"get_hot_topics\",\"dependsOn\":[0,1]}]}", [0], 2);
   assert.deepEqual(parsed, [{ index: 2, goal: "改查热点", tool: "get_hot_topics", dependsOn: [0] }]);
+});
+
+test("a short follow-up is grounded to the previous citation instead of generic feeds", () => {
+  const grounded = groundHistoryFollowup("什么意思", [
+    { index: 0, goal: "读取先前标注为[1]的报道正文", tool: "get_story", dependsOn: [] },
+    { index: 1, goal: "补充最新资讯", tool: "get_latest", dependsOn: [0] },
+  ], [HISTORY_ITEM]);
+  assert.deepEqual(grounded, [{
+    index: 0,
+    goal: "读取上一轮[1]《无畏契约全球冠军赛结果》并解释追问",
+    tool: "get_article",
+    dependsOn: [],
+  }]);
+});
+
+test("a history reference without an id falls back to its exact title search", () => {
+  const missingId = { ...HISTORY_ITEM, objectId: null };
+  const grounded = groundHistoryFollowup("这篇讲了什么", [
+    { index: 0, goal: "读取上一轮报道", tool: "get_article", dependsOn: [] },
+    { index: 1, goal: "补充最新资讯", tool: "get_latest", dependsOn: [0] },
+  ], [missingId]);
+  assert.equal(grounded.length, 1);
+  assert.equal(grounded[0]?.tool, "search");
+  assert.equal(JSON.parse(directToolArgs("search", "这篇讲了什么", grounded[0]!.goal)!).q, HISTORY_ITEM.title);
 });
 
 test("fallback plans match the deep examples and never invent an id tool first", () => {
@@ -354,6 +390,31 @@ test("a planned search runs directly, an id step asks once, and synthesis cites 
   assert.equal(world.events.some((event) => event.type === "research_report"), true);
   assert.equal(world.box.current.draft.includes("[1]"), true);
   assert.equal(world.box.current.draft.includes("导致"), false);
+});
+
+test("the follow-up '什么意思' reopens the cited article and never falls back to hot or latest", async () => {
+  const world = harness({
+    question: "什么意思",
+    historyReferences: [HISTORY_ITEM],
+    script: (opts) => {
+      if (opts.purpose === "ask.research_plan") return answer(JSON.stringify({ steps: [
+        { goal: "读取先前标注为[1]的报道正文", tool: "get_story", dependsOn: [] },
+        { goal: "查看近期热点", tool: "get_hot_topics", dependsOn: [0] },
+      ] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "赛事结果已有报道", kind: "fact", evidenceIds: [1], quote: "get_article 资料", conflictsWith: [] }] }));
+      return answer("这条报道说明赛事已经结束 [1]。");
+    },
+  });
+  world.run.background = `助手：上一轮回答\n历史出处映射：${JSON.stringify([HISTORY_ITEM])}`;
+  await runResearchDriver(world.run);
+  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_final", "ask.research_verify"]);
+  assert.deepEqual(world.executed.map((item) => item.name), ["get_article"]);
+  assert.deepEqual(JSON.parse(world.executed[0]!.args), { article_id: "valorant-champion" });
+  assert.equal(world.executed.some((item) => item.name === "get_hot_topics" || item.name === "get_latest"), false);
+  assert.equal(world.chats.find((item) => item.purpose === "ask.research_plan")?.json, true);
+  const verify = world.chats.find((item) => item.purpose === "ask.research_verify");
+  assert.equal(verify?.json, true);
+  assert.equal(verify?.maxTokens, 2800);
 });
 
 test("an empty first pass replans once, then a new direct tool can still finish", async () => {

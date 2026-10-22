@@ -251,6 +251,8 @@ export interface ChatToolsStreamOptions {
   onDelta?: (text: string) => void | Promise<void>;
   /** When false, omit tools from the request (final answer / forced no-tools). Default true when tools.length > 0. */
   enableTools?: boolean;
+  /** Request a JSON object for internal structured phases. User-facing answers leave this unset. */
+  json?: boolean;
 }
 
 export interface ChatToolsStreamResult {
@@ -261,8 +263,8 @@ export interface ChatToolsStreamResult {
   reused: boolean;
   model: string;
   usage: Record<string, unknown> | null;
-  /** True when the outbound request body did not set response_format json_object. */
-  jsonModeForced: false;
+  /** True when the outbound request requested response_format json_object. */
+  jsonModeForced: boolean;
 }
 
 interface ToolAccum {
@@ -355,8 +357,8 @@ function parseSseChatStream(
 
 /**
  * Streaming chat with optional tools for the ask agent. Goes through paidRequest like chatJson.
- * Does **not** set response_format json_object (answers are natural language). Identity must include
- * taskId and roundIndex so recovery reuses the same logical key without double billing.
+ * Natural-language answers omit response_format. Internal structured phases may opt into JSON mode.
+ * Identity includes taskId, roundIndex and JSON mode so recovery never reuses a differently shaped call.
  */
 export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<ChatToolsStreamResult> {
   const spec = MODELS[opts.model];
@@ -369,6 +371,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
   const temperature = opts.temperature ?? 0.2;
   const maxTokens = Math.max(opts.maxTokens ?? 2048, 512) + (spec.reasoningTokens ?? 0);
   const enableTools = opts.enableTools !== false && opts.tools.length > 0;
+  const jsonModeForced = opts.json === true && spec.jsonMode;
   const messages: ChatToolsMessage[] = [
     ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
     ...opts.messages,
@@ -384,10 +387,11 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
     max_tokens: maxTokens,
     stream: true,
     ...(enableTools ? { tools: opts.tools, tool_choice: "auto" } : {}),
+    ...(jsonModeForced ? { response_format: { type: "json_object" } } : {}),
     ...(spec.extra ?? {}),
   };
-  // Never inherit chatJson's forced JSON mode on the user-facing answer path.
-  if ("response_format" in body) delete body.response_format;
+  // Model-level extras must not force JSON onto the user-facing answer path.
+  if (!jsonModeForced && "response_format" in body) delete body.response_format;
 
   const receipt = await paidRequest(
     {
@@ -405,6 +409,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
         maxTokens,
         extra: spec.extra ?? null,
         stream: true,
+        jsonModeForced,
         taskId: opts.taskId,
         roundIndex: opts.roundIndex,
       },
@@ -419,6 +424,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
         roundIndex: opts.roundIndex,
         stream: true,
         enableTools,
+        jsonModeForced,
       },
       attemptTag: opts.attemptTag,
     },
@@ -505,7 +511,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
     reused: receipt.reused,
     model: spec.key,
     usage: response.usage ?? null,
-    jsonModeForced: false,
+    jsonModeForced,
   };
 }
 
