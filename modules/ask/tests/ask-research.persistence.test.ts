@@ -363,7 +363,7 @@ test("a crashed verification resumes the same round without another model charge
   assert.equal(row!.status, "completed_degraded");
   // The resumed round is not charged twice. One repair still cannot parse claims, so the
   // retrieved row is listed as an unverified report and stays out of the verified conclusion.
-  assert.match(row!.final_answer ?? "", /核验输出无法解析/);
+  assert.match(row!.final_answer ?? "", /没能核对出可靠结论/);
   assert.match(row!.final_answer ?? "", /来源报道但尚未核实/);
   assert.match(row!.final_answer ?? "", /无畏契约 测试更新/);
   const conclusion = row!.final_answer?.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
