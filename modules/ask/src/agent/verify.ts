@@ -1,5 +1,6 @@
 // Deterministic claim checks. The model may propose a quote; only this file decides the verdict.
 // A legal citation number is not enough: the quote has to occur in the cited evidence text.
+import { beijingDate, beijingTime } from "@aihot/contracts/time";
 
 export type ClaimStatus = "supported" | "insufficient" | "disputed" | "contradicted" | "withdrawn";
 export type ClaimKind = "fact" | "inference";
@@ -12,7 +13,11 @@ export interface VerifiableEvidence {
   sourceName?: string | null;
   sourceType?: string | null;
   excerpt?: string | null;
+  /** Public article text already shown on the item page. Quotes may match it; it is not a new fact. */
+  bodyExcerpt?: string | null;
   publishedAt?: string | null;
+  /** When the item entered the site timeline. This is not the event time. */
+  timelineAt?: string | null;
   siteUrl?: string | null;
 }
 
@@ -36,9 +41,25 @@ export interface VerifiedClaim {
 
 export interface ReportTimelineItem {
   at: string;
+  timelineAt?: string | null;
+  /** A date written inside the source text. It is not the publication time. */
+  mentioned?: string | null;
   title: string;
   evidenceId: number;
   sourceType: SourceType;
+  credibility: "已证实" | "来源报道但尚未核实";
+}
+
+export interface ReportedItem {
+  id: number;
+  title: string;
+  sourceName: string | null;
+  sourceType: SourceType;
+  siteUrl: string | null;
+  publishedAt: string | null;
+  timelineAt: string | null;
+  mentioned: string | null;
+  excerpt: string | null;
 }
 
 export interface ReportHeatItem {
@@ -48,9 +69,11 @@ export interface ReportHeatItem {
 }
 
 export interface ResearchReport {
+  lead: string;
   summary: string[];
   timeline: ReportTimelineItem[];
-  coverage: { official: number; media: number; unknown: number };
+  reported: ReportedItem[];
+  coverage: { official: number; media: number; unknown: number; cited: number };
   comparison: Array<{ text: string; evidenceIds: number[] }>;
   heat: ReportHeatItem[];
   chart: Array<{ label: string; value: number; evidenceId: number }> | null;
@@ -85,7 +108,7 @@ function hasWholeNumber(text: string, number: string): boolean {
 }
 
 function evidenceText(item: VerifiableEvidence): string {
-  return [item.title, item.excerpt, item.sourceName].filter((part): part is string => !!part && part.trim().length > 0).join("\n");
+  return [item.title, item.excerpt, item.bodyExcerpt, item.sourceName].filter((part): part is string => !!part && part.trim().length > 0).join("\n");
 }
 
 function citedItems(claim: { evidenceIds: number[] }, evidence: VerifiableEvidence[]): VerifiableEvidence[] {
@@ -255,7 +278,48 @@ function chartOf(heat: ReportHeatItem[]): ResearchReport["chart"] {
   return null;
 }
 
-export function buildReport(question: string, claims: VerifiedClaim[], evidence: VerifiableEvidence[]): { markdown: string; report: ResearchReport } {
+function clock(at: string): string {
+  return `${beijingDate(at)} ${beijingTime(at)}`;
+}
+
+/** A date written in the source. Publication time stays on publishedAt. */
+function mentionedWhen(text: string): string | null {
+  return text.replace(/\s+/g, "").match(/20\d{2}年\d{1,2}月\d{1,2}日|\d{1,2}月\d{1,2}日/)?.[0] ?? null;
+}
+
+function coverageOf(items: VerifiableEvidence[]): { official: number; media: number; unknown: number } {
+  const coverage = { official: 0, media: 0, unknown: 0 };
+  for (const item of items) {
+    const type = sourceTypeOf(item.sourceType);
+    if (type === "官方来源") coverage.official += 1;
+    else if (type === "媒体报道") coverage.media += 1;
+    else coverage.unknown += 1;
+  }
+  return coverage;
+}
+
+function timeBits(item: { publishedAt?: string | null; timelineAt?: string | null; mentioned?: string | null }): string {
+  const bits: string[] = [];
+  if (item.publishedAt) bits.push(`报道发布 ${clock(item.publishedAt)}`);
+  const skew = item.publishedAt && item.timelineAt ? Math.abs(Date.parse(item.timelineAt) - Date.parse(item.publishedAt)) : Number.POSITIVE_INFINITY;
+  if (item.timelineAt && (!item.publishedAt || skew >= 60_000)) bits.push(`站内时间 ${clock(item.timelineAt)}`);
+  if (item.mentioned) bits.push(`报道中写到 ${item.mentioned}，这不是报道发布时间`);
+  return bits.join(" · ");
+}
+
+function missesSubject(question: string, evidence: VerifiableEvidence[]): boolean {
+  const names = [...question.matchAll(/《([^》]{1,40})》/g)].map((match) => match[1]!.trim()).filter(Boolean);
+  if (!names.length || !evidence.length) return false;
+  const blob = evidence.map(evidenceText).join("\n");
+  return names.every((name) => !blob.includes(name));
+}
+
+export function buildReport(
+  question: string,
+  claims: VerifiedClaim[],
+  evidence: VerifiableEvidence[],
+  opts: { unparsed?: boolean } = {},
+): { markdown: string; report: ResearchReport } {
   const supported = claims.filter((claim) => claim.status === "supported" && claim.kind === "fact");
   const shownIds = new Set(supported.flatMap((claim) => claim.evidenceIds));
   const shown = evidence.filter((item) => shownIds.has(item.id));
@@ -264,19 +328,16 @@ export function buildReport(question: string, claims: VerifiedClaim[], evidence:
     .map((item) => ({
       // The article title can state a fact this pass rejected. The line is only the supported sentences.
       at: item.publishedAt!,
+      timelineAt: item.timelineAt ?? null,
+      mentioned: mentionedWhen(supported.filter((claim) => claim.evidenceIds.includes(item.id)).map((claim) => claim.quote).join("\n")),
       title: supported.filter((claim) => claim.evidenceIds.includes(item.id)).map((claim) => claim.text).join("；"),
       evidenceId: item.id,
       sourceType: sourceTypeOf(item.sourceType),
+      credibility: "已证实" as const,
     }))
     .filter((item) => item.title)
     .sort((a, b) => a.at.localeCompare(b.at));
-  const coverage = { official: 0, media: 0, unknown: 0 };
-  for (const item of shown) {
-    const type = sourceTypeOf(item.sourceType);
-    if (type === "官方来源") coverage.official += 1;
-    else if (type === "媒体报道") coverage.media += 1;
-    else coverage.unknown += 1;
-  }
+  const coverage = { ...coverageOf(evidence), cited: shown.length };
   const heat = heatOf(shown);
   const comparison = claims
     .filter((claim) => claim.status === "disputed" || claim.status === "contradicted")
@@ -292,9 +353,34 @@ export function buildReport(question: string, claims: VerifiedClaim[], evidence:
     siteUrl: item.siteUrl ?? null,
     publishedAt: item.publishedAt ?? null,
   }));
+  const reported = evidence.filter((item) => !shownIds.has(item.id)).map((item) => ({
+    id: item.id,
+    title: item.title ?? item.kind ?? "资料",
+    sourceName: item.sourceName ?? null,
+    sourceType: sourceTypeOf(item.sourceType),
+    siteUrl: item.siteUrl ?? null,
+    publishedAt: item.publishedAt ?? null,
+    timelineAt: item.timelineAt ?? null,
+    mentioned: mentionedWhen(evidenceText(item)),
+    excerpt: (item.excerpt ?? "").trim().slice(0, 160) || null,
+  }));
+  const subjectMiss = missesSubject(question, evidence);
+  const lead = !evidence.length
+    ? "站内公开资料里没有检索到可以引用的报道，所以这次不能给出具体结论。"
+    : [
+        `这次检索到 ${evidence.length} 条站内资料：官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。其中 ${coverage.cited} 条被已证实结论引用。`,
+        opts.unparsed
+          ? "核验输出无法解析成主张，没有写成已证实结论。"
+          : coverage.cited
+            ? "下面只把通过逐字核验的句子写成已证实事实。"
+            : "没有主张通过逐字核验，不能把来源报道写成已证实事实。",
+        subjectMiss ? "问题里的名称没有出现在这些资料的标题或摘要中，不能把它们当成对该问题的回答。" : "",
+      ].filter(Boolean).join("");
   const report: ResearchReport = {
+    lead,
     summary: supported.map((claim) => `${claim.text}${claim.evidenceIds.length ? ` [${claim.evidenceIds.join("][")}]` : ""}`),
     timeline,
+    reported,
     coverage,
     comparison,
     heat,
@@ -303,33 +389,56 @@ export function buildReport(question: string, claims: VerifiedClaim[], evidence:
     citations,
     claims,
   };
+  const reportedTimeline = reported.filter((item) => item.publishedAt || item.mentioned);
   const lines = [
     `# ${question.trim().slice(0, 80) || "深度研究报告"}`,
     "",
-    "## 核心结论",
-    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : ["现有资料不足以确认具体结论。"]),
+    lead,
     "",
-    "## 关键时间线",
-    ...(timeline.length ? timeline.map((item) => `- ${item.at.slice(0, 16).replace("T", " ")} ${item.title} [${item.evidenceId}] · ${item.sourceType}`) : ["现有证据没有可排序的发布时间。"]),
+    "## 核心结论",
+    ...(report.summary.length ? report.summary.map((line) => `- ${line}`) : [opts.unparsed ? "核验输出无法解析，没有已证实事实。" : "没有通过逐字核验的事实。来源报道不能写成已证实结论。"]),
+    "",
+    "## 报道时间",
+    ...(timeline.length || reportedTimeline.length
+      ? [
+          ...timeline.map((item) => `- ${timeBits(item) || "没有单独的报道发布时间"} · ${item.credibility} · ${item.title} [${item.evidenceId}] · ${item.sourceType}`),
+          ...reportedTimeline.map((item) => `- ${timeBits(item) || "没有单独的报道发布时间"} · 来源报道但尚未核实 · ${item.title} [${item.id}] · ${item.sourceType}`),
+        ]
+      : [evidence.length ? "这些资料没有可排序的报道发布时间，也不能从正文里读出事件日期。" : "没有检索到带时间的资料。"]),
     "",
     "## 官方与媒体",
-    `本报告引用的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。来源类型只说明材料出处，不等于事实已经核实。`,
+    `这次检索到的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。被已证实结论引用 ${coverage.cited} 条。来源类型只说明材料出处，不等于事实已经核实。`,
     "",
-    "## 差异与争议",
-    ...(comparison.length ? comparison.map((item) => `- ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`) : ["这次没有核到互相矛盾、或把媒体猜测写成官方确认的主张。"]),
-    "",
-    "## 热度观察",
-    ...(heat.length
-      ? [...heat.map((item) => `- ${item.label}：${item.value} [${item.evidenceId}]`), "这些数字只来自对应证据里的统计，不能据此断言热度变化的原因。"]
-      : ["这次没有可引用的热度统计。"]),
-    "",
-    "## 尚未确认",
-    ...(uncertainty.length ? uncertainty.map((item) => `- ${item.note} ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`) : ["没有需要降级或删除的主张。"]),
-    "",
+    ...(reported.length ? [
+      "## 来源报道但尚未核实",
+      ...reported.map((item) => {
+        const when = timeBits(item);
+        const clip = item.excerpt ? `\n  摘录：${item.excerpt}` : "";
+        return `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}${when ? ` · ${when}` : ""}${clip}`;
+      }),
+      "这些只是来源报道，还没有通过逐字核验。",
+      "",
+    ] : []),
+    ...(comparison.length ? [
+      "## 差异与争议",
+      ...comparison.map((item) => `- ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`),
+      "",
+    ] : []),
+    ...(heat.length ? [
+      "## 热度观察",
+      ...heat.map((item) => `- ${item.label}：${item.value} [${item.evidenceId}]`),
+      "这些数字只来自对应证据里的统计，不能据此断言热度变化的原因。",
+      "",
+    ] : []),
+    ...(uncertainty.length ? [
+      "## 尚未确认",
+      ...uncertainty.map((item) => `- ${item.note} ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`),
+      "",
+    ] : []),
     "## 引用",
     ...(citations.length
       ? citations.map((item) => `- [${item.id}] ${item.title}${item.sourceName ? ` · ${item.sourceName}` : ""} · ${item.sourceType}`)
-      : [evidence.length ? "没有被已证实结论引用的资料。" : "没有登记证据。"]),
+      : [evidence.length ? `没有被已证实结论引用的资料。上面列出了检索到的 ${evidence.length} 条来源报道。` : "没有登记证据。"]),
   ];
   return { markdown: lines.join("\n"), report };
 }

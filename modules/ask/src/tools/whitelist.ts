@@ -32,6 +32,20 @@ function clipExcerpt(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 400) : "";
 }
 
+function plainPublic(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+
+
 function sourceKind(firstParty: unknown): "官方来源" | "媒体报道" | "未知" {
   if (firstParty === true) return "官方来源";
   if (firstParty === false) return "媒体报道";
@@ -217,14 +231,14 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         const evidence: EvidenceCandidate[] = res.items.map((it) => ({
           kind: "item" as const, objectId: it.id, title: it.title, sourceName: it.source.name,
           publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original,
-          toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty, excerpt: clipExcerpt(it.summary), sourceType: sourceKind(it.firstParty) },
+          toolName: tool, rawRef: { id: it.id, q: a.q ?? null, firstParty: it.firstParty, excerpt: clipExcerpt(it.summary), timelineAt: it.timelineAt, sourceType: sourceKind(it.firstParty) },
         }));
         const structured = { count: res.items.length, mode, expanded, from: res.from, until: res.until, nextCursor: res.nextCursor, aliases: queries,
           retrieval: { engine: res.retrieval.used, fallbackReason: res.retrieval.fallbackReason,
             keywordCandidates: res.retrieval.keywordCandidates, semanticCandidates: res.retrieval.semanticCandidates,
             vectorCandidates: res.retrieval.vectorCandidates } };
         const text = JSON.stringify({ scope: mode === "selected" ? "精选" : "全部公开动态（含未入选）", ...structured,
-          note: "时间范围按站内时间，开始含、结束不含。有 nextCursor 仅为一页，不得冒充完整统计。来源类型不代表事实已核实。空结果仅指本查询范围；具名搜索无结果不得改用无关近期列表凑答案。",
+          note: "时间范围按站内时间，开始含、结束不含。有 nextCursor 仅为一页，不得冒充完整统计。来源类型不代表事实已核实。空结果仅指本查询范围；具名搜索无结果不得改用无关近期列表凑答案。publishedAt 是报道发布时间，timelineAt 是站内时间，都不是事件发生时间。",
           items: res.items.map((it, i) => ({ evidencePosition: i + 1, article_id: it.id, title: it.title, summary: it.summary,
             source: it.source.name, sourceType: it.firstParty ? "官方来源" : "媒体报道", publishedAt: it.publishedAt, timelineAt: it.timelineAt })) });
         return { ok: true, name: tool, text, structured, evidence };
@@ -235,12 +249,13 @@ export async function executeAskTool(name: string, argsJson: string): Promise<To
         if (detail.kind !== "found" || detail.item.readingMode === "summary-only") return { ok: false, name: tool, errorCode: "not_found", message: "这篇资讯已不可用或仅保留来源信息，暂不支持问答。" };
         const it = detail.item;
         const sourceType = sourceKind(detail.row.source_tier === "T1");
+        const bodyExcerpt = it.readingMode === "full" ? plainPublic(it.body?.zh || it.body?.original).slice(0, 800) : "";
         return { ok: true, name: tool, text: JSON.stringify({ article_id: it.id, title: it.title, summary: it.summary,
-          source: it.source.name, sourceType, publishedAt: it.publishedAt, story: it.story,
-          note: "只有标题与摘要。不得补写未提供的全文细节；媒体转述不等于官方确认。" }),
+          source: it.source.name, sourceType, publishedAt: it.publishedAt, timelineAt: it.timelineAt, story: it.story,
+          note: "工具结果包含标题、摘要和时间。不得补写未提供的全文细节；媒体转述不等于官方确认。报道发布时间不是事件发生时间。" }),
           structured: { count: 1 }, evidence: [{ kind: "item", objectId: it.id, title: it.title, sourceName: it.source.name,
             publishedAt: it.publishedAt, siteUrl: `/items/${it.id}`, originalUrl: it.links.original, toolName: tool,
-            rawRef: { id: it.id, excerpt: clipExcerpt(it.summary), sourceType } }] };
+            rawRef: { id: it.id, excerpt: clipExcerpt(it.summary), bodyExcerpt: bodyExcerpt.length >= 40 ? bodyExcerpt : "", timelineAt: it.timelineAt, sourceType } }] };
       }
       case "get_hot_topics": {
         const a = parsed.data as { limit?: number };

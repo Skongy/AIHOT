@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { Link, useSearchParams } from "react-router";
 import type { Screen } from "../../../apps/web/app/components/shell/screens";
 import { pageMeta } from "../../../apps/web/app/lib/seo";
@@ -58,56 +59,78 @@ function ResearchProcess({ plan, streaming }: { plan: NonNullable<Message["plan"
   </section>;
 }
 const CLAIM_STATUS: Record<string, string> = { supported: "已证实", insufficient: "证据不足", disputed: "存在争议", contradicted: "相互矛盾", withdrawn: "已移除" };
+function clockLabel(at: string): string {
+  return `${beijingDate(at)} ${beijingTime(at)}`;
+}
 function ReportView({ report }: { report: ResearchReportView }) {
   const max = report.chart ? Math.max(...report.chart.map((point) => point.value), 1) : 1;
+  const reported = report.reported ?? [];
+  const cited = report.coverage.cited ?? report.citations.length;
   return <div className="ask-report">
+    {report.lead && <p>{report.lead}</p>}
     <section>
       <h3>核心结论</h3>
-      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>现有资料不足以确认具体结论。</p>}
+      {report.summary.length ? <ul>{report.summary.map((line) => <li key={line}>{line}</li>)}</ul> : <p>没有通过逐字核验的事实。来源报道不能写成已证实结论。</p>}
     </section>
     <section>
-      <h3>关键时间线</h3>
-      {report.timeline.length ? <ol className="ask-report-timeline">{report.timeline.map((item) => <li key={`${item.evidenceId}-${item.at}`}>
-        <time dateTime={item.at}>{item.at.slice(0, 16).replace("T", " ")}</time>
-        <span>{item.title}</span>
-        <small>[{item.evidenceId}] · {item.sourceType}</small>
-      </li>)}</ol> : <p>现有证据没有可排序的发布时间。</p>}
+      <h3>报道时间</h3>
+      {report.timeline.length || reported.some((item) => item.publishedAt || item.mentioned) ? <ol className="ask-report-timeline">
+        {report.timeline.map((item) => <li key={`verified-${item.evidenceId}-${item.at}`}>
+          <time dateTime={item.at}>报道发布 {clockLabel(item.at)}</time>
+          <span>{item.title}</span>
+          <small>{item.credibility ?? "已证实"} · [{item.evidenceId}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
+        </li>)}
+        {reported.filter((item) => item.publishedAt || item.mentioned).map((item) => <li key={`reported-${item.id}`}>
+          <time dateTime={item.publishedAt ?? undefined}>{item.publishedAt ? `报道发布 ${clockLabel(item.publishedAt)}` : "报道中的日期"}</time>
+          <span>{item.title}</span>
+          <small>来源报道但尚未核实 · [{item.id}] · {item.sourceType}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}，这不是报道发布时间` : ""}</small>
+        </li>)}
+      </ol> : <p>没有检索到带时间的资料。</p>}
     </section>
     <section>
       <h3>官方与媒体</h3>
-      <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span></p>
-      <p>来源类型只说明材料出处，不等于事实已经核实。</p>
+      <p className="ask-report-coverage"><span>官方来源 {report.coverage.official}</span><span>媒体报道 {report.coverage.media}</span><span>未区分 {report.coverage.unknown}</span><span>已证实引用 {cited}</span></p>
+      <p>这些数字是这次检索到的资料，不是已证实的新闻条数。来源类型只说明材料出处，不等于事实已经核实。</p>
     </section>
+    {reported.length > 0 && <section>
+      <h3>来源报道但尚未核实</h3>
+      <ol className="ask-report-citations">{reported.map((item) => <li key={item.id}>
+        <details>
+          <summary>[{item.id}] {item.title}</summary>
+          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType} · 来源报道但尚未核实{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}{item.timelineAt ? ` · 站内时间 ${clockLabel(item.timelineAt)}` : ""}{item.mentioned ? ` · 报道中写到 ${item.mentioned}` : ""}</p>
+          {item.excerpt && <p>{item.excerpt}</p>}
+          {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
+        </details>
+      </li>)}</ol>
+    </section>}
     {(report.comparison.length > 0) && <section>
       <h3>差异与争议</h3>
       <ul>{report.comparison.map((item) => <li key={item.text}>{item.text}{item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}</li>)}</ul>
     </section>}
-    <section>
+    {report.heat.length > 0 && <section>
       <h3>热度观察</h3>
-      {report.heat.length ? <>
-        <dl className="ask-report-heat">{report.heat.map((item) => <div key={`${item.evidenceId}-${item.label}`}><dt>{item.label}</dt><dd>{item.value} <small>[{item.evidenceId}]</small></dd></div>)}</dl>
-        {report.chart && <div className="ask-report-chart" role="img" aria-label="同一指标的多次统计">{report.chart.map((point) => <div key={`${point.evidenceId}-${point.label}`}>
-          <span>{point.label}</span><span className="ask-report-bar"><i style={{ width: `${Math.max(4, Math.round(point.value / max * 100))}%` }}/></span><strong>{point.value}</strong>
-        </div>)}</div>}
-        <p>这些数字只来自对应证据，不能据此断言热度变化的原因。</p>
-      </> : <p>这次没有可引用的热度统计。</p>}
-    </section>
-    <section>
+      <dl className="ask-report-heat">{report.heat.map((item) => <div key={`${item.evidenceId}-${item.label}`}><dt>{item.label}</dt><dd>{item.value} <small>[{item.evidenceId}]</small></dd></div>)}</dl>
+      {report.chart && <div className="ask-report-chart" role="img" aria-label="同一指标的多次统计">{report.chart.map((point) => <div key={`${point.evidenceId}-${point.label}`}>
+        <span>{point.label}</span><span className="ask-report-bar"><i style={{ width: `${Math.max(4, Math.round(point.value / max * 100))}%` }}/></span><strong>{point.value}</strong>
+      </div>)}</div>}
+      <p>这些数字只来自对应证据，不能据此断言热度变化的原因。</p>
+    </section>}
+    {report.uncertainty.length > 0 && <section>
       <h3>尚未确认</h3>
-      {report.uncertainty.length ? <ul className="ask-report-uncertainty">{report.uncertainty.map((item) => <li key={`${item.status}-${item.text}`}>
+      <ul className="ask-report-uncertainty">{report.uncertainty.map((item) => <li key={`${item.status}-${item.text}`}>
         <b>{CLAIM_STATUS[item.status] ?? item.status}</b>
         <span>{item.note} {item.text}</span>
-      </li>)}</ul> : <p>没有需要降级或删除的主张。</p>}
-    </section>
+      </li>)}</ul>
+    </section>}
     <section>
       <h3>引用</h3>
       {report.citations.length ? <ol className="ask-report-citations">{report.citations.map((item) => <li key={item.id}>
         <details>
           <summary>[{item.id}] {item.title}</summary>
-          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType}{item.publishedAt ? ` · ${item.publishedAt.slice(0, 16).replace("T", " ")}` : ""}</p>
+          <p>{item.sourceName ? `${item.sourceName} · ` : ""}{item.sourceType}{item.publishedAt ? ` · 报道发布 ${clockLabel(item.publishedAt)}` : ""}</p>
           {item.siteUrl?.startsWith("/") && <Link to={item.siteUrl}>查看来源</Link>}
         </details>
-      </li>)}</ol> : <p>没有登记证据。</p>}
+      </li>)}</ol> : <p>{reported.length ? `没有被已证实结论引用的资料。上面列出了检索到的 ${reported.length} 条来源报道。` : "没有登记证据。"}</p>}
     </section>
   </div>;
 }

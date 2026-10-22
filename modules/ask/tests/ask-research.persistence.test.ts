@@ -338,24 +338,26 @@ test("a crashed verification resumes the same round without another model charge
     workerId: "worker-verify",
     chat: async (opts) => {
       rounds.push(opts.roundIndex);
-      assert.equal((await getTask(task.id))!.model_calls, 3);
       return fake("不是 JSON");
     },
   });
-  assert.deepEqual(rounds, [3]);
+  assert.deepEqual(rounds, [3, 4]);
   const row = await getTask(task.id);
-  assert.equal(row!.model_calls, 3);
+  assert.equal(row!.model_calls, 4);
   assert.equal(row!.status, "completed_degraded");
-  // The resumed verifier returned no claims. A verified report may cite only a supported fact,
-  // so the collected row stays out of the conclusion and the citation list.
-  assert.match(row!.final_answer ?? "", /现有资料不足以确认具体结论/);
-  assert.match(row!.final_answer ?? "", /没有被已证实结论引用的资料/);
-  assert.doesNotMatch(row!.final_answer ?? "", /\[1\]/);
+  // The resumed round is not charged twice. One repair still cannot parse claims, so the
+  // retrieved row is listed as an unverified report and stays out of the verified conclusion.
+  assert.match(row!.final_answer ?? "", /核验输出无法解析/);
+  assert.match(row!.final_answer ?? "", /来源报道但尚未核实/);
+  assert.match(row!.final_answer ?? "", /无畏契约 测试更新/);
+  const conclusion = row!.final_answer?.split("## 核心结论")[1]?.split("\n## ")[0] ?? "";
+  assert.doesNotMatch(conclusion, /\[1\]/);
+  assert.match(row!.final_answer ?? "", /\[1\]/);
   assert.doesNotMatch(row!.final_answer ?? "", /草稿认为/);
   let extra = 0;
   await runDeepResearch({ taskId: task.id, workerId: "worker-verify-again", chat: async () => { extra += 1; return fake("不是 JSON"); } });
   assert.equal(extra, 0);
-  assert.equal((await getTask(task.id))!.model_calls, 3);
+  assert.equal((await getTask(task.id))!.model_calls, 4);
 });
 
 test("a second verification resume stops before another paid call", async () => {

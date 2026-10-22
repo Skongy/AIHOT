@@ -4,12 +4,15 @@ export type AskMode = "normal" | "deep";
 export type ResearchStepStatus = "pending" | "running" | "done" | "skipped" | "failed";
 export type ResearchStepView = { index: number; goal: string; tool: string | null; toolLabel: string | null; status: ResearchStepStatus; dependsOn: number[]; summary?: string };
 export type ResearchPlanView = { version: number; steps: ResearchStepView[] };
-export type ReportTimelineItem = { at: string; title: string; evidenceId: number; sourceType: string };
+export type ReportTimelineItem = { at: string; timelineAt?: string | null; mentioned?: string | null; title: string; evidenceId: number; sourceType: string; credibility?: string };
+export type ReportedItem = { id: number; title: string; sourceName: string | null; sourceType: string; siteUrl: string | null; publishedAt: string | null; timelineAt: string | null; mentioned: string | null; excerpt: string | null };
 export type ReportHeatItem = { label: string; value: string; evidenceId: number };
 export type ResearchReportView = {
+  lead?: string;
   summary: string[];
   timeline: ReportTimelineItem[];
-  coverage: { official: number; media: number; unknown: number };
+  reported?: ReportedItem[];
+  coverage: { official: number; media: number; unknown: number; cited?: number };
   comparison: Array<{ text: string; evidenceIds: number[] }>;
   heat: ReportHeatItem[];
   chart: Array<{ label: string; value: number; evidenceId: number }> | null;
@@ -103,7 +106,15 @@ export function reportFromPayload(payload: Record<string, unknown>): ResearchRep
     if (!item || typeof item !== "object") return [];
     const row = item as Record<string, unknown>;
     if (typeof row.at !== "string" || typeof row.title !== "string" || !Number.isInteger(row.evidenceId)) return [];
-    return [{ at: row.at, title: row.title, evidenceId: row.evidenceId as number, sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知" }];
+    return [{
+      at: row.at,
+      timelineAt: typeof row.timelineAt === "string" ? row.timelineAt : null,
+      mentioned: typeof row.mentioned === "string" ? row.mentioned : null,
+      title: row.title,
+      evidenceId: row.evidenceId as number,
+      sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知",
+      credibility: typeof row.credibility === "string" ? row.credibility : "已证实",
+    }];
   }) : [];
   const heat = Array.isArray(report.heat) ? report.heat.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
@@ -142,14 +153,33 @@ export function reportFromPayload(payload: Record<string, unknown>): ResearchRep
       publishedAt: typeof row.publishedAt === "string" ? row.publishedAt : null,
     }];
   }) : [];
-  if (!textList(report.summary).length && !timeline.length && !citations.length && !uncertainty.length) return undefined;
+  const reported = Array.isArray(report.reported) ? report.reported.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (!Number.isInteger(row.id) || typeof row.title !== "string") return [];
+    return [{
+      id: row.id as number,
+      title: row.title,
+      sourceName: typeof row.sourceName === "string" ? row.sourceName : null,
+      sourceType: typeof row.sourceType === "string" ? row.sourceType : "未知",
+      siteUrl: typeof row.siteUrl === "string" ? row.siteUrl : null,
+      publishedAt: typeof row.publishedAt === "string" ? row.publishedAt : null,
+      timelineAt: typeof row.timelineAt === "string" ? row.timelineAt : null,
+      mentioned: typeof row.mentioned === "string" ? row.mentioned : null,
+      excerpt: typeof row.excerpt === "string" ? row.excerpt : null,
+    }];
+  }) : [];
+  if (!textList(report.summary).length && !timeline.length && !citations.length && !uncertainty.length && !reported.length && typeof report.lead !== "string") return undefined;
   return {
+    lead: typeof report.lead === "string" ? report.lead : undefined,
     summary: textList(report.summary),
     timeline,
+    reported,
     coverage: {
       official: typeof coverage.official === "number" ? coverage.official : 0,
       media: typeof coverage.media === "number" ? coverage.media : 0,
       unknown: typeof coverage.unknown === "number" ? coverage.unknown : 0,
+      cited: typeof coverage.cited === "number" ? coverage.cited : undefined,
     },
     comparison: rows(report.comparison),
     heat,
