@@ -86,7 +86,10 @@ export function registerAskRoutes(app: FastifyInstance) {
     try {
       task = await sql.begin(async (tx) => {
         const t = await createTask({ sessionId, clientRequestId: decision.clientRequestId, message: decision.message, mode: decision.mode }, tx);
-        await enqueueOn(askRunQueue, { taskId: t.id }, {}, tx);
+        // ask.run uses policy "short": created jobs that share a singleton key collapse to one row.
+        // An empty key made two sessions enqueue as the same job, and the loser stayed queued with no job.
+        const jobId = await enqueueOn(askRunQueue, { taskId: t.id }, { singletonKey: t.id }, tx);
+        if (!jobId) throw new Error("ask.run enqueue returned no job");
         return t;
       });
     } catch (e) {

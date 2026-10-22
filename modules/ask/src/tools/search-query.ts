@@ -29,6 +29,44 @@ export function askRange(input: AskRangeInput, fallback: AskWindow, now = new Da
 
 const normal = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[《》]/g, "").replace(/\s+/g, " ").trim();
 
+const CONTENT_STOPS = ["有没有公布", "有没有", "这一周", "为什么", "是否", "哪些", "哪个", "怎么", "如何", "什么", "哪位", "哪支", "谁", "吗", "呢"];
+const CONTENT_HINTS = ["全球冠军赛", "冠军赛", "平衡调整", "夺冠", "冠军", "平衡", "联名", "贴纸", "缓刑", "补丁", "售价"];
+const CONTENT_LATIN_STOP = new Set(["the", "who", "won", "and", "for", "with", "from", "game", "games"]);
+
+/** Space-separated terms for keyword search. A whole question must not become one LIKE phrase. */
+export function askContentQuery(text: string): string {
+  const raw = normal(text).replace(/[？?。！!，,、]/g, " ").replace(/\s+/g, " ").trim();
+  let entity = "";
+  let entityAt = -1;
+  for (const item of Object.values(ENTITIES)) {
+    const names = [...new Set([item.name, ...item.aliases, ...(item.otherNames ?? [])].map(normal))].sort((a, b) => b.length - a.length);
+    for (const name of names) {
+      if (name.length < 2 || name.length < entity.length) continue;
+      const index = raw.indexOf(name);
+      if (index < 0) continue;
+      if (/^[a-z0-9]/.test(name) && /[a-z0-9]/.test(raw[index - 1] ?? "")) continue;
+      if (/[a-z0-9]$/.test(name) && /[a-z0-9]/.test(raw[index + name.length] ?? "")) continue;
+      if (name.length === entity.length && index > entityAt) continue;
+      entity = name;
+      entityAt = index;
+    }
+  }
+  const years = raw.match(/20\d{2}/g) ?? [];
+  const hints: string[] = [];
+  let scan = raw;
+  for (const hint of [...CONTENT_HINTS].sort((a, b) => b.length - a.length)) {
+    if (!scan.includes(hint) || hints.some((chosen) => chosen.includes(hint))) continue;
+    hints.push(hint);
+    scan = scan.split(hint).join(" ");
+  }
+  let rest = entityAt >= 0 ? `${raw.slice(0, entityAt)} ${raw.slice(entityAt + entity.length)}` : raw;
+  for (const stop of CONTENT_STOPS) rest = rest.split(stop).join(" ");
+  const latin = [...rest.matchAll(/[a-z][a-z0-9][a-z0-9.-]{0,}/g)].map((match) => match[0]).filter((token) => !CONTENT_LATIN_STOP.has(token) && token !== entity);
+  const terms = [...new Set([entity, ...years, ...hints, ...latin].map((term) => term.trim()).filter((term) => term.length >= 2))];
+  if (terms.length) return terms.slice(0, 6).join(" ");
+  return raw.length >= 2 ? raw.slice(0, 80) : "游戏新闻";
+}
+
 /** Expand one named entity, retaining extra keywords; never broaden an unknown query. */
 export function askAliases(query: string): string[] {
   const q = normal(query);

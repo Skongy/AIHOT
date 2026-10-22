@@ -217,6 +217,8 @@ test("fallback plans match the deep examples and never invent an id tool first",
   assert.deepEqual(heat.map((item) => item.tool), ["get_hot_topics", "search"]);
   assert.equal(inferWindow(DEEP_STARTERS[3]!.question), "all");
   assert.equal(searchQueryFromQuestion(DEEP_STARTERS[3]!.question), "原神");
+  assert.equal(searchQueryFromQuestion("2026 无畏契约全球冠军赛谁夺冠？"), "无畏契约 2026 全球冠军赛 夺冠");
+  assert.equal(searchQueryFromQuestion("不存在的游戏 Nebula Orchard 9 有更新吗？"), "nebula orchard");
 });
 
 test("direct tool args come from the question, and id tools stay empty", () => {

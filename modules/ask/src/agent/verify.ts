@@ -156,7 +156,16 @@ export function assessClaims(proposed: ProposedClaim[], evidence: VerifiableEvid
   return preliminary;
 }
 
+function boundClaim(claim: ProposedClaim, evidence: VerifiableEvidence[]): ProposedClaim {
+  if (claim.evidenceIds.length) return claim;
+  const quote = compact(claim.quote);
+  if (quote.length < 12) return claim;
+  const hits = evidence.filter((item) => compact(evidenceText(item)).includes(quote));
+  return hits.length === 1 ? { ...claim, evidenceIds: [hits[0]!.id] } : claim;
+}
+
 function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvidence[]): VerifiedClaim {
+  claim = boundClaim(claim, evidence);
   const items = citedItems(claim, evidence);
   const text = items.map(evidenceText).join("\n");
   const quote = compact(claim.quote);
@@ -227,25 +236,27 @@ function chartOf(heat: ReportHeatItem[]): ResearchReport["chart"] {
 
 export function buildReport(question: string, claims: VerifiedClaim[], evidence: VerifiableEvidence[]): { markdown: string; report: ResearchReport } {
   const supported = claims.filter((claim) => claim.status === "supported" && claim.kind === "fact");
-  const timeline = evidence
+  const citedIds = new Set(claims.flatMap((claim) => claim.evidenceIds));
+  const shown = citedIds.size ? evidence.filter((item) => citedIds.has(item.id)) : evidence;
+  const timeline = shown
     .filter((item) => item.publishedAt && item.title)
     .map((item) => ({ at: item.publishedAt!, title: item.title!, evidenceId: item.id, sourceType: sourceTypeOf(item.sourceType) }))
     .sort((a, b) => a.at.localeCompare(b.at));
   const coverage = { official: 0, media: 0, unknown: 0 };
-  for (const item of evidence) {
+  for (const item of shown) {
     const type = sourceTypeOf(item.sourceType);
     if (type === "官方来源") coverage.official += 1;
     else if (type === "媒体报道") coverage.media += 1;
     else coverage.unknown += 1;
   }
-  const heat = heatOf(evidence);
+  const heat = heatOf(shown);
   const comparison = claims
     .filter((claim) => claim.status === "disputed" || claim.status === "contradicted")
     .map((claim) => ({ text: claim.text, evidenceIds: claim.evidenceIds }));
   const uncertainty = claims
     .filter((claim) => claim.status !== "supported")
     .map((claim) => ({ status: claim.status, text: claim.text, note: claim.note, evidenceIds: claim.evidenceIds }));
-  const citations = evidence.map((item) => ({
+  const citations = shown.map((item) => ({
     id: item.id,
     title: item.title ?? item.kind ?? "资料",
     sourceName: item.sourceName ?? null,
@@ -274,7 +285,7 @@ export function buildReport(question: string, claims: VerifiedClaim[], evidence:
     ...(timeline.length ? timeline.map((item) => `- ${item.at.slice(0, 16).replace("T", " ")} ${item.title} [${item.evidenceId}] · ${item.sourceType}`) : ["现有证据没有可排序的发布时间。"]),
     "",
     "## 官方与媒体",
-    `已登记资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。来源类型只说明材料出处，不等于事实已经核实。`,
+    `本报告引用的资料中，官方来源 ${coverage.official} 条，媒体报道 ${coverage.media} 条，未能区分来源类型 ${coverage.unknown} 条。来源类型只说明材料出处，不等于事实已经核实。`,
     "",
     "## 差异与争议",
     ...(comparison.length ? comparison.map((item) => `- ${item.text}${item.evidenceIds.length ? ` [${item.evidenceIds.join("][")}]` : ""}`) : ["这次没有核到互相矛盾、或把媒体猜测写成官方确认的主张。"]),

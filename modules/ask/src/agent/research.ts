@@ -10,6 +10,7 @@ import {
   listMessages, listPlanSteps, renewLease, replaceClaims, replacePendingPlanSteps, savePlanStep, saveResearchCheckpoint,
   setActiveReceipt, updateDraft, type PlanStepStatus, type TaskStatus,
 } from "../db/store.ts";
+import { askContentQuery } from "../tools/search-query.ts";
 import {
   ASK_TOOL_LABELS_ZH, ASK_TOOL_NAMES, askToolSpecs, executeAskTool, friendlyStepSummary,
   type AskToolName, type EvidenceCandidate, type ToolExecResult,
@@ -201,9 +202,7 @@ export function searchQueryFromQuestion(question: string, goal = ""): string {
   if (fromGoal.length) return fromGoal.join(" ").slice(0, 200);
   const fromQuestion = quotedNames(question);
   if (fromQuestion.length === 1) return fromQuestion[0]!.slice(0, 200);
-  const cleaned = question.replace(/[？?。！!，,]/g, " ").replace(/\s+/g, " ").trim();
-  const query = cleaned.slice(0, 80);
-  return query.length >= 2 ? query : "游戏新闻";
+  return askContentQuery(goal ? `${question} ${goal}` : question);
 }
 
 /** Args for tools whose parameters come from the question. ID tools stay null so we never invent an id. */

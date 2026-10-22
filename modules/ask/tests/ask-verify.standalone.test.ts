@@ -51,6 +51,23 @@ test("matching quotes can still be contradicted, official, or only a guess", () 
   assert.equal(rows[5]!.status, "withdrawn");
 });
 
+test("a quote found in exactly one evidence item is bound to that item", () => {
+  const [row] = assessClaims([
+    claim("巴西战队LOUD夺得冠军", [], "巴西战队LOUD夺得冠军"),
+  ], [official, { ...media, excerpt: "巴西战队LOUD夺得冠军，独得100万美元奖金。" }]);
+  assert.equal(row!.status, "supported");
+  assert.deepEqual(row!.evidenceIds, [2]);
+});
+
+test("the same quote in two items is not assigned to either", () => {
+  const shared = "巴西战队LOUD夺得冠军";
+  const [row] = assessClaims([
+    claim(shared, [], shared),
+  ], [{ ...official, excerpt: shared }, { ...media, excerpt: shared }]);
+  assert.equal(row!.status, "insufficient");
+  assert.deepEqual(row!.evidenceIds, []);
+});
+
 test("missing evidence, empty retrieval text, and a changed number stay insufficient", () => {
   const rows = assessClaims([
     claim("有公开报道", [9], "有公开报道"),
