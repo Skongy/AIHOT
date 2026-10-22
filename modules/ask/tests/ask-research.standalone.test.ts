@@ -7,8 +7,9 @@ import { ReceiptBusyError, ReceiptUnknownError } from "@aihot/backend/providers/
 import type { ChatToolCall, ChatToolsStreamOptions, ChatToolsStreamResult } from "@aihot/backend/providers/llm";
 import { decideAskPost } from "../src/http/decide.ts";
 import {
-  DEEP_LIMITS, directToolArgs, fallbackResearchPlan, inferWindow, nextResearchAction, parseReplan, parseResearchPlan,
-  groundHistoryFollowup, researchClock, runResearchDriver, searchQueryFromQuestion, taskCheckpoint,
+  actionableResearchPlan, DEEP_LIMITS, directToolArgs, evidenceForResearchStep, fallbackResearchPlan, inferWindow,
+  nextResearchAction, parseReplan, parseResearchPlan, groundHistoryFollowup, researchClock, runResearchDriver,
+  searchQueryFromQuestion, taskCheckpoint,
   type HistoryReference,
   type LoadedResearch, type ResearchRun, type ResearchState, type StepState,
 } from "../src/agent/research.ts";
@@ -88,6 +89,7 @@ function harness(options: {
   nowMs?: number;
   script?: (opts: ChatToolsStreamOptions) => ChatToolsStreamResult | "unknown" | Error;
   evidenceFor?: (name: string) => boolean;
+  resultFor?: (name: string, args: string) => ToolExecResult | null;
   cancelAfterPlan?: boolean;
   historyReferences?: HistoryReference[];
 }) {
@@ -115,6 +117,8 @@ function harness(options: {
     },
     executeTool: async (name, args) => {
       executed.push({ name, args });
+      const scripted = options.resultFor?.(name, args);
+      if (scripted) return scripted;
       const allowed = (ASK_TOOL_NAMES as readonly string[]).includes(name);
       if (!allowed || options.evidenceFor?.(name) === false) {
         const fail: ToolExecResult = allowed
@@ -160,6 +164,9 @@ function harness(options: {
         id: evidenceId,
         title: item.title,
         kind: item.kind,
+        objectId: item.objectId,
+        toolName: item.toolName,
+        parentObjectId: typeof raw.publicId === "string" ? raw.publicId : null,
         sourceName: item.sourceName,
         sourceType: typeof raw.sourceType === "string" ? raw.sourceType : undefined,
         excerpt: typeof raw.excerpt === "string" ? raw.excerpt : undefined,
@@ -243,6 +250,36 @@ test("a short follow-up is grounded to the previous citation instead of generic 
   }]);
 });
 
+test("analysis-only plan steps are removed because synthesis owns the comparison", () => {
+  const actionable = actionableResearchPlan([
+    { index: 0, goal: "查热点", tool: "get_hot_topics", dependsOn: [] },
+    { index: 1, goal: "读取事件", tool: "get_story", dependsOn: [0] },
+    { index: 2, goal: "对照并总结", tool: null, dependsOn: [1] },
+  ]);
+  assert.deepEqual(actionable.map((item) => [item.index, item.tool, item.dependsOn]), [
+    [0, "get_hot_topics", []],
+    [1, "get_story", [0]],
+  ]);
+});
+
+test("a choose-one hotspot step registers one candidate instead of the whole unrelated page", () => {
+  const candidates = ["one", "two", "three"].map((objectId) => ({
+    kind: "story" as const, objectId, title: objectId, sourceName: null, publishedAt: null,
+    siteUrl: `/story/${objectId}`, originalUrl: null, toolName: "get_hot_topics", rawRef: {},
+  }));
+  assert.deepEqual(evidenceForResearchStep(
+    step({ index: 0, goal: "确定最近一个热点事件", status: "running", tool: "get_hot_topics" }),
+    "get_hot_topics",
+    candidates,
+  ).map((item) => item.objectId), ["one"]);
+  assert.deepEqual(evidenceForResearchStep(
+    step({ index: 0, goal: "查看近期热点", status: "running", tool: "get_hot_topics" }),
+    "get_hot_topics",
+    candidates,
+    "梳理最近一个热点事件",
+  ).map((item) => item.objectId), ["one"]);
+});
+
 test("a history reference without an id falls back to its exact title search", () => {
   const missingId = { ...HISTORY_ITEM, objectId: null };
   const grounded = groundHistoryFollowup("这篇讲了什么", [
@@ -266,8 +303,8 @@ test("fallback plans match the deep examples and never invent an id tool first",
   assert.equal(inferWindow(DEEP_STARTERS[1]!.question), "7d");
 
   const coverage = fallbackResearchPlan(DEEP_STARTERS[2]!.question);
-  assert.deepEqual(coverage.map((item) => item.tool), ["search", "get_story"]);
-  assert.equal(coverage[0]!.tool, "search");
+  assert.deepEqual(coverage.map((item) => item.tool), ["get_hot_topics", "get_story", "search"]);
+  assert.deepEqual(coverage.map((item) => item.dependsOn), [[], [0], [1]]);
 
   const heat = fallbackResearchPlan(DEEP_STARTERS[3]!.question);
   assert.deepEqual(heat.map((item) => item.tool), ["get_hot_topics", "search"]);
@@ -275,6 +312,10 @@ test("fallback plans match the deep examples and never invent an id tool first",
   assert.equal(searchQueryFromQuestion(DEEP_STARTERS[3]!.question), "原神");
   assert.equal(searchQueryFromQuestion("2026 无畏契约全球冠军赛谁夺冠？"), "无畏契约 2026 全球冠军赛 夺冠");
   assert.equal(searchQueryFromQuestion("不存在的游戏 Nebula Orchard 9 有更新吗？"), "nebula orchard");
+
+  const sourceComparison = fallbackResearchPlan("梳理最近一个热点事件里，官方消息和媒体报道有什么不同。");
+  assert.deepEqual(sourceComparison.map((item) => item.tool), ["get_hot_topics", "get_story", "search"]);
+  assert.deepEqual(sourceComparison.map((item) => item.dependsOn), [[], [0], [1]]);
 });
 
 test("direct tool args come from the question, and id tools stay empty", () => {
@@ -414,7 +455,59 @@ test("the follow-up '什么意思' reopens the cited article and never falls bac
   assert.equal(world.chats.find((item) => item.purpose === "ask.research_plan")?.json, true);
   const verify = world.chats.find((item) => item.purpose === "ask.research_verify");
   assert.equal(verify?.json, true);
-  assert.equal(verify?.maxTokens, 2800);
+  assert.equal(verify?.maxTokens, 4800);
+});
+
+test("a generic official-vs-media question keeps one hotspot through story and search", async () => {
+  const researchQuestion = "梳理最近一个热点事件里，官方消息和媒体报道有什么不同。";
+  const candidate = (objectId: string, title: string) => ({
+    kind: "story" as const, objectId, title, sourceName: null, publishedAt: null,
+    siteUrl: `/story/${objectId}`, originalUrl: null, toolName: "get_hot_topics", rawRef: { sourceType: "未知" },
+  });
+  const world = harness({
+    question: researchQuestion,
+    resultFor: (name) => {
+      if (name === "get_hot_topics") return {
+        ok: true, name, text: "hot", structured: { count: 2 }, evidence: [
+          candidate("hot-a", "《赛博朋克2077》2.5免费更新上线"),
+          candidate("hot-b", "完全无关的第二个热点"),
+        ],
+      };
+      if (name === "get_story") return {
+        ok: true, name, text: "story", structured: { count: 3 }, evidence: [
+          candidate("hot-a", "《赛博朋克2077》2.5免费更新上线"),
+          { kind: "item", objectId: "official-a", title: "官方公告：2.5 免费更新上线", sourceName: "游戏官方", publishedAt: null, siteUrl: "/items/official-a", originalUrl: null, toolName: name, rawRef: { publicId: "hot-a", sourceType: "官方来源" } },
+          { kind: "item", objectId: "media-a", title: "媒体解读 2.5 更新内容", sourceName: "测试媒体", publishedAt: null, siteUrl: "/items/media-a", originalUrl: null, toolName: name, rawRef: { publicId: "hot-a", sourceType: "媒体报道" } },
+        ],
+      };
+      if (name === "search") return {
+        ok: true, name, text: "search", structured: { count: 1 }, evidence: [
+          { kind: "item", objectId: "media-b", title: "媒体补充 2.5 更新体验", sourceName: "另一媒体", publishedAt: null, siteUrl: "/items/media-b", originalUrl: null, toolName: name, rawRef: { sourceType: "媒体报道" } },
+        ],
+      };
+      return null;
+    },
+    script: (opts) => {
+      if (opts.purpose === "ask.research_plan") return answer(JSON.stringify({ steps: [
+        { goal: "确定最近一个热点事件", tool: "get_hot_topics", dependsOn: [] },
+        { goal: "读取该热点事件", tool: "get_story", dependsOn: [0] },
+        { goal: "检索该事件的官方与媒体报道", tool: "search", dependsOn: [1] },
+        { goal: "对照并总结差异", tool: null, dependsOn: [2] },
+      ] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [
+        { text: "官方公告称2.5免费更新已经上线", kind: "fact", evidenceIds: [3], quote: "官方公告：2.5 免费更新上线", conflictsWith: [] },
+      ] }));
+      return answer("官方公告称 2.5 免费更新已经上线 [3]。");
+    },
+  });
+  await runResearchDriver(world.run);
+  assert.deepEqual(world.executed.map((item) => item.name), ["get_hot_topics", "get_story", "search"]);
+  assert.deepEqual(JSON.parse(world.executed[1]!.args), { public_id: "hot-a", limit: 20 });
+  assert.match(JSON.parse(world.executed[2]!.args).q, /赛博朋克/);
+  assert.equal(world.executed.some((item) => item.args.includes("完全无关")), false);
+  assert.deepEqual(world.box.current.steps.map((item) => item.tool), ["get_hot_topics", "get_story", "search"]);
+  assert.deepEqual(world.chats.map((item) => item.purpose), ["ask.research_plan", "ask.research_final", "ask.research_verify"]);
+  assert.equal(world.box.current.status, "completed");
 });
 
 test("an empty first pass replans once, then a new direct tool can still finish", async () => {

@@ -83,7 +83,7 @@ test("chatToolsStream can force json_object for internal structured phases", asy
     MODEL_CALLS_ENABLED: "true",
     LLM_BASE_URL: `http://127.0.0.1:${port}/v1`,
     LLM_API_KEY: "test-key",
-    LLM_MODEL: "deepseek-flash",
+    LLM_MODEL: "MiniMax-M2.7",
     LLM_JSON_MODE: "true",
   });
   try {
@@ -91,7 +91,7 @@ test("chatToolsStream can force json_object for internal structured phases", asy
       model: "default",
       purpose: "ask.research_verify",
       subject: `unit:${newUuid()}`,
-      promptVersion: "ask-research-v2",
+      promptVersion: "ask-research-v3",
       system: "only json",
       messages: [{ role: "user", content: "verify" }],
       tools: [],
@@ -103,6 +103,7 @@ test("chatToolsStream can force json_object for internal structured phases", asy
     assert.equal(result.jsonModeForced, true);
     assert.ok(sawBody);
     assert.deepEqual((sawBody as unknown as Record<string, unknown>).response_format, { type: "json_object" });
+    assert.equal((sawBody as unknown as Record<string, unknown>).reasoning_split, true);
   } finally {
     for (const k of Object.keys(process.env)) {
       if (!(k in prev)) delete process.env[k];

@@ -372,6 +372,9 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
   const maxTokens = Math.max(opts.maxTokens ?? 2048, 512) + (spec.reasoningTokens ?? 0);
   const enableTools = opts.enableTools !== false && opts.tools.length > 0;
   const jsonModeForced = opts.json === true && spec.jsonMode;
+  // MiniMax M2.x keeps mandatory thinking inside `content` unless reasoning_split is enabled.
+  // Structured phases parse only the answer, so keep reasoning in its dedicated field.
+  const separateReasoning = jsonModeForced && /^minimax-/i.test(spec.model);
   const messages: ChatToolsMessage[] = [
     ...(opts.system ? [{ role: "system" as const, content: opts.system }] : []),
     ...opts.messages,
@@ -389,6 +392,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
     ...(enableTools ? { tools: opts.tools, tool_choice: "auto" } : {}),
     ...(jsonModeForced ? { response_format: { type: "json_object" } } : {}),
     ...(spec.extra ?? {}),
+    ...(separateReasoning ? { reasoning_split: true } : {}),
   };
   // Model-level extras must not force JSON onto the user-facing answer path.
   if (!jsonModeForced && "response_format" in body) delete body.response_format;
@@ -410,6 +414,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
         extra: spec.extra ?? null,
         stream: true,
         jsonModeForced,
+        separateReasoning,
         taskId: opts.taskId,
         roundIndex: opts.roundIndex,
       },
@@ -425,6 +430,7 @@ export async function chatToolsStream(opts: ChatToolsStreamOptions): Promise<Cha
         stream: true,
         enableTools,
         jsonModeForced,
+        separateReasoning,
       },
       attemptTag: opts.attemptTag,
     },

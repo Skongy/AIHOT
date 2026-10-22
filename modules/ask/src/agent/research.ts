@@ -33,7 +33,7 @@ export const DEEP_LIMITS = {
 /** A gap longer than the task lease is time the worker was gone, not research time. */
 export const RESEARCH_CONTINUITY_MS = 60_000;
 
-const PROMPT_VERSION = "ask-research-v2";
+const PROMPT_VERSION = "ask-research-v3";
 const TERMINAL = new Set<TaskStatus>(["completed", "completed_degraded", "failed", "cancelled", "limit_reached"]);
 const ID_TOOLS = new Set<AskToolName>(["get_story", "get_article", "explain_hot", "explain_selection"]);
 
@@ -305,6 +305,92 @@ export function groundHistoryFollowup(
   }];
 }
 
+/** Planning models sometimes add a final “compare/summarize” step. Synthesis already does that. */
+export function actionableResearchPlan(drafts: PlanStepDraft[]): PlanStepDraft[] {
+  const kept = drafts.filter((step) => step.tool !== null);
+  if (!kept.length) return [];
+  const mapped = new Map(kept.map((step, index) => [step.index, index]));
+  return kept.map((step, index) => ({
+    ...step,
+    index,
+    dependsOn: step.dependsOn.flatMap((dep) => mapped.has(dep) ? [mapped.get(dep)!] : []),
+  }));
+}
+
+function parsedStepArgs(step: StepState): Record<string, unknown> | null {
+  const raw = step.checkpoint?.toolArgs;
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function dependencyEvidence(loaded: LoadedResearch, step: StepState): VerifiableEvidence[] {
+  const out: VerifiableEvidence[] = [];
+  for (const dependency of step.dependsOn) {
+    const source = loaded.steps.find((item) => item.index === dependency);
+    if (!source) continue;
+    const start = source.checkpoint?.evidenceBefore ?? 0;
+    const laterStarts = loaded.steps
+      .filter((item) => item.index > source.index && typeof item.checkpoint?.evidenceBefore === "number")
+      .map((item) => item.checkpoint!.evidenceBefore!)
+      .filter((value) => value >= start);
+    const end = laterStarts.length ? Math.min(...laterStarts) : loaded.evidence.length;
+    out.push(...loaded.evidence.slice(start, end));
+  }
+  return out;
+}
+
+function dependencyToolCall(
+  loaded: LoadedResearch,
+  step: StepState,
+  question: string,
+): { name: AskToolName; args: string } | null {
+  const candidates = dependencyEvidence(loaded, step);
+  if (step.tool === "get_story" || step.tool === "explain_hot") {
+    const story = candidates.find((item) => item.kind === "story" && item.objectId);
+    if (!story) return null;
+    return step.tool === "explain_hot"
+      ? { name: "explain_hot", args: JSON.stringify({ public_id: story.objectId }) }
+      : { name: "get_story", args: JSON.stringify({ public_id: story.objectId, limit: 20 }) };
+  }
+  if (step.tool === "get_article" || step.tool === "explain_selection") {
+    const article = candidates.find((item) => (item.kind === "item" || item.kind === "selection_explain") && item.objectId);
+    const name = step.tool === "explain_selection" ? "explain_selection" : "get_article";
+    return article ? { name, args: JSON.stringify({ article_id: article.objectId }) } : null;
+  }
+  if (step.tool !== "search") return null;
+  for (const dependency of [...step.dependsOn].reverse()) {
+    const source = loaded.steps.find((item) => item.index === dependency);
+    const args = source ? parsedStepArgs(source) : null;
+    const objectId = typeof args?.public_id === "string" ? args.public_id
+      : typeof args?.article_id === "string" ? args.article_id : null;
+    if (!objectId) continue;
+    const subject = loaded.evidence.find((item) => item.objectId === objectId);
+    if (!subject?.title) continue;
+    const q = subject.title.slice(0, 200);
+    return { name: "search", args: JSON.stringify({ q, window: inferWindow(question), mode: "all", limit: 8 }) };
+  }
+  return null;
+}
+
+/** A “choose one hotspot” discovery step registers one candidate, not an unrelated whole page. */
+export function evidenceForResearchStep(
+  step: StepState,
+  name: AskToolName,
+  evidence: EvidenceCandidate[],
+  question = "",
+): EvidenceCandidate[] {
+  if (name !== "get_hot_topics") return evidence;
+  const intent = `${question}\n${step.goal}`;
+  const chooseOne = /一个|某个|选(?:择|取).{0,12}热点|确定.{0,12}热点/.test(intent)
+    && !/多个|对比|比较/.test(intent);
+  return chooseOne ? evidence.slice(0, 1) : evidence;
+}
+
 function extractJsonObject(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const raw = (fenced?.[1] ?? text).trim();
@@ -378,6 +464,13 @@ export function fallbackResearchPlan(question: string): PlanStepDraft[] {
     ];
   }
   if (/官方|媒体/.test(question)) {
+    if (!names.length && /一个|某个|热点/.test(question)) {
+      return [
+        { index: 0, goal: "确定最近一个热点事件", tool: "get_hot_topics", dependsOn: [] },
+        { index: 1, goal: "读取该热点的报道时间线", tool: "get_story", dependsOn: [0] },
+        { index: 2, goal: "补充检索该热点的官方与媒体报道", tool: "search", dependsOn: [1] },
+      ];
+    }
     return [
       { index: 0, goal: "检索该热点的公开报道，并保留来源名称", tool: "search", dependsOn: [] },
       { index: 1, goal: "若上一步出现事件 ID，读取报道时间线；没有真实 ID 就不要猜测", tool: "get_story", dependsOn: [0] },
@@ -583,9 +676,10 @@ function evidenceLines(evidence: LoadedResearch["evidence"]): string {
   return evidence.map((item) => {
     const source = item.sourceName ? ` · ${item.sourceName}` : "";
     const type = item.sourceType ? ` · ${sourceTypeOf(item.sourceType)}` : "";
+    const object = item.objectId ? ` · kind=${item.kind ?? "unknown"} · object_id=${item.objectId}` : "";
     const excerpt = item.excerpt ? `\n    摘要：${item.excerpt.slice(0, 400)}` : "";
     const body = item.bodyExcerpt ? `\n    公开正文：${item.bodyExcerpt.slice(0, 800)}` : "";
-    return `[${item.id}] ${item.title ?? item.kind ?? "资料"}${source}${type}${at("报道发布", item.publishedAt)}${at("站内时间", item.timelineAt)}${excerpt}${body}`;
+    return `[${item.id}] ${item.title ?? item.kind ?? "资料"}${source}${type}${object}${at("报道发布", item.publishedAt)}${at("站内时间", item.timelineAt)}${excerpt}${body}`;
   }).join("\n");
 }
 
@@ -803,10 +897,10 @@ async function plan(run: ResearchRun, loaded: LoadedResearch, resume: boolean): 
     system: `${clockLine(started)}
 你是 GAMEHOT 的研究规划器。只输出 JSON，不要解释，不要回答用户。
 可用工具只有：${ASK_TOOL_NAMES.join("、")}。
-把问题拆成 2 到 ${DEEP_LIMITS.MAX_STEPS} 步。每步格式：{"goal":"这一步要核对的事实","tool":"search 或上面的工具名或 null","dependsOn":[更早步骤下标]}
+把问题拆成 1 到 ${DEEP_LIMITS.MAX_STEPS} 个资料收集步骤。每步格式：{"goal":"这一步要核对的事实","tool":"上面的一个真实工具名","dependsOn":[更早步骤下标]}
 具名游戏、对比和时间线优先用 search。get_story、get_article、explain_hot、explain_selection 只能依赖已经能提供真实 ID 的步骤，不能作为没有任何 ID 的第一步。
 历史出处中 kind=item 或 selection_explain 必须用 get_article(article_id=objectId)；kind=story 或 hot_explain 必须用 get_story(public_id=objectId)。不得用 get_latest 或 get_hot_topics 代替读取一条明确的历史出处。
-不要规划联网搜索、写库或游戏攻略。输出 {"steps":[...]}`,
+不要规划“分析、对比、总结、写报告”步骤，最终综合阶段会自动完成这些工作。不要把 tool 写成 null。不要规划联网搜索、写库或游戏攻略。输出 {"steps":[...]}`,
     messages: [{ role: "user", content: `${run.background ? `先前对话（只供理解指代，不能当作证据）：\n${run.background}\n\n` : ""}研究问题：${run.question}` }],
     tools: [],
     taskId: run.taskId,
@@ -824,7 +918,8 @@ async function plan(run: ResearchRun, loaded: LoadedResearch, resume: boolean): 
   const nextCheckpoint = { ...current.checkpoint, planReceiptId: result === "fallback" ? current.checkpoint.planReceiptId : result.receiptId };
   const parsed = result === "fallback" ? null : parseResearchPlan(result.content);
   const grounded = groundHistoryFollowup(run.question, parsed ?? fallbackResearchPlan(run.question), run.historyReferences);
-  const steps = draftsToSteps(grounded);
+  const actionable = actionableResearchPlan(grounded);
+  const steps = draftsToSteps(actionable.length ? actionable : parsed ? grounded : fallbackResearchPlan(run.question));
   await run.setPlan(1, steps, nextCheckpoint);
   await emitPlan(run);
   return false;
@@ -847,7 +942,7 @@ async function replan(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     promptVersion: PROMPT_VERSION,
     system: `${clockLine(started)}
 上一步没有收集到新的可引用资料。请只输出仍需执行的新步骤 JSON：{"steps":[{"goal":"...","tool":"...","dependsOn":[已有步骤的绝对下标]}]}
-不要重复已完成步骤。没有真实 ID 时不要使用 get_story、get_article、explain_hot、explain_selection。最多 ${DEEP_LIMITS.MAX_STEPS} 步。`,
+不要重复已完成步骤。没有真实 ID 时不要使用 get_story、get_article、explain_hot、explain_selection。每一步必须使用真实工具，不要增加分析或总结步骤。最多 ${DEEP_LIMITS.MAX_STEPS} 步。`,
     messages: [{ role: "user", content: `问题：${run.question}\n已有步骤：${loaded.steps.map((step) => `${step.index}. ${step.status} ${step.goal} ${step.summary ?? ""}`).join("\n")}\n资料：\n${evidenceLines(loaded.evidence)}` }],
     tools: [],
     taskId: run.taskId,
@@ -869,11 +964,12 @@ async function replan(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     replanPending: false,
     replanReceiptId: result === "fallback" ? current.checkpoint.replanReceiptId : result.receiptId,
   };
-  if (!parsed) {
+  const actionable = parsed?.filter((step) => step.tool !== null) ?? [];
+  if (!actionable.length) {
     await run.saveCheckpoint(nextCheckpoint);
     return false;
   }
-  await run.setPlan(current.planVersion + 1, draftsToSteps(parsed), nextCheckpoint);
+  await run.setPlan(current.planVersion + 1, draftsToSteps(actionable), nextCheckpoint);
   await emitPlan(run);
   return false;
 }
@@ -883,18 +979,22 @@ async function stepModel(run: ResearchRun, loaded: LoadedResearch, index: number
   const groundedHistory = !resume && current.tool && ID_TOOLS.has(current.tool)
     ? historyReadCall(run.question, current.goal, run.historyReferences)
     : null;
-  if (groundedHistory) {
+  const groundedDependency = !resume && current.tool && ID_TOOLS.has(current.tool)
+    ? dependencyToolCall(loaded, current, run.question)
+    : null;
+  const grounded = groundedHistory ?? groundedDependency;
+  if (grounded) {
     const direct: StepState = {
       ...current,
-      tool: groundedHistory.name,
+      tool: grounded.name,
       status: "running",
       attempt: current.attempt + 1,
       checkpoint: {
         phase: "model_done",
         roundIndex: 0,
         evidenceBefore: loaded.evidence.length,
-        toolName: groundedHistory.name,
-        toolArgs: groundedHistory.args,
+        toolName: grounded.name,
+        toolArgs: grounded.args,
         fallbackUsed: false,
       },
     };
@@ -976,14 +1076,15 @@ async function tool(run: ResearchRun, loaded: LoadedResearch, index: number, res
   let name = current.checkpoint?.toolName ? asTool(current.checkpoint.toolName) : null;
   let args = current.checkpoint?.toolArgs;
   if (!name || !args) {
-    const built = current.tool ? directToolArgs(current.tool, run.question, current.goal) : null;
-    if (!current.tool || !built) {
+    const grounded = dependencyToolCall(loaded, current, run.question);
+    const built = grounded ?? (current.tool ? { name: current.tool, args: directToolArgs(current.tool, run.question, current.goal) } : null);
+    if (!built?.args) {
       const done: StepState = { ...current, status: "running", summary: "没有可用的真实 ID，未凭空继续查询", checkpoint: { ...(current.checkpoint ?? { phase: "model_done", roundIndex: 0 }), phase: "tool_done", toolError: "没有可用的真实 ID，未凭空继续查询" } };
       await run.saveStep(done);
       return false;
     }
-    name = current.tool;
-    args = built;
+    name = built.name;
+    args = built.args;
   }
   if (!resume) await run.bumpTool();
   const started: StepState = {
@@ -1012,13 +1113,16 @@ async function tool(run: ResearchRun, loaded: LoadedResearch, index: number, res
     exec = { ok: false, name, errorCode: "internal_error", message: "工具执行失败。" };
   }
   let ids: number[] = [];
+  let registeredEvidence: EvidenceCandidate[] = [];
   if (exec.ok && exec.evidence.length) {
-    ids = await run.recordEvidence(exec.evidence);
+    registeredEvidence = evidenceForResearchStep(current, exec.name, exec.evidence, run.question);
+    ids = await run.recordEvidence(registeredEvidence);
     if (ids.length) {
-      await run.emit("evidence", { items: exec.evidence.map((item, i) => ({ id: ids[i], kind: item.kind, title: item.title, siteUrl: item.siteUrl, originalUrl: item.originalUrl, sourceName: item.sourceName, publishedAt: item.publishedAt })) });
+      await run.emit("evidence", { items: registeredEvidence.map((item, i) => ({ id: ids[i], kind: item.kind, title: item.title, siteUrl: item.siteUrl, originalUrl: item.originalUrl, sourceName: item.sourceName, publishedAt: item.publishedAt })) });
     }
   }
-  await run.emit("step_end", { stepId: `p${index}`, ok: exec.ok, summary: exec.ok ? friendlyStepSummary(exec) : exec.message, errorCode: exec.ok ? undefined : exec.errorCode });
+  const summary = exec.ok ? friendlyStepSummary({ ...exec, evidence: registeredEvidence }) : exec.message;
+  await run.emit("step_end", { stepId: `p${index}`, ok: exec.ok, summary, errorCode: exec.ok ? undefined : exec.errorCode });
   await run.saveStep({
     ...started,
     checkpoint: { ...started.checkpoint!, phase: "tool_done", toolError: exec.ok ? undefined : exec.message },
@@ -1055,13 +1159,13 @@ async function synthesis(run: ResearchRun, loaded: LoadedResearch, resume: boole
     system: `${clockLine(started)}
 根据已经登记的资料回答。不得调用工具，不得编造来源、数字或事件。
 只有资料里能区分官方和媒体时才写差异，否则明确说现有资料无法区分。
-引用只能使用下面列出的编号。`,
+引用只能使用下面列出的编号。围绕问题直接作答，控制在 1200 字以内。`,
     messages: [{ role: "user", content: `问题：${run.question}\n步骤：${loaded.steps.map((step) => `${step.index}. ${step.goal}（${step.summary ?? step.status}）`).join("\n")}\n可引用资料：\n${evidenceLines(loaded.evidence)}` }],
     tools: [],
     taskId: run.taskId,
     roundIndex: round,
     enableTools: false,
-    maxTokens: 2048,
+    maxTokens: 3200,
   }, "fallback");
   if (result === "stopped") return true;
   if (result === "unpaid") {
@@ -1097,14 +1201,14 @@ async function verify(run: ResearchRun, loaded: LoadedResearch, resume: boolean)
     system: `${clockLine(started)}
 你只核验下面的草稿。只输出 JSON，不要写报告。
 格式：{"claims":[{"text":"一句可核验的事实","kind":"fact 或 inference","evidenceIds":[已有编号],"quote":"从对应证据标题、摘要或公开正文中逐字复制的原话","conflictsWith":[]}]}
-quote 不能改写。结论里的每个数字都必须原样出现在 quote 里。官方表态只能引用来源类型为官方来源的材料。热度变化不能写成原因。报道发布时间和站内时间不是事件发生时间。最多 8 条。${checkpoint.verifyRepairUsed ? "\n上一次没有输出可解析的 claims。这次只输出一个 JSON 对象。" : ""}`,
+每条 claim 只复制一段不超过 240 字的连续原话作为 quote，不要把多篇材料拼成一个 quote。结论里的每个数字都必须原样出现在 quote 里。官方表态只能引用来源类型为官方来源的材料。热度变化不能写成原因。报道发布时间和站内时间不是事件发生时间。最多 4 条。${checkpoint.verifyRepairUsed ? "\n上一次没有输出可解析的 claims。这次只输出一个 JSON 对象，最多 3 条。" : ""}`,
     messages: [{ role: "user", content: `问题：${run.question}\n草稿：\n${loaded.draft || "（没有草稿）"}\n可引用资料：\n${evidenceLines(loaded.evidence)}` }],
     tools: [],
     taskId: run.taskId,
     roundIndex: round,
     enableTools: false,
     json: true,
-    maxTokens: 2800,
+    maxTokens: 4800,
   }, "fallback");
   if (result === "stopped") return true;
   if (result === "unpaid") {
@@ -1290,6 +1394,9 @@ export async function runDeepResearch(opts: { taskId: string; workerId: string; 
             id: item.id,
             title: item.title,
             kind: item.kind,
+            objectId: item.object_id,
+            toolName: item.tool_name,
+            parentObjectId: typeof raw.publicId === "string" ? raw.publicId : null,
             sourceName: item.source_name,
             sourceType: sourceTypeOf(typeof raw.sourceType === "string" ? raw.sourceType : null, raw.firstParty),
             excerpt: typeof raw.excerpt === "string" ? raw.excerpt : "",

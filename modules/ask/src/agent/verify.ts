@@ -10,6 +10,12 @@ export interface VerifiableEvidence {
   id: number;
   title?: string | null;
   kind?: string;
+  /** Internal public object identifier used to ground later research steps. */
+  objectId?: string | null;
+  /** Tool that registered this evidence; shown only to the research executor. */
+  toolName?: string | null;
+  /** Story id attached to a report returned by get_story. */
+  parentObjectId?: string | null;
   sourceName?: string | null;
   sourceType?: string | null;
   excerpt?: string | null;
