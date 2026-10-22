@@ -10,12 +10,14 @@ import {
   actionableResearchPlan, DEEP_LIMITS, directToolArgs, evidenceForResearchStep, fallbackResearchPlan, inferWindow,
   nextResearchAction, parseReplan, parseResearchPlan, groundHistoryFollowup, researchClock, runResearchDriver,
   searchQueryFromQuestion, taskCheckpoint,
+  parseDirectDecision,
   type HistoryReference,
   type LoadedResearch, type ResearchRun, type ResearchState, type StepState,
 } from "../src/agent/research.ts";
 import { ASK_TOOL_NAMES, type AskToolName, type ToolExecResult } from "../src/tools/whitelist.ts";
 import { DEEP_STARTERS, STARTERS } from "../web/starters.ts";
 import { applyAskEvent, snapshotResearch, snapshotSteps, type Message } from "../web/types.ts";
+import { conversationAnswer } from "../src/agent/conversation.ts";
 
 const QUESTION = "梳理《无畏契约》最近一个月的重要事件和发展时间线。";
 const UUID = "11111111-1111-4111-8111-111111111111";
@@ -194,6 +196,55 @@ test("deep limits stay separate from the normal ask loop", () => {
   assert.match(queue, /retryDelay: 90/);
   assert.match(queue, /expireInSeconds: 600/);
   assert.match(queue, /heartbeatSeconds: 30/);
+});
+
+test("greetings and capability questions finish without models, tools or a research report", async () => {
+  for (const question of ["你好，你能干什么？", "你好", "你是谁？", "深度研究怎么用？", "谢谢你"]) {
+    const world = harness({ question, script: () => { throw new Error("must not call a model"); } });
+    await runResearchDriver(world.run);
+    assert.equal(world.box.current.status, "completed");
+    assert.equal(world.chats.length, 0);
+    assert.equal(world.executed.length, 0);
+    assert.ok(world.box.current.draft.length > 0);
+    assert.equal(world.events.some((event) => event.type === "research_report" || event.type === "research_plan"), false);
+  }
+  for (const question of ["你好，CS2今天更新了什么？", "谢谢你，再查下原神", "你能干什么？顺便说说谁夺冠了", "这篇讲了什么？"]) {
+    assert.equal(conversationAnswer(question), null, question);
+  }
+});
+
+test("the planner can answer or clarify without fabricating news steps", async () => {
+  for (const action of ["answer", "clarify"]) {
+    const world = harness({ question: "这两种模式应该怎么选？", script: () => answer(JSON.stringify({ action, answer: "简单问题可以直接问，复杂事件可以使用深度模式。" })) });
+    await runResearchDriver(world.run);
+    assert.deepEqual(world.chats.map((call) => call.purpose), ["ask.research_plan"]);
+    assert.equal(world.executed.length, 0);
+    assert.equal(world.box.current.status, "completed");
+    assert.match(world.box.current.draft, /简单问题/);
+    assert.equal(world.box.current.steps.length, 0);
+  }
+  assert.equal(parseDirectDecision(JSON.stringify({ action: "answer", answer: "据新闻 [9]。" })), null);
+  assert.equal(parseDirectDecision(JSON.stringify({ action: "answer", answer: "回答", steps: [{}] })), null);
+});
+
+test("a persisted direct decision resumes without paying again and still honors cancel", async () => {
+  for (const cancelled of [false, true]) {
+    const world = harness({ seed: { modelCalls: 1, cancelRequested: cancelled, checkpoint: taskCheckpoint({ directAnswer: "请告诉我你指的是哪款游戏。", planReceiptId: 100 }), receiptStatus: { 100: "completed" } } });
+    await runResearchDriver(world.run);
+    assert.equal(world.chats.length, 0);
+    assert.equal(world.executed.length, 0);
+    assert.equal(world.box.current.status, cancelled ? "cancelled" : "completed");
+  }
+});
+
+test("an invalid direct decision does not turn into unrelated news research", async () => {
+  const world = harness({ question: "这两种模式应该怎么选？", script: () => answer(JSON.stringify({ action: "answer", answer: "参考新闻 [9]。" })) });
+  await runResearchDriver(world.run);
+  assert.equal(world.chats.length, 1);
+  assert.equal(world.executed.length, 0);
+  assert.equal(world.box.current.status, "completed_degraded");
+  assert.equal(world.box.current.steps.length, 0);
+  assert.doesNotMatch(world.box.current.draft, /\[9\]/);
 });
 
 test("queue downtime does not spend the research clock", () => {
@@ -413,7 +464,7 @@ test("a planned search runs directly, an id step asks once, and synthesis cites 
         { goal: "读取事件时间线", tool: "get_story", dependsOn: [0] },
       ] }));
       if (opts.purpose === "ask.research_step") return answer("", [toolCall("get_story", { storyId: "story-1" })]);
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "检索到公开资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [] }] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "检索到公开资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [], relevant: true, entailed: true }] }));
       return answer("根据 [1]，近期有公开报道。");
     },
   });
@@ -442,7 +493,7 @@ test("the follow-up '什么意思' reopens the cited article and never falls bac
         { goal: "读取先前标注为[1]的报道正文", tool: "get_story", dependsOn: [] },
         { goal: "查看近期热点", tool: "get_hot_topics", dependsOn: [0] },
       ] }));
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "赛事结果已有报道", kind: "fact", evidenceIds: [1], quote: "get_article 资料", conflictsWith: [] }] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "赛事结果已有报道", kind: "fact", evidenceIds: [1], quote: "get_article 资料", conflictsWith: [], relevant: true, entailed: true }] }));
       return answer("这条报道说明赛事已经结束 [1]。");
     },
   });
@@ -494,8 +545,8 @@ test("a generic official-vs-media question keeps one hotspot through story and s
         { goal: "检索该事件的官方与媒体报道", tool: "search", dependsOn: [1] },
         { goal: "对照并总结差异", tool: null, dependsOn: [2] },
       ] }));
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [
-        { text: "官方公告称2.5免费更新已经上线", kind: "fact", evidenceIds: [3], quote: "官方公告：2.5 免费更新上线", conflictsWith: [] },
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [
+        { text: "官方公告称2.5免费更新已经上线", kind: "fact", evidenceIds: [3], quote: "官方公告：2.5 免费更新上线", conflictsWith: [], relevant: true, entailed: true },
       ] }));
       return answer("官方公告称 2.5 免费更新已经上线 [3]。");
     },
@@ -521,7 +572,7 @@ test("an empty first pass replans once, then a new direct tool can still finish"
       if (opts.purpose === "ask.research_replan") return answer(JSON.stringify({ steps: [
         { goal: "改查热点榜", tool: "get_hot_topics", dependsOn: [0] },
       ] }));
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ claims: [{ text: "热点榜有对应事件", kind: "fact", evidenceIds: [1], quote: "get_hot_topics 资料", conflictsWith: [] }] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "热点榜有对应事件", kind: "fact", evidenceIds: [1], quote: "get_hot_topics 资料", conflictsWith: [], relevant: true, entailed: true }] }));
       return answer("根据 [1]，热点榜有对应事件。");
     },
   });
@@ -547,7 +598,7 @@ test("a non-json replan does not call synthesis or run an unknown tool", async (
   assert.deepEqual(world.executed, []);
   assert.equal(world.chats.some((item) => item.purpose === "ask.research_final"), false);
   assert.equal(world.box.current.steps[0]?.tool, null);
-  assert.equal(world.box.current.status, "completed");
+  assert.equal(world.box.current.status, "completed_degraded");
   assert.match(world.box.current.draft, /没有检索到可以引用的报道/);
 });
 
@@ -602,7 +653,7 @@ test("a busy step receipt is not paid again", async () => {
   await runResearchDriver(world.run);
   assert.equal(world.chats.filter((item) => item.purpose === "ask.research_step").length, 1);
   assert.equal(world.box.current.steps[0]?.status, "failed");
-  assert.equal(world.box.current.status, "completed");
+  assert.equal(world.box.current.status, "completed_degraded");
   const calls = world.chats.length;
   await runResearchDriver(world.run);
   assert.equal(world.chats.length, calls);
@@ -623,7 +674,7 @@ test("a second resume of an unfinished model step fails without another chat", a
   await runResearchDriver(world.run);
   assert.equal(world.chats.length, 0);
   assert.equal(world.box.current.steps[0]?.status, "failed");
-  assert.equal(world.box.current.status, "completed");
+  assert.equal(world.box.current.status, "completed_degraded");
 });
 
 test("model budget, tool budget, and the clock stop before a new paid or tool call", async () => {
@@ -676,7 +727,7 @@ test("an open tool can finish after the clock, and a committed tool is not run a
       steps: [step({ index: 0, goal: "检索", status: "running", tool: "search", checkpoint: { phase: "tool_done", roundIndex: 0, evidenceBefore: 0 } })],
     },
     script: (opts) => opts.purpose === "ask.research_verify"
-      ? answer(JSON.stringify({ claims: [{ text: "报道已经保存", kind: "fact", evidenceIds: [1], quote: "已保存报道", conflictsWith: [] }] }))
+      ? answer(JSON.stringify({ answered: true, claims: [{ text: "报道已经保存", kind: "fact", evidenceIds: [1], quote: "已保存报道", conflictsWith: [], relevant: true, entailed: true }] }))
       : answer("根据 [1]，报道已经保存。"),
   });
   await runResearchDriver(done.run);

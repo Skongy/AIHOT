@@ -11,6 +11,7 @@ import { publishArticle } from "@aihot/backend/publication/publish";
 import { chatToolsStream, type ChatToolsStreamOptions, type ChatToolsStreamResult } from "@aihot/backend/providers/llm";
 import { newUuid } from "@aihot/backend/lib/ids";
 import { runDeepResearch } from "../src/agent/research.ts";
+import { runAskTask } from "../src/agent/loop.ts";
 import {
   claimTask, createSession, createTask, getTask, listClaims, listEventsAfter, listEvidence, listPlanSteps, requestCancel, savePlanStep,
 } from "../src/db/store.ts";
@@ -73,6 +74,21 @@ before(async () => {
 });
 
 after(closeDb);
+
+test("both modes persist a capability answer with zero model/tool calls and no research plan", async () => {
+  for (const mode of ["normal", "deep"] as const) {
+    const { sessionId } = await createSession();
+    const task = await createTask({ sessionId, clientRequestId: newUuid(), message: "你好，你能干什么？", mode });
+    await runAskTask({ taskId: task.id, workerId: "conversation-test", chat: async () => { throw new Error("unexpected model call"); } });
+    const saved = await getTask(task.id);
+    assert.equal(saved?.status, "completed");
+    assert.equal(saved?.model_calls, 0);
+    assert.equal(saved?.tool_calls, 0);
+    assert.match(saved?.final_answer ?? "", /GAMEHOT 游戏资讯助手/);
+    assert.equal((await listPlanSteps(task.id)).length, 0);
+    assert.equal((await listEvidence(task.id)).length, 0);
+  }
+});
 
 test("normal mode never enters the deep runner", async () => {
   const { sessionId } = await createSession();
@@ -149,7 +165,7 @@ test("resume of a crashed plan reuses the same model round", async () => {
       seen.push({ purpose: opts.purpose, modelCalls: row!.model_calls, roundIndex: opts.roundIndex });
       if (opts.purpose === "ask.research_plan") return fake(PLAN);
       if (opts.purpose === "ask.research_verify") {
-        return fake(JSON.stringify({ claims: [{ text: "官方确认测试更新", kind: "fact", evidenceIds: [1], quote: "官方确认测试更新", conflictsWith: [] }] }));
+        return fake(JSON.stringify({ answered: true, claims: [{ text: "官方确认测试更新", kind: "fact", evidenceIds: [1], quote: "官方确认测试更新", conflictsWith: [], relevant: true, entailed: true }] }));
       }
       return fake("公开报道提到了测试更新。[1]");
     },
@@ -227,7 +243,7 @@ test("a completed plan renews the lease before synthesis", async () => {
       const [lease] = await sql<{ ok: boolean }[]>`SELECT lease_expires_at > now() AS ok FROM ask_tasks WHERE id = ${task.id}::uuid`;
       renewed = lease?.ok === true;
       if (opts.purpose === "ask.research_verify") {
-        return fake(JSON.stringify({ claims: [{ text: "官方确认测试更新", kind: "fact", evidenceIds: [1], quote: "官方确认测试更新", conflictsWith: [] }] }));
+        return fake(JSON.stringify({ answered: true, claims: [{ text: "官方确认测试更新", kind: "fact", evidenceIds: [1], quote: "官方确认测试更新", conflictsWith: [], relevant: true, entailed: true }] }));
       }
       return fake("公开报道提到了测试更新。[1]");
     },

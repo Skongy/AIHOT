@@ -1,4 +1,4 @@
-// Claim verdicts are deterministic. These cases do not call a model or a database.
+// Mechanical checks with explicit stub semantic judgments; not a live-model quality evaluation.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -24,13 +24,42 @@ const heat: VerifiableEvidence = {
 };
 
 function claim(text: string, evidenceIds: number[], quote: string, extra: Partial<{ kind: "fact" | "inference"; conflictsWith: number[] }> = {}) {
-  return { text, kind: extra.kind ?? "fact" as const, evidenceIds, quote, conflictsWith: extra.conflictsWith ?? [] };
+  return { relevant: true, entailed: true, text, kind: extra.kind ?? "fact" as const, evidenceIds, quote, conflictsWith: extra.conflictsWith ?? [] };
 }
 
 test("a citation number does not make an unsupported sentence true", () => {
   const [row] = assessClaims([claim("游戏将在下月停服", [2], "游戏将在下月停服")], [media]);
   assert.equal(row!.status, "insufficient");
   assert.equal(row!.evidenceIds[0], 2);
+});
+
+test("quote presence alone cannot pass missing, negative, or irrelevant semantic review", () => {
+  const raw = { text: "游戏已停止运营", kind: "fact" as const, evidenceIds: [1], quote: official.excerpt!, conflictsWith: [] };
+  const rows = assessClaims([
+    raw,
+    { ...raw, relevant: true, entailed: false },
+    { ...raw, relevant: false, entailed: true },
+  ], [official], "你好，你能干什么？");
+  assert.deepEqual(rows.map((row) => row.status), ["insufficient", "withdrawn", "withdrawn"]);
+  const parsed = parseClaims(JSON.stringify({ answered: true, claims: [{ ...raw, relevant: "true", entailed: "true" }] }));
+  assert.equal(assessClaims(parsed!, [official])[0]!.status, "insufficient");
+  const report = buildReport("你好，你能干什么？", rows.slice(1), [official]).report;
+  assert.equal(report.summary.length, 0);
+  assert.equal(report.timeline.length, 0);
+  assert.equal(report.reported.length, 0);
+});
+
+test("a fact answer omits unrelated timeline and source comparison sections", () => {
+  const rows = assessClaims([claim("官方确认测试服将于 5 月 20 日开启", [1], "官方确认测试服将于 5 月 20 日开启")], [official]);
+  const { markdown, report } = buildReport("测试服哪天开？", rows, [official, media]);
+  assert.equal(report.showTimeline, false);
+  assert.equal(report.showCoverage, false);
+  assert.doesNotMatch(markdown, /## 报道时间|## 官方与媒体/);
+  assert.equal(report.reported.length, 0);
+  assert.doesNotMatch(markdown, /媒体猜测冠军皮肤/);
+  const view = reportFromPayload({ report });
+  assert.equal(view?.showTimeline, false);
+  assert.equal(view?.showCoverage, false);
 });
 
 test("matching quotes can still be contradicted, official, or only a guess", () => {
@@ -85,14 +114,13 @@ test("the report keeps supported facts, real dates, and real heat numbers", () =
     claim("热度上升导致停服", [3], "当前热榜第 4 名"),
     claim("官方确认冠军皮肤将在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出"),
   ], [official, media, heat]);
-  const { markdown, report } = buildReport("《无畏契约》最近发生了什么？", claims, [official, media, heat]);
+  const { markdown, report } = buildReport("《无畏契约》最近的时间线？", claims, [official, media, heat]);
   assert.equal(report.summary.length, 1);
   assert.match(report.summary[0]!, /5 月 20 日/);
-  assert.equal(markdown.includes("热度上升导致停服"), true);
-  assert.match(markdown, /不能写成因果关系|已从结论中移除/);
+  assert.equal(markdown.includes("热度上升导致停服"), false);
   assert.equal(report.summary.some((line) => line.includes("导致")), false);
   assert.deepEqual(report.timeline.map((item) => item.evidenceId), [1]);
-  assert.equal(report.timeline[0]!.credibility, "已证实");
+  assert.equal(report.timeline[0]!.credibility, "来源支持");
   assert.deepEqual(report.coverage, { official: 1, media: 1, unknown: 1, cited: 1 });
   assert.equal(report.heat.find((item) => item.label === "热榜名次"), undefined);
   assert.equal(report.citations.some((item) => item.id === 2), false);
@@ -100,7 +128,7 @@ test("the report keeps supported facts, real dates, and real heat numbers", () =
   assert.equal(report.chart, null);
   assert.equal(markdown.includes("## 热度观察"), false);
   assert.match(markdown, /来源报道但尚未核实/);
-  assert.match(markdown, /这次检索到 3 条/);
+  assert.match(markdown, /以下回答依据本次查到的来源/);
 });
 
 test("two supported observations of the same heat label can be charted, one snapshot cannot", () => {
@@ -117,7 +145,7 @@ test("two supported observations of the same heat label can be charted, one snap
   assert.equal(unverified.report.timeline.length, 0);
   assert.equal(unverified.report.reported.length, 2);
   assert.match(unverified.markdown, /来源报道但尚未核实/);
-  assert.match(unverified.markdown, /不能把来源报道写成已证实事实/);
+  assert.match(unverified.markdown, /现有资料不足以可靠回答/);
 });
 
 test("a different year stays out of the summary and the timeline", () => {
@@ -135,7 +163,7 @@ test("a different year stays out of the summary and the timeline", () => {
     claim("LOUD夺得冠军。", [8], "Evil Geniuses曾在2023年夺得全球冠军赛冠军。"),
   ], [old, current], "2026 无畏契约全球冠军赛谁夺冠？");
   assert.deepEqual(rows.map((row) => row.status), ["insufficient", "supported", "insufficient"]);
-  const { report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？", rows, [old, current]);
+  const { report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？梳理时间线", rows, [old, current]);
   assert.equal(report.summary.length, 1);
   assert.match(report.summary[0]!, /LOUD/);
   assert.deepEqual(report.timeline.map((item) => item.evidenceId), [9]);
@@ -158,10 +186,10 @@ test("a timeline line uses the supported sentence, not an unverified headline", 
     status: "insufficient" as const, evidenceIds: [9], quote: "巴西战队LOUD夺得冠军",
     note: "结论中的数字 2026 没有出现在所引原话里。",
   };
-  const { markdown, report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？", [rejected, supported], [item]);
+  const { markdown, report } = buildReport("2026 无畏契约全球冠军赛谁夺冠？梳理时间线", [rejected, supported], [item]);
   assert.equal(report.timeline.length, 1);
   assert.equal(report.timeline[0]!.title, supported.text);
-  assert.doesNotMatch(markdown.split("## 官方与媒体")[0]!, /LOUD/);
+  assert.doesNotMatch(markdown.split("## 尚未确认")[0]!, /LOUD/);
   assert.match(markdown, /尚未确认[\s\S]*LOUD/);
   assert.match(markdown, /## 引用[\s\S]*LOUD夺冠/);
 });
@@ -298,8 +326,8 @@ test("an unsupported fact gets one search, then a matching quote can be kept", a
   let pass = 0;
   const driver = world(() => {
     pass += 1;
-    if (pass === 1) return reply(JSON.stringify({ claims: [claim("游戏将在下月停服", [2], "游戏将在下月停服")] }));
-    return reply(JSON.stringify({ claims: [claim("补检没有停服报道", [3], "补检没有停服报道")] }));
+    if (pass === 1) return reply(JSON.stringify({ answered: true, claims: [claim("游戏将在下月停服", [2], "游戏将在下月停服")] }));
+    return reply(JSON.stringify({ answered: true, claims: [claim("补检没有停服报道", [3], "补检没有停服报道")] }));
   });
   await runResearchDriver(driver.run);
   assert.deepEqual(driver.chats, ["ask.research_verify", "ask.research_verify"]);
@@ -312,12 +340,20 @@ test("an unsupported fact gets one search, then a matching quote can be kept", a
   assert.match(driver.box.current.draft, /核心结论/);
 });
 
+test("a supported detail does not imply the question was fully answered", async () => {
+  const driver = world(() => reply(JSON.stringify({ answered: false, claims: [claim("有报道猜测冠军皮肤可能在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出")] })));
+  await runResearchDriver(driver.run);
+  assert.equal(driver.box.current.claims[0]?.status, "supported");
+  assert.equal(driver.box.current.status, "completed_degraded");
+  assert.match(driver.box.current.draft, /不足以完整回答/);
+});
+
 test("an unparsed verification is repaired once, then the sources stay labeled", async () => {
   let pass = 0;
   const driver = world(() => {
     pass += 1;
     if (pass === 1) return reply("我先写一份完整报告，不输出 JSON。");
-    return reply(JSON.stringify({ claims: [claim("有报道猜测冠军皮肤可能在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出")] }));
+    return reply(JSON.stringify({ answered: true, claims: [claim("有报道猜测冠军皮肤可能在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出")] }));
   });
   await runResearchDriver(driver.run);
   assert.deepEqual(driver.chats, ["ask.research_verify", "ask.research_verify"]);
