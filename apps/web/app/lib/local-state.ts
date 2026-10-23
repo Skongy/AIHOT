@@ -256,11 +256,14 @@ const THEME_COLOR = { light: "#F3F4F6", dark: "#0A0A0B" } as const;
 
 /** Puts a theme on the page: the document's data-theme and the browser's theme colour. */
 export function applyTheme(theme: "light" | "dark", followsSystem: boolean) {
-  document.documentElement.setAttribute("data-theme", theme);
+  if (document.documentElement.dataset.theme !== theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
   // The two theme-color tags answer the system scheme; a chosen theme sets both to its own colour.
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     const scheme = meta.media.includes("dark") ? "dark" : "light";
-    meta.content = followsSystem ? THEME_COLOR[scheme] : THEME_COLOR[theme];
+    const color = followsSystem ? THEME_COLOR[scheme] : THEME_COLOR[theme];
+    if (meta.content !== color) meta.content = color;
   }
 }
 
