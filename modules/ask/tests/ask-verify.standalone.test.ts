@@ -33,6 +33,14 @@ test("a citation number does not make an unsupported sentence true", () => {
   assert.equal(row!.evidenceIds[0], 2);
 });
 
+test("a model semantic flag cannot promote a paraphrase beyond its verbatim quote", () => {
+  const source: VerifiableEvidence = { id: 12, title: "展会报道", sourceType: "媒体报道", excerpt: "星河工作室参与了本次展会。" };
+  const [row] = assessClaims([claim("星河工作室主办了本次展会。", [12], "星河工作室参与了本次展会。")], [source]);
+  assert.equal(row!.status, "insufficient");
+  assert.match(row!.note, /逐字定位/);
+  assert.equal(supplementQuery([row!], "星河工作室最近的报道是什么？"), null);
+});
+
 test("quote presence alone cannot pass missing, negative, or irrelevant semantic review", () => {
   const raw = { text: "游戏已停止运营", kind: "fact" as const, evidenceIds: [1], quote: official.excerpt!, conflictsWith: [] };
   const rows = assessClaims([
@@ -65,12 +73,12 @@ test("a fact answer omits unrelated timeline and source comparison sections", ()
 test("matching quotes can still be contradicted, official, or only a guess", () => {
   const rows = assessClaims([
     claim("官方确认测试服将于 5 月 20 日开启", [1], "官方确认测试服将于 5 月 20 日开启"),
-    claim("官方确认冠军皮肤将在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出"),
-    claim("测试服日期已经公布", [1], "5 月 20 日", { conflictsWith: [3] }),
-    claim("测试服日期尚未公布", [2], "可能在下月推出", { conflictsWith: [2] }),
+    claim("官方称：有报道猜测冠军皮肤可能在下月推出", [2], "有报道猜测冠军皮肤可能在下月推出"),
+    claim("官方确认测试服将于 5 月 20 日开启", [1], "官方确认测试服将于 5 月 20 日开启", { conflictsWith: [3] }),
+    claim("据媒体报道，测试服尚未公布日期。", [4], "测试服尚未公布日期。", { conflictsWith: [2] }),
     claim("热度上升导致停服", [3], "当前热榜第 4 名"),
-    claim("参与讨论的人变多", [3], "近 48h 参与方：12", { kind: "inference" }),
-  ], [official, media, heat]);
+    claim("近 48h 参与方：12", [3], "近 48h 参与方：12", { kind: "inference" }),
+  ], [official, media, heat, { id: 4, title: "报道", sourceType: "媒体报道", excerpt: "测试服尚未公布日期。" }]);
   assert.equal(rows[0]!.status, "supported");
   assert.equal(rows[1]!.status, "disputed");
   assert.equal(rows[2]!.status, "contradicted");

@@ -28,6 +28,14 @@ test("citation check passes registered only", () => {
   assert.equal(checkCitations("根据 [1] 和 [2]", [1, 2]).ok, true);
 });
 
+test("normal answers require a registered citation on every factual sentence", () => {
+  const options = { requireSentenceCitations: true, evidence: [{ id: 1, text: "第一条事实。" }, { id: 2, text: "第二条事实。" }] };
+  assert.deepEqual(checkCitations("第一条事实 [1]。第二条事实没有引用。", [1], options), { ok: false, issues: ["uncited_sentence"] });
+  assert.equal(checkCitations("# 结论\n第一条事实 [1]。\n- 第二条事实 [2]。", [1, 2], options).ok, true);
+  assert.deepEqual(checkCitations("第一条事实 [2]。", [1, 2], options), { ok: false, issues: ["citation_text_mismatch"] });
+  assert.equal(checkCitations("一般说明，没有引用。", [], { requireSentenceCitations: true }).ok, true);
+});
+
 test("sanitize strips images and iframes", () => {
   const out = sanitizeAskMarkdown("你好 ![x](https://evil/x.png) <iframe src='https://e'></iframe> [ok](/items/a)", new Set(["/items/a"]));
   assert.ok(!out.includes("iframe"));

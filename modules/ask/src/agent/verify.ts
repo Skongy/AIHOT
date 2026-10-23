@@ -122,6 +122,12 @@ function evidenceText(item: VerifiableEvidence): string {
   return [item.title, item.excerpt, item.bodyExcerpt, item.sourceName].filter((part): part is string => !!part && part.trim().length > 0).join("\n");
 }
 
+function propositionText(value: string): string {
+  return compact(value)
+    .replace(/^(?:据|根据).{1,40}?(?:报道|公告|消息|官方发布|官方公告)[，,:：]?/, "")
+    .replace(/^官方(?:称|表示|宣布|确认|公布)[，,:：]?/, "");
+}
+
 function citedItems(claim: { evidenceIds: number[] }, evidence: VerifiableEvidence[]): VerifiableEvidence[] {
   const known = new Map(evidence.map((item) => [item.id, item]));
   return claim.evidenceIds.flatMap((id) => {
@@ -231,6 +237,12 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   if (!items.length || !quote || !items.some((item) => compact(evidenceText(item)).includes(quote))) {
     return { ...base, status: "insufficient", note: items.length ? "引用的证据里没有这句原话，不能据此下结论。" : "没有对应的已登记证据。" };
   }
+  if (CAUSAL.test(claim.text)) {
+    return { ...base, kind: "inference", status: "withdrawn", note: "热度或时间上的同时出现不能写成因果关系，这条已从结论中移除。" };
+  }
+  if (claim.kind === "inference") {
+    return { ...base, status: "withdrawn", note: "这是推测，不写入来源支持结论。" };
+  }
   // Numeric publisher names (e.g. 17173) are attribution, not a factual value
   // that must occur in the quoted sentence. Keep the strict check for numbers
   // that are not part of any cited source's identity.
@@ -243,11 +255,11 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   if (missesAskedYear(question, claim, items)) {
     return { ...base, status: "insufficient", note: "这条结论对不上问题里的年份，不能写入来源支持结论。" };
   }
-  if (CAUSAL.test(claim.text)) {
-    return { ...base, kind: "inference", status: "withdrawn", note: "热度或时间上的同时出现不能写成因果关系，这条已从结论中移除。" };
-  }
-  if (claim.kind === "inference") {
-    return { ...base, status: "withdrawn", note: "这是推测，不写入来源支持结论。" };
+  // A model's entailed=true flag is not independent proof. Keep a claim in the
+  // supported set only when its factual wording can be located verbatim in its quote.
+  const proposition = propositionText(claim.text);
+  if (!proposition || !quote.includes(proposition)) {
+    return { ...base, status: "insufficient", note: `结论的事实表述${missingNumber ? `（数字 ${missingNumber}）` : ""}无法在所引原文中逐字定位，不能标记为来源支持。` };
   }
   if (OFFICIAL_SAY.test(claim.text) && !items.some((item) => sourceTypeOf(item.sourceType) === "官方来源")) {
     return { ...base, status: "disputed", note: "结论写成了官方表态，但所引证据没有官方来源。" };
@@ -256,11 +268,11 @@ function assessOne(claim: ProposedClaim, index: number, evidence: VerifiableEvid
   if (types.has("官方来源") && types.has("媒体报道") && !items.filter((item) => sourceTypeOf(item.sourceType) === "官方来源").some((item) => compact(evidenceText(item)).includes(quote))) {
     return { ...base, status: "disputed", note: "同一主张同时引用了官方和媒体，而这句原话只出现在媒体报道中。" };
   }
-  return { ...base, status: "supported", note: "模型判断切题且有语义支持，引文与数字检查通过；这不等于独立证实新闻事实。" };
+  return { ...base, status: "supported", note: "模型判断切题；事实表述在所引原文中逐字出现，数字、年份和来源检查通过。这不等于对现实事实的独立证实。" };
 }
 
 export function supplementQuery(claims: VerifiedClaim[], question: string): string | null {
-  const claim = claims.find((item) => item.kind === "fact" && item.status === "insufficient");
+  const claim = claims.find((item) => item.kind === "fact" && item.status === "insufficient" && !item.note.includes("逐字定位"));
   if (!claim) return null;
   const names = [...question.matchAll(/《([^》]{1,40})》/g)].map((match) => match[1]!.trim()).filter(Boolean);
   const text = claim.text.replace(/[？?。！!，,]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);

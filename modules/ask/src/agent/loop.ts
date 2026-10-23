@@ -50,6 +50,15 @@ function visibleAnswer(draft: string, evidence: Array<{ id: number; title: strin
   return emptyFallback;
 }
 
+function citationSources(evidence: Awaited<ReturnType<typeof listEvidence>>) {
+  return evidence.map((item) => ({
+    id: item.id,
+    text: [item.title, item.source_name, item.raw_ref?.excerpt, item.raw_ref?.bodyExcerpt]
+      .filter((part): part is string => typeof part === "string" && !!part.trim())
+      .join("\n"),
+  }));
+}
+
 export async function runAskTask(opts: LoopOptions): Promise<void> {
   const chat = opts.chat ?? chatToolsStream;
   const now = opts.now ?? Date.now;
@@ -70,7 +79,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
       await completeReceipt(sql, existing.active_receipt_id);
       const draft = existing.draft_answer ?? existing.final_answer ?? "";
       const evidence = await listEvidence(opts.taskId);
-      const check = checkCitations(draft, evidence.map((e) => e.id));
+      const check = checkCitations(draft, evidence.map((e) => e.id), { requireSentenceCitations: true, evidence: citationSources(evidence) });
       const status = check.ok ? "completed" : "completed_degraded";
       await appendEvent(opts.taskId, "citation_check", { ok: check.ok, issues: check.issues });
       await appendEvent(opts.taskId, "answer_done", { text: draft, finishReason: "recovery" });
@@ -309,7 +318,7 @@ export async function runAskTask(opts: LoopOptions): Promise<void> {
           evidence.map((e) => ({ id: e.id, title: e.title, kind: e.kind })),
           "这次没能整理出回答。你可以换个问法，或缩小时间范围后再试。",
         );
-        const check = checkCitations(answer, evidence.map((e) => e.id));
+        const check = checkCitations(answer, evidence.map((e) => e.id), { requireSentenceCitations: true, evidence: citationSources(evidence) });
         await appendEvent(opts.taskId, "citation_check", { ok: check.ok, issues: check.issues });
         await appendEvent(opts.taskId, "answer_done", { text: answer, finishReason: result.finishReason ?? "stop" });
         const status = check.ok ? "completed" : "completed_degraded";

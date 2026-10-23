@@ -140,8 +140,27 @@ export function extractXmlToolCalls(text: string): { toolCalls: XmlToolCall[]; r
   return { toolCalls, remainder };
 }
 
-/** Citation check: [n] must be in registered evidence ids. No model call. */
-export function checkCitations(answer: string, evidenceIds: number[]): { ok: boolean; issues: string[] } {
+export interface CitationEvidenceText { id: number; text: string }
+
+function citationComparable(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/\s+/g, "").replace(/[“”‘’「」『』"'*`]/g, "");
+}
+
+function citedProposition(sentence: string): string {
+  return citationComparable(sentence
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")
+    .replace(/\[[0-9]+\]/g, "")
+    .replace(/^\*\*|\*\*$/g, "")
+    .trim())
+    .replace(/^(?:据|根据)[^，,:：。！？!?]{1,40}?(?:报道|公告|消息)[，,:：]?/, "");
+}
+
+/** Citation check: registered ids, per-sentence coverage and exact source text. No model call. */
+export function checkCitations(
+  answer: string,
+  evidenceIds: number[],
+  options: { requireSentenceCitations?: boolean; evidence?: CitationEvidenceText[] } = {},
+): { ok: boolean; issues: string[] } {
   const issues: string[] = [];
   const registered = new Set(evidenceIds);
   const seen = new Set<number>();
@@ -151,6 +170,25 @@ export function checkCitations(answer: string, evidenceIds: number[]): { ok: boo
     if (!registered.has(n)) issues.push(`unregistered_citation:${n}`);
   }
   if (registered.size && !seen.size && answer.trim()) issues.push("missing_citations");
+  if (options.requireSentenceCitations && registered.size) {
+    const sentences = answer
+      .split(/(?<=[。！？!?；;])|\r?\n/)
+      .map((part) => part.trim())
+      .filter((part) => part && !/^#{1,6}\s/.test(part) && !/^\*\*[^*]+\*\*\s*$/.test(part) && !/^(?:来源|结论|摘要|参考资料|检索范围)[：:]?$/.test(part.replace(/\*\*/g, "")))
+      .filter((part) => /[\p{L}\p{N}]/u.test(part.replace(/\[[0-9]+\]/g, "")));
+    const textById = new Map((options.evidence ?? []).map((item) => [item.id, citationComparable(item.text)]));
+    for (const sentence of sentences) {
+      const citedIds = [...sentence.matchAll(/\[(\d+)\]/g)].map((match) => Number(match[1])).filter((id) => registered.has(id));
+      if (!citedIds.length) {
+        issues.push("uncited_sentence");
+        continue;
+      }
+      const proposition = citedProposition(sentence);
+      if (textById.size && proposition && !citedIds.some((id) => textById.get(id)?.includes(proposition))) {
+        issues.push("citation_text_mismatch");
+      }
+    }
+  }
   // Bare http(s) URLs in the answer that are not a simple citation marker — flagged for degraded (links must come from evidence).
   for (const m of answer.matchAll(/https?:\/\/[^\s)\]>]+/g)) {
     issues.push(`raw_url:${m[0]!.slice(0, 80)}`);

@@ -11,6 +11,7 @@ import {
   nextResearchAction, parseReplan, parseResearchPlan, groundHistoryFollowup, researchClock, runResearchDriver,
   searchQueryFromQuestion, taskCheckpoint,
   parseDirectDecision,
+  questionNeedsEvidence,
   type HistoryReference,
   type LoadedResearch, type ResearchRun, type ResearchState, type StepState,
 } from "../src/agent/research.ts";
@@ -247,6 +248,26 @@ test("the planner can answer or clarify without fabricating news steps", async (
   }
   assert.equal(parseDirectDecision(JSON.stringify({ action: "answer", answer: "据新闻 [9]。" })), null);
   assert.equal(parseDirectDecision(JSON.stringify({ action: "answer", answer: "回答", steps: [{}] })), null);
+  const factual = JSON.stringify({ action: "answer", answer: "无畏契约冠军赛是电竞赛事。" });
+  assert.equal(questionNeedsEvidence("无畏契约冠军赛谁夺冠了？"), true);
+  assert.equal(questionNeedsEvidence("无畏契约冠军赛的最终冠军是谁？"), true);
+  assert.equal(parseDirectDecision(factual, "无畏契约冠军赛谁夺冠了？"), null);
+  assert.equal(parseDirectDecision(JSON.stringify({ action: "answer", answer: "冠军赛是一项电竞赛事。" }), "冠军赛是什么？"), "冠军赛是一项电竞赛事。");
+});
+
+test("a current event fact cannot bypass retrieval through a planner direct answer", async () => {
+  const world = harness({
+    question: "无畏契约冠军赛谁夺冠了？",
+    script: (opts) => {
+      if (opts.purpose === "ask.research_plan") return answer(JSON.stringify({ action: "answer", answer: "某队夺冠。" }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "search 资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [], relevant: true, entailed: true }] }));
+      return answer("search 资料 [1]。");
+    },
+  });
+  await runResearchDriver(world.run);
+  assert.deepEqual(world.executed.map((item) => item.name), ["search"]);
+  assert.equal(world.box.current.status, "completed");
+  assert.equal(world.box.current.steps.length, 1);
 });
 
 test("a persisted direct decision resumes without paying again and still honors cancel", async () => {
@@ -501,7 +522,7 @@ test("a planned search runs directly, an id step asks once, and synthesis cites 
         { goal: "读取事件时间线", tool: "get_story", dependsOn: [0] },
       ] }));
       if (opts.purpose === "ask.research_step") return answer("", [toolCall("get_story", { storyId: "story-1" })]);
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "检索到公开资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [], relevant: true, entailed: true }] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "search 资料", kind: "fact", evidenceIds: [1], quote: "search 资料", conflictsWith: [], relevant: true, entailed: true }] }));
       return answer("根据 [1]，近期有公开报道。");
     },
   });
@@ -530,8 +551,8 @@ test("the follow-up '什么意思' reopens the cited article and never falls bac
         { goal: "读取先前标注为[1]的报道正文", tool: "get_story", dependsOn: [] },
         { goal: "查看近期热点", tool: "get_hot_topics", dependsOn: [0] },
       ] }));
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "赛事结果已有报道", kind: "fact", evidenceIds: [1], quote: "get_article 资料", conflictsWith: [], relevant: true, entailed: true }] }));
-      return answer("这条报道说明赛事已经结束 [1]。");
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "get_article 资料", kind: "fact", evidenceIds: [1], quote: "get_article 资料", conflictsWith: [], relevant: true, entailed: true }] }));
+      return answer("get_article 资料 [1]。");
     },
   });
   world.run.background = `助手：上一轮回答\n历史出处映射：${JSON.stringify([HISTORY_ITEM])}`;
@@ -583,9 +604,9 @@ test("a generic official-vs-media question keeps one hotspot through story and s
         { goal: "对照并总结差异", tool: null, dependsOn: [2] },
       ] }));
       if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [
-        { text: "官方公告称2.5免费更新已经上线", kind: "fact", evidenceIds: [3], quote: "官方公告：2.5 免费更新上线", conflictsWith: [], relevant: true, entailed: true },
+        { text: "2.5 免费更新上线", kind: "fact", evidenceIds: [3], quote: "官方公告：2.5 免费更新上线", conflictsWith: [], relevant: true, entailed: true },
       ] }));
-      return answer("官方公告称 2.5 免费更新已经上线 [3]。");
+      return answer("2.5 免费更新上线 [3]。");
     },
   });
   await runResearchDriver(world.run);
@@ -609,7 +630,7 @@ test("an empty first pass replans once, then a new direct tool can still finish"
       if (opts.purpose === "ask.research_replan") return answer(JSON.stringify({ steps: [
         { goal: "改查热点榜", tool: "get_hot_topics", dependsOn: [0] },
       ] }));
-      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "热点榜有对应事件", kind: "fact", evidenceIds: [1], quote: "get_hot_topics 资料", conflictsWith: [], relevant: true, entailed: true }] }));
+      if (opts.purpose === "ask.research_verify") return answer(JSON.stringify({ answered: true, claims: [{ text: "get_hot_topics 资料", kind: "fact", evidenceIds: [1], quote: "get_hot_topics 资料", conflictsWith: [], relevant: true, entailed: true }] }));
       return answer("根据 [1]，热点榜有对应事件。");
     },
   });
@@ -764,8 +785,8 @@ test("an open tool can finish after the clock, and a committed tool is not run a
       steps: [step({ index: 0, goal: "检索", status: "running", tool: "search", checkpoint: { phase: "tool_done", roundIndex: 0, evidenceBefore: 0 } })],
     },
     script: (opts) => opts.purpose === "ask.research_verify"
-      ? answer(JSON.stringify({ answered: true, claims: [{ text: "报道已经保存", kind: "fact", evidenceIds: [1], quote: "已保存报道", conflictsWith: [], relevant: true, entailed: true }] }))
-      : answer("根据 [1]，报道已经保存。"),
+      ? answer(JSON.stringify({ answered: true, claims: [{ text: "已保存报道", kind: "fact", evidenceIds: [1], quote: "已保存报道", conflictsWith: [], relevant: true, entailed: true }] }))
+      : answer("已保存报道 [1]。"),
   });
   await runResearchDriver(done.run);
   assert.deepEqual(done.executed, []);
