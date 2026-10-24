@@ -16,12 +16,13 @@ import { onlyXArticleLink, xArticleText } from "../sources/x.ts";
 import { sanitizeBody, trimTrailingChrome } from "./sanitize.ts";
 import { contentHash, fillPublicationTime, reviseMaterial } from "./materials.ts";
 import { markdownBody } from "./markdown.ts";
+import { feedBody, officialBody } from "./public-body.ts";
 
 export interface ExtractedBody {
   html: string;
   text: string;
   images: Array<{ kind: "image"; url: string; width: number | null; height: number | null }>;
-  via: "readability" | "jina";
+  via: "readability" | "jina" | "feed" | "source-api";
   /** The page's publication metadata; neither modification time nor dates mentioned in its prose. */
   publishedAt?: Date | null;
 }
@@ -80,8 +81,15 @@ export function readable(html: string, url: string, utcOffset?: string): Extract
   return { html: clean, text, images, via: "readability", publishedAt: parseLooseDate(article.publishedTime, utcOffset) };
 }
 
-export async function extractFromUrl(url: string, subject: string, utcOffset?: string): Promise<ExtractedBody | null> {
+export async function extractFromUrl(url: string, subject: string, utcOffset?: string, source?: SourceRow): Promise<ExtractedBody | null> {
   if (isVideoPageUrl(url)) return null;
+  // Publisher-supplied bodies avoid scraping a JavaScript shell or paying for a fallback.
+  if (source?.kind === "rss" && source.config.summaryIsBody === true) {
+    try { const got = await feedBody(url, source); if (got) return got; }
+    catch { /* A feed outage must not prevent trying the article page. */ }
+  }
+  try { const got = await officialBody(url, utcOffset); if (got) return got; }
+  catch { /* The ordinary page and budgeted fallback remain available. */ }
   try {
     const res = await guardedFetch(url, { timeoutMs: 20_000, maxBytes: 6 * 1024 * 1024 });
     if (isVideoPageUrl(res.url)) return null;
@@ -118,12 +126,12 @@ export function pageFetchable(url: string, sourceKind: string): boolean {
 
 /** Fetches and stores the body of one article. Unconfirmed bodies are recorded as such. */
 export async function extractArticleBody(articleId: string): Promise<"ok" | "unconfirmed" | "skipped"> {
-  const [a] = await sql<{ id: string; url: string; body_status: string; revision: number; x_post: { tweetId?: string } | null; config: SourceRow["config"] }[]>`
-    SELECT a.id, a.url, a.body_status, a.revision, a.x_post, s.config
+  const [a] = await sql<{ id: string; url: string; body_status: string; revision: number; x_post: { tweetId?: string } | null; source: SourceRow }[]>`
+    SELECT a.id, a.url, a.body_status, a.revision, a.x_post, row_to_json(s) AS source
     FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${articleId}`;
   if (!a || a.body_status === "ok") return "skipped";
   if (a.x_post?.tweetId) return extractXArticle(a.id, a.x_post.tweetId, a.revision);
-  const got = await extractFromUrl(a.url, `article:${a.id}`, articleUtcOffset(a.config));
+  const got = await extractFromUrl(a.url, `article:${a.id}`, articleUtcOffset(a.source.config), a.source);
   if (!got) {
     return markUnconfirmed(articleId, a.revision);
   }
@@ -133,7 +141,7 @@ export async function extractArticleBody(articleId: string): Promise<"ok" | "unc
       SELECT title, excerpt, content_hash FROM articles
       WHERE id = ${articleId} AND revision = ${a.revision} AND body_status <> 'ok' FOR UPDATE`;
     if (!row) return "skipped";
-    const time = a.config.detail?.publishedAtAuthoritative === true ? null : await fillPublicationTime(tx, articleId, got.publishedAt);
+    const time = a.source.config.detail?.publishedAtAuthoritative === true ? null : await fillPublicationTime(tx, articleId, got.publishedAt);
     const hash = contentHash({ title: row.title, bodyText: got.text, excerpt: row.excerpt });
     if (!time && hash === row.content_hash) {
       await tx`UPDATE articles SET body_status = 'ok', wire_fingerprint = coalesce(wire_fingerprint, ${wireFingerprint(row.title, got.text)}), updated_at = now() WHERE id = ${articleId}`;

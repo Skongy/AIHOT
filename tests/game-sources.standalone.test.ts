@@ -76,7 +76,7 @@ test("every game source has a supported config and the requested news-reading po
     const hot = HOT.includes(s.id);
     assert.equal(s.participation_mode, hot ? "hot_signal" : "editorial", s.id);
     const readsNews = !hot && s.enabled !== false;
-    assert.equal(s.site_fulltext, readsNews, `${s.id}: on-site bodies only for active news sources`);
+    assert.equal(s.site_fulltext, !hot, `${s.id}: pausing collection must not disable existing article bodies`);
     if (readsNews) assert.equal(s.config.fetchPublicContent, true, `${s.id}: fetch the article body for reading`);
     assert.equal(s.syndicate_fulltext, false, s.id);
     assert.ok(s.interval_minutes >= 30 && s.interval_minutes <= 1440, s.id);
@@ -108,7 +108,7 @@ test("every game source has a supported config and the requested news-reading po
   }
   for (const id of ["rss-steam-pubg", "rss-steam-delta-force", "rss-steam-apex", "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3"]) {
     assert.equal(byId.get(id)!.enabled, false, id);
-    assert.equal(byId.get(id)!.site_fulltext, false, id);
+    assert.equal(byId.get(id)!.site_fulltext, true, `${id}: existing bodies remain readable while collection is paused`);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
     const prefixes = byId.get(id)!.config.publisherUrlPrefixes as string[];
     assert.ok(Array.isArray(prefixes) && prefixes.length === 1, id);
@@ -116,7 +116,7 @@ test("every game source has a supported config and the requested news-reading po
   }
   for (const id of ["rss-megacrit-news", "web-larian-news"]) {
     assert.equal(byId.get(id)!.enabled, false, id);
-    assert.equal(byId.get(id)!.site_fulltext, false, id);
+    assert.equal(byId.get(id)!.site_fulltext, true, `${id}: existing bodies remain readable while collection is paused`);
     assert.equal(byId.get(id)!.config.ingestNoiseFilter, undefined, id);
     assert.equal(byId.get(id)!.tier, "T1", id);
   }
