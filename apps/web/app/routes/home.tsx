@@ -38,11 +38,12 @@ export default function Home() {
       {/* Phones: the bar (精选 | 全部, filter, search), the filter in use, today's hot topics, the feed. */}
       <FeedBar base="/" category={filters.category} channel={filters.channel} />
       <ActiveFilters base="/" category={filters.category} channel={filters.channel} tag={filters.tag} />
-      <div className="hidden lg:block">
+      <div className="workspace-header hidden lg:block">
         <div className="flex items-center gap-4">
           <h1 className="font-display text-[28px] font-semibold leading-[1.2] tracking-[0.02em] text-ink">{title}</h1>
+          <p className="workspace-heading-note">游戏资讯 · AI 精选</p>
         </div>
-        <div className="mb-5 mt-4 flex items-center justify-between gap-4">
+        <div className="workspace-filters mb-5 mt-4 flex items-center justify-between gap-4">
           <CategoryTabs base="/" category={filters.category} channel={filters.channel} layoutId="home-cat-desk" className="min-w-0" />
           <SearchField keep={{ category: filters.category }} />
         </div>

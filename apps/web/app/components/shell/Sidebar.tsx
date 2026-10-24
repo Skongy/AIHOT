@@ -37,7 +37,7 @@ function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
       to={item.to}
       prefetch="intent"
       aria-current={isActive ? "page" : undefined}
-      className={`group/nav relative flex h-10 items-center gap-2.5 rounded-tile px-3 text-[14px] transition-colors duration-150 press ${
+      className={`sidebar-link group/nav relative flex h-10 items-center gap-2.5 rounded-tile px-3 text-[14px] transition-colors duration-150 press ${
         isActive
           ? "bg-accent-muted font-semibold text-ink"
           : "font-medium text-ink-4 hover:bg-surface-hover hover:text-ink"
@@ -92,15 +92,19 @@ export function Sidebar({ changelogVersion }: { changelogVersion: string | null 
   const dot = useChangelogDot(changelogVersion);
   const { nav, bar } = useNavIndicator();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-border-strong bg-sidebar px-4 pb-3.5 pt-6 lg:flex">
-      <Link to="/" className="mb-5 flex h-[50px] items-center px-1 text-ink" aria-label={`${SITE.name} 首页`}>
-        <Wordmark size={26} />
+    <aside className="gamehot-sidebar sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-border-strong bg-sidebar px-4 pb-3.5 pt-6 lg:flex">
+      <Link to="/" className="sidebar-brand mb-5 flex h-[50px] items-center px-1 text-ink" aria-label={`${SITE.name} 首页`}>
+        <img src="/logo-mark.png" width={32} height={40} alt="" className="sidebar-brand-mark" />
+        <span className="sidebar-brand-copy">
+          <Wordmark size={22} />
+          <span className="sidebar-brand-caption">游戏情报 · 看见重点</span>
+        </span>
       </Link>
       <nav ref={nav} className="scrollbar-thin relative -mx-1 flex-1 overflow-y-auto px-1" aria-label="主导航">
         <span ref={bar} aria-hidden="true" className="nav-indicator pointer-events-none absolute left-1 top-0 z-10 w-0.5 bg-accent opacity-0" />
         {sidebar().map((section) => (
           <div key={section.title}>
-            <div className="px-3 pb-1 pt-4 text-[11px] uppercase tracking-[0.08em] text-ink-4">{section.title}</div>
+            <div className="sidebar-section-label px-3 pb-1 pt-4 text-[11px] uppercase tracking-[0.08em] text-ink-4">{section.title}</div>
             <div className="flex flex-col gap-0.5">
               {section.items.map((item) => (
                 <SideLink key={item.to} item={item} dot={dot} />
@@ -109,7 +113,8 @@ export function Sidebar({ changelogVersion }: { changelogVersion: string | null 
           </div>
         ))}
       </nav>
-      <div className="mt-2 space-y-2.5 px-1 pt-1">
+      <div className="sidebar-tools mt-2 space-y-2.5 px-1 pt-1">
+        <span className="sidebar-tools-label">外观</span>
         {SITE.github && (
           <a
             href={SITE.github}
