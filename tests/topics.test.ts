@@ -151,3 +151,24 @@ test("every topic has a page; unknown topics and pages past the end have none", 
   assert.deepEqual(body.groups.map((g) => g.key), ["company", "field", "genre"]);
   assert.deepEqual(body.topics.map((t) => t.slug).sort(), TOPICS.map((t) => t.slug).sort(), "the index lists every topic");
 });
+
+test("title-based games include historical aliases but respect scope, numbers and franchises", async () => {
+  const chinese = await report({ at: hoursAgo(9), title: `《GTA6》新预告 ${T}` });
+  const english = await report({ at: hoursAgo(8), title: `全新预告 ${T}`, originalTitle: `Grand Theft Auto VI trailer ${T}` });
+  const pooled = await report({ at: hoursAgo(7), title: `GTA 6 开发消息 ${T}`, selected: false });
+  await report({ at: hoursAgo(6), title: `GTA60 无关的游戏 ${T}` });
+  const withdrawn = await report({ at: hoursAgo(5), title: `GTA6 撤回的消息 ${T}` });
+  await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${withdrawn}`;
+  const future = await report({ at: hoursAgo(4), title: `GTA6 尚未公开 ${T}` });
+  await sql`UPDATE publications SET visible_after = now() + interval '1 day' WHERE article_id = ${future}`;
+  const data = await page("gta-6");
+  assert.deepEqual(ids(data.items).sort(), [chinese, english].sort());
+  assert.equal(data.topic.total, 2);
+  assert.equal(data.topic.poolTotal, 3);
+  assert.ok(!ids(data.items).includes(pooled));
+  const response = await app.inject({ method: "GET", url: `/api/site/items/${english}` });
+  assert.ok(JSON.parse(response.body).topics.some((topic: { slug: string }) => topic.slug === "gta-6"));
+  const massEffect = await report({ at: hoursAgo(3), title: `《质量效应5》开发进展 ${T}` });
+  await report({ at: hoursAgo(2), title: `《质量效应》系列开发回顾 ${T}` });
+  assert.deepEqual(ids((await page("mass-effect-5")).items), [massEffect]);
+});
