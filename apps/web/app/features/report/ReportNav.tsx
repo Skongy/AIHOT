@@ -1,10 +1,10 @@
 // Moving between reports: the archive column on desktop; on phones the kind switch in the bar
 // (ReportLayout) and recent-issue chips under it.
 import { IntentLink } from "../../components/ui/IntentLink";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ReportNavigationEntry, ReportNavigationResponse, ReportKind } from "@aihot/contracts/site";
 import { PillTabs } from "../../components/ui/Tabs";
-import { IconChevronRight } from "../../components/icons";
+import { IconChevronLeft, IconChevronRight, IconList } from "../../components/icons";
 import { KINDS, KIND_LABEL, KIND_PATH, archiveGroups, archiveMark, chipLabel, reportPath } from "./format";
 
 /** 日报 / 周报 / 月报 as the site's pill switch: spread across the archive column, or compact in the phone bar (opening at the top). */
@@ -23,24 +23,41 @@ export function KindSwitch({ kind, phone = false }: { kind: ReportKind; phone?: 
 
 /** Desktop archive column: every issue of this kind, grouped, the current one highlighted. */
 export function ReportArchive({ kind, index, current }: { kind: ReportKind; index: ReportNavigationEntry[]; current: string | null }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const archiveId = useId();
   const groups = archiveGroups(kind, index);
   const openId = groups.find((g) => g.entries.some((e) => e.key === current))?.id ?? groups[0]?.id;
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[280px] shrink-0 flex-col border-r border-line bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--surface))] pl-5 pr-3 lg:flex dark:bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--bg))]">
-      <div className="pb-4 pt-8">
-        <KindSwitch kind={kind} />
+    <aside aria-label="往期列表面板" className={`sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-line bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--surface))] pt-6 transition-[width,padding] duration-200 ease-out motion-reduce:transition-none lg:flex dark:bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--bg))] ${collapsed ? "w-[52px] px-2" : "w-[280px] pl-5 pr-3"}`}>
+      <div className="mb-2 flex h-8 shrink-0 items-center justify-between">
+        {!collapsed && <span className="pl-1 text-[11.5px] font-semibold tracking-[0.3em] text-ink">往期</span>}
+        <button
+          type="button"
+          aria-label={collapsed ? "展开往期列表" : "收起往期列表"}
+          aria-expanded={!collapsed}
+          aria-controls={archiveId}
+          title={collapsed ? "展开往期列表" : "收起往期列表"}
+          onClick={() => setCollapsed((value) => !value)}
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-3 shadow-sm transition-colors hover:border-line-strong hover:bg-bg-sunk hover:text-ink"
+        >
+          {collapsed ? <IconList size={17} /> : <IconChevronLeft size={17} />}
+        </button>
       </div>
-      <div className="border-b border-line-strong pb-2 pl-1 text-[11.5px] font-semibold tracking-[0.3em] text-ink">往期</div>
-      <nav aria-label={`${KIND_LABEL[kind]}历史`} className="scrollbar-thin -mr-3 flex-1 overflow-y-auto pb-6 pr-3">
-        {groups.map((g) => (
-          <ArchiveGroup key={g.id} g={g} kind={kind} current={current} initiallyOpen={g.id === openId} />
-        ))}
-      </nav>
-      {kind === "daily" && (
-        <IntentLink to="/daily/archive" className="flex h-12 shrink-0 items-center justify-between border-t border-line pl-1 pr-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:text-accent">
-          日报合订本 <IconChevronRight size={14} />
-        </IntentLink>
-      )}
+      <div id={archiveId} hidden={collapsed} className={`min-h-0 flex-1 flex-col ${collapsed ? "" : "flex"}`}>
+        <div className="border-b border-line-strong pb-4">
+          <KindSwitch kind={kind} />
+        </div>
+        <nav aria-label={`${KIND_LABEL[kind]}历史`} className="scrollbar-thin -mr-3 flex-1 overflow-y-auto pb-6 pr-3">
+          {groups.map((g) => (
+            <ArchiveGroup key={g.id} g={g} kind={kind} current={current} initiallyOpen={g.id === openId} />
+          ))}
+        </nav>
+        {kind === "daily" && (
+          <IntentLink to="/daily/archive" className="flex h-12 shrink-0 items-center justify-between border-t border-line pl-1 pr-1.5 text-[12.5px] font-medium text-ink-2 transition-colors hover:text-accent">
+            日报合订本 <IconChevronRight size={14} />
+          </IntentLink>
+        )}
+      </div>
     </aside>
   );
 }
