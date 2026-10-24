@@ -69,6 +69,8 @@ const api=createServer(async(req,res)=>{
     return res.end(JSON.stringify({taskId:activeTask.taskId,status:activeTask.status}));
   }
   if(p.endsWith('/cancel')){
+    // A closing page may cancel after visit() has reset the previous fixture task.
+    if(!activeTask){res.statusCode=404;return res.end(JSON.stringify({detail:'任务不存在'}));}
     activeTask.status='cancelled'; sseResponse?.end(event('task_status',{status:'cancelled'},6));sseResponse=null;return res.end('{}');
   }
   if(p.endsWith('/events')){
