@@ -472,7 +472,7 @@
       "tags": [
         "媒体"
       ],
-      "site_fulltext": false,
+      "site_fulltext": true,
       "syndicate_fulltext": false,
       "enabled": false,
       "seed_revision": 4

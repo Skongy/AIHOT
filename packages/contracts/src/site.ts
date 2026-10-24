@@ -173,6 +173,8 @@ export interface SiteItemDetail extends ItemSummary {
   author: string | null;
   /** Whitelisted HTML of the language shown; the other one is null. */
   body: { zh: string | null; original: string | null; zhKind: "translation" | "original" | null; complete: boolean } | null;
+  /** Why a normal article has no displayable body; separate from summary-only visibility. */
+  bodyUnavailableReason?: "source-policy" | "pending" | "unavailable";
   outline: OutlineEntry[];
   relatedStories: StoryRef[];
   /** The topics the report belongs to. */

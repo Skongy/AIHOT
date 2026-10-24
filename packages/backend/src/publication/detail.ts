@@ -14,6 +14,7 @@ import { topicLinks, topicMembership } from "./topics.ts";
 import { buildSelectionExplain, countWirePeers } from "./selection-explain.ts";
 
 interface DetailRow extends ItemRow {
+  source_site_fulltext: boolean;
   body_html: string | null;
   body_text: string | null;
   body_status: string;
@@ -45,7 +46,7 @@ function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
 
 async function loadRow(id: string): Promise<DetailRow | null> {
   const [row] = await sql<DetailRow[]>`
-    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete,
+    SELECT ${ITEM_COLUMNS}, s.site_fulltext AS source_site_fulltext, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete,
       ${topicMembership()} AS topics,
       a.wire_fingerprint, p.story_id,
       an.output AS analysis_output
@@ -173,6 +174,11 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     readingMode: "full",
     author: row.author,
     body: reading.body,
+    ...(!reading.body && !showsPost(row) ? {
+      bodyUnavailableReason: !row.source_site_fulltext ? "source-policy" as const
+        : row.body_status === "pending" || (row.body_status === "ok" && !!row.body_html) ? "pending" as const
+        : "unavailable" as const,
+    } : {}),
     outline: reading.outline,
     relatedStories: related,
     topics: topicLinks(row.topics),

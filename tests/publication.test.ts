@@ -117,6 +117,40 @@ test("Markdown retains numeric superscripts, subscripts and fenced code while re
   await sql`UPDATE sources SET site_fulltext = true WHERE id = ${SOURCE}`;
 });
 
+test("article body availability distinguishes source policy, pending extraction and unavailable bodies", async () => {
+  const id = await article();
+  try {
+    await publishArticle(id, released());
+    const available = JSON.parse((await get(`/api/site/items/${id}`)).body);
+    assert.ok(available.body);
+    assert.equal(available.bodyUnavailableReason, undefined);
+
+    await sql`UPDATE sources SET site_fulltext = false WHERE id = ${SOURCE}`;
+    await publishArticle(id, released());
+    const restricted = JSON.parse((await get(`/api/site/items/${id}`)).body);
+    assert.equal(restricted.body, null);
+    assert.equal(restricted.bodyUnavailableReason, "source-policy");
+    assert.equal(restricted.readingMode, "full", "source policy does not hide the article's analysis metadata");
+    assert.ok(restricted.summary);
+
+    await sql`UPDATE sources SET site_fulltext = true WHERE id = ${SOURCE}`;
+    const waiting = JSON.parse((await get(`/api/site/items/${id}`)).body);
+    assert.equal(waiting.bodyUnavailableReason, "pending", "stored text can be waiting for republication, not extraction");
+    await republishSource(SOURCE);
+    const restored = JSON.parse((await get(`/api/site/items/${id}`)).body);
+    assert.ok(restored.body, "restoring the source setting republishes existing stored bodies without reanalysis");
+    assert.equal(restored.bodyUnavailableReason, undefined);
+
+    await sql`UPDATE articles SET body_html = NULL, body_text = NULL, body_status = 'pending' WHERE id = ${id}`;
+    await publishArticle(id, released());
+    assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).bodyUnavailableReason, "pending");
+    await sql`UPDATE articles SET body_status = 'unconfirmed' WHERE id = ${id}`;
+    assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).bodyUnavailableReason, "unavailable");
+  } finally {
+    await sql`UPDATE sources SET site_fulltext = true WHERE id = ${SOURCE}`;
+  }
+});
+
 test("site reading sends one language while exports retain both, including after withdrawal", async () => {
   const id = await article();
   await sql`UPDATE articles SET language = 'en', body_html = '<h2>Original heading</h2><p>Original full body</p>' WHERE id = ${id}`;
