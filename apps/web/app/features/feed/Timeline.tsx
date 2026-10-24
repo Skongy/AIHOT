@@ -135,7 +135,7 @@ export function TimelineSlot({ at, children, fresh = false, delay = 0, dataKey, 
     <li
       ref={liRef}
       data-card-key={dataKey}
-      className={`group/slot bleed touch:has-[a:active]:bg-bg-sunk/70 lg:mx-0 lg:px-0 lg:touch:has-[a:active]:bg-transparent ${fresh ? "animate-fade-up" : ""} ${dimmable ? "read-dimmable" : ""}`}
+      className={`timeline-slot group/slot bleed touch:has-[a:active]:bg-bg-sunk/70 lg:mx-0 lg:px-0 lg:touch:has-[a:active]:bg-transparent ${fresh ? "animate-fade-up" : ""} ${dimmable ? "read-dimmable" : ""}`}
       style={fresh ? { animationDelay: `${delay}ms` } : undefined}
     >
       {/* Phones: the row without the rail (the item shows its time); a hairline between rows. */}

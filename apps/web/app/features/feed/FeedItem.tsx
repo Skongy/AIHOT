@@ -39,7 +39,7 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
   const tags = showTags ? item.tags.slice(0, 3) : [];
 
   return (
-    <article className="group/card card-focus card-spotlight relative min-w-0 lg:card lg:card-hover lg:press lg:px-[18px] lg:pb-[14px] lg:pt-[15px]" onMouseMove={onCardSpotlightMove} data-item-id={item.id}>
+    <article className="group/card card-focus card-spotlight relative min-w-0 lg:card lg:card-hover lg:press lg:px-[18px] lg:pb-[14px] lg:pt-[15px]" onMouseMove={onCardSpotlightMove} data-item-id={item.id} data-selected={item.selected || undefined}>
       <header className="flex min-h-[22px] items-center gap-1.5 text-[12.5px] leading-[18px] text-ink-4 lg:min-h-[18px] lg:gap-2">
         <SourceLine item={item} className="text-ink-4" />
         {at && (
@@ -126,7 +126,7 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
       )}
 
       {item.reason && (
-        <div className="mt-1 lg:mt-3 lg:border-t lg:border-line-soft lg:pt-3">
+        <div className="feed-note mt-1 lg:mt-3 lg:border-t lg:border-line-soft lg:pt-3">
           <p className="line-clamp-1 text-[13px] leading-[1.65] text-note lg:line-clamp-none lg:leading-[1.75]">{`${ITEM_COPY.reasonLabel}：`}{item.reason}</p>
         </div>
       )}

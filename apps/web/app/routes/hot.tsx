@@ -264,7 +264,7 @@ export default function HotPage() {
   const runners = rest.slice(0, 2);
   const others = rest.slice(2);
   return (
-    <div className="pb-10">
+    <div className="hot-workspace pb-10">
       <PhoneBar
         title="热点"
         large
@@ -285,7 +285,7 @@ export default function HotPage() {
           </button>
         }
       />
-      <header className="hidden flex-wrap items-end justify-between gap-x-6 gap-y-2 pb-5 pt-1 lg:flex">
+      <header className="workspace-header hidden flex-wrap items-end justify-between gap-x-6 gap-y-2 pb-5 pt-1 lg:flex">
         <div>
           <div className="flex items-center gap-2 text-[12px] font-semibold tracking-[0.08em] text-hot">
             <span className="relative flex size-2" aria-hidden="true">
