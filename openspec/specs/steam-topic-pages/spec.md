@@ -1,38 +1,9 @@
-# steam-topic-pages Specification
+# 游戏主题详情规范
 
-## Purpose
-规定四款 Steam 种子游戏主题深页：展示公开商店元数据与本站已收录的更新/新闻时间线，且不依赖 Steam WebAPI key，也不改精选门槛。
+## 当前行为（2026-10-24）
 
-## Requirements
-
-### Requirement: 种子主题绑定 Steam AppID
-
-系统 SHALL 在行业包主题定义中为四款种子游戏（以撒的结合：重生、杀戮尖塔 2、喵喵的结合、博德之门 3）配置对应的 Steam `steamAppId`（250900、2868840、686060、1086940）。未配置 `steamAppId` 的主题 MUST NOT 请求 Steam 商店接口。
-
-#### Scenario: 四款种子均可解析 AppID
-
-- **WHEN** 加载上述任一主题定义
-- **THEN** 主题带有正确的 `steamAppId` 整型字段
-
-### Requirement: 无 key 拉取商店元数据
-
-对配置了 `steamAppId` 的主题，系统 MAY 通过公开的 Steam store `appdetails` JSON（含中文语言与国区）获取商店元数据。系统 MUST NOT 要求 Steam WebAPI key。拉取或解析失败时，主题页 MUST 仍可返回，仅省略商店面板。
-
-#### Scenario: 成功时返回可读元数据
-
-- **WHEN** appdetails 返回 success 且含游戏数据
-- **THEN** 主题页 API 提供名称、短简介、封面、发售信息、开发商/发行商、类型与可选国区价格，以及商店页链接
-
-#### Scenario: 失败时降级
-
-- **WHEN** 网络失败或 Steam 返回 success=false
-- **THEN** `steam` 字段为 null，精选时间线仍可展示
-
-### Requirement: 主题页展示时间线与商店卡
-
-配置了 Steam 的主题在其第 1 页 SHALL 向读者展示商店卡（若有元数据）以及本站已收录精选条目构成的更新/新闻时间线。系统 MUST NOT 因此修改 `industry/selection.ts` 门槛数字。
-
-#### Scenario: 深页结构
-
-- **WHEN** 读者打开 `/topics/baldurs-gate-3`
-- **THEN** 页面在列表上方展示商店信息（可用时），并以时间线列出该主题精选新闻
+- 所有游戏主题统一展示主题介绍、统计与已有精选新闻时间线；不展示 Steam 商店图片、价格或资料卡，也不请求 appdetails。
+- 已上线主题 slug 保持不变。
+- 新游戏主题由近 30 天可公开新闻统计决定，严格超过 10 条才加入；同款游戏别名合并计数，不将系列泛称混算到具体续作。
+- 有实体标签的主题沿用原匹配规则；无标签的新游戏通过明确名称和别名匹配中文或原始标题，不借用厂商标签或摘要中的顺带提及。
+- 列表、计数与关联主题共用匹配规则，保留公开权限、发布时间、精选规则与分页。

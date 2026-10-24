@@ -8,7 +8,6 @@ import type { CategoryKey } from "@aihot/contracts/taxonomy";
 import type {
   Brand, TopicGroup, TopicGroupKey, TopicLink, TopicPage, TopicSummary, TopicsResponse,
 } from "@aihot/contracts/site";
-import { loadSteamTopicPanel } from "./steam.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { REPO_ROOT } from "../config.ts";
@@ -26,8 +25,6 @@ export interface Topic {
   definition: string;
   /** Companies: the subject id (industry/taxonomy.ts ENTITIES). */
   entityId: string | null;
-  /** Steam store app id for seed game deep pages; null when not a Steam-bound topic. */
-  steamAppId: number | null;
   /** Tags that put a report in the topic: a company's subject tag, a direction's or a form's tags. */
   tags: string[];
   /** Companies: a title naming the company by any of its names (a PostgreSQL regular expression). */
@@ -39,7 +36,7 @@ export interface Topic {
 interface TopicFile {
   groups: TopicGroup[];
   topics: Array<{
-    slug: string; name: string; group: TopicGroupKey; entityId?: string; steamAppId?: number; aliases?: string[]; tags?: string[]; definition: string;
+    slug: string; name: string; group: TopicGroupKey; entityId?: string; aliases?: string[]; tags?: string[]; definition: string;
   }>;
 }
 
@@ -47,10 +44,11 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const nameParts = (name: string) => name.split("/").map((s) => s.trim()).filter(Boolean);
 
 /** Any name of the company: the topic's name and its parts, the subject's names. Latin names match as whole words. */
-function titlePattern(name: string, entityId: string): string {
-  const e = ENTITIES[entityId];
-  const names = new Set([name, ...nameParts(name), ...(e ? [e.name, ...e.aliases, ...(e.otherNames ?? [])] : [])]);
-  return `(?<![A-Za-z])(${[...names].map(escape).join("|")})(?![A-Za-z])`;
+function titlePattern(name: string, entityId: string | null, aliases: string[] = []): string {
+  const e = entityId ? ENTITIES[entityId] : null;
+  const names = new Set([name, ...nameParts(name), ...aliases, ...(e ? [e.name, ...e.aliases, ...(e.otherNames ?? [])] : [])]);
+  const boundary = entityId ? "[A-Za-z]" : "[A-Za-z0-9]";
+  return `(?<!${boundary})(${[...names].map(escape).join("|")})(?!${boundary})`;
 }
 
 const file = JSON.parse(readFileSync(path.join(REPO_ROOT, "industry/topics.json"), "utf8")) as TopicFile;
@@ -63,10 +61,9 @@ export const TOPICS: Topic[] = file.topics.map((t) => ({
   group: t.group,
   definition: t.definition,
   entityId: t.entityId ?? null,
-  steamAppId: typeof t.steamAppId === "number" && Number.isInteger(t.steamAppId) && t.steamAppId > 0 ? t.steamAppId : null,
   tags: t.entityId ? [`entity:${t.entityId}`] : (t.tags ?? []),
-  pattern: t.entityId ? titlePattern(t.name, t.entityId) : null,
-  aliases: t.entityId ? [t.slug, t.name, ...nameParts(t.name), ...(t.aliases ?? [])] : [],
+  pattern: t.entityId ? titlePattern(t.name, t.entityId) : t.group === "company" && t.aliases?.length ? titlePattern(t.name, null, t.aliases) : null,
+  aliases: t.group === "company" ? [t.slug, t.name, ...nameParts(t.name), ...(t.aliases ?? [])] : [],
 }));
 
 const BY_SLUG = new Map(TOPICS.map((t, position) => [t.slug, { topic: t, position }]));
@@ -88,8 +85,10 @@ export function topicBrowseLinks() {
 
 /** One membership rule for topic discovery and a single topic's page and count. */
 function topicMatch(tags: ReturnType<typeof sql>, pattern: ReturnType<typeof sql>) {
-  return sql`p.tags && ${tags} AND (${pattern} IS NULL OR p.title ~* ${pattern} OR coalesce(p.original_title, '') ~* ${pattern}
-    OR (SELECT count(*) FROM unnest(p.tags) AS e(tag) WHERE e.tag LIKE 'entity:%') = 1)`;
+  return sql`((p.tags && ${tags} AND (${pattern} IS NULL OR p.title ~* ${pattern} OR coalesce(p.original_title, '') ~* ${pattern}
+    OR (SELECT count(*) FROM unnest(p.tags) AS e(tag) WHERE e.tag LIKE 'entity:%') = 1))
+    OR (cardinality(${tags}) = 0 AND ${pattern} IS NOT NULL
+      AND (p.title ~* ${pattern} OR coalesce(p.original_title, '') ~* ${pattern})))`;
 }
 
 /**
@@ -323,7 +322,7 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     return part ? [{ name: m.name, ...part }] : [];
   });
   for (const part of parts) recheck.push(...part.recheck);
-  const [rows, pool, brands, live, steam] = await Promise.all([
+  const [rows, pool, brands, live] = await Promise.all([
     ids.length
       ? sql<ItemRow[]>`SELECT ${ITEM_COLUMNS} ${ITEM_FROM} WHERE p.article_id = ANY(${ids}::text[]) AND ${seatedCondition(at)} AND ${inTopic(topic)}
           ORDER BY p.timeline_at DESC, p.article_id DESC`
@@ -331,8 +330,6 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     poolTotal(topic, now),
     companyBrands(),
     currentSeats(recheck, at, [topic]),
-    // Store card only on page 1. Explicit `now` is the test clock — skip outbound Steam for hermetic tests.
-    page === 1 && !now ? loadSteamTopicPanel(topic.steamAppId) : Promise.resolve(null),
   ]);
   const groupName = TOPIC_GROUPS.find((g) => g.key === topic.group)?.name ?? "";
   return {
@@ -342,7 +339,6 @@ export async function loadTopicPage(slug: string, page: number, now?: Date): Pro
     page,
     pageCount,
     pageSize: TOPIC_PAGE_SIZE,
-    steam,
   };
 }
 

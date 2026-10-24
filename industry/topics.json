@@ -3,7 +3,7 @@
     {
       "key": "company",
       "name": "游戏",
-      "blurb": "一款 Steam 游戏一页：更新、DLC、评测与相关新闻"
+      "blurb": "一款游戏一页：更新、赛事、评测与相关新闻"
     },
     {
       "key": "field",
@@ -22,32 +22,28 @@
       "name": "以撒的结合：重生",
       "group": "company",
       "entityId": "binding-of-isaac-rebirth",
-      "definition": "《以撒的结合：重生》（The Binding of Isaac: Rebirth）及其 DLC（Afterbirth / Afterbirth+ / Repentance）在 Steam 上的更新、补丁、主机移植与相关新闻。",
-      "steamAppId": 250900
+      "definition": "《以撒的结合：重生》（The Binding of Isaac: Rebirth）及其 DLC（Afterbirth / Afterbirth+ / Repentance）在 Steam 上的更新、补丁、主机移植与相关新闻。"
     },
     {
       "slug": "slay-the-spire-2",
       "name": "杀戮尖塔 2",
       "group": "company",
       "entityId": "slay-the-spire-2",
-      "definition": "《杀戮尖塔 2》（Slay the Spire 2）的抢先体验更新、补丁、平衡与相关新闻。",
-      "steamAppId": 2868840
+      "definition": "《杀戮尖塔 2》（Slay the Spire 2）的抢先体验更新、补丁、平衡与相关新闻。"
     },
     {
       "slug": "mewgenics",
       "name": "喵喵的结合",
       "group": "company",
       "entityId": "mewgenics",
-      "definition": "《喵喵的结合》（Mewgenics）的更新、本地化、主机版与相关新闻。",
-      "steamAppId": 686060
+      "definition": "《喵喵的结合》（Mewgenics）的更新、本地化、主机版与相关新闻。"
     },
     {
       "slug": "baldurs-gate-3",
       "name": "博德之门 3",
       "group": "company",
       "entityId": "baldurs-gate-3",
-      "definition": "《博德之门 3》（Baldur's Gate 3）的补丁、模组与社区、跨平台与相关新闻。",
-      "steamAppId": 1086940
+      "definition": "《博德之门 3》（Baldur's Gate 3）的补丁、模组与社区、跨平台与相关新闻。"
     },
     {
       "slug": "valorant",
@@ -61,40 +57,35 @@
       "name": "CS2",
       "group": "company",
       "entityId": "counter-strike-2",
-      "definition": "《反恐精英 2》（Counter-Strike 2 / CS2）的版本更新、地图与武器平衡、反作弊、赛事及社区生态相关新闻。",
-      "steamAppId": 730
+      "definition": "《反恐精英 2》（Counter-Strike 2 / CS2）的版本更新、地图与武器平衡、反作弊、赛事及社区生态相关新闻。"
     },
     {
       "slug": "dota-2",
       "name": "Dota 2",
       "group": "company",
       "entityId": "dota-2",
-      "definition": "《Dota 2》的版本更新、英雄与装备平衡、赛事、战队及社区生态相关新闻。",
-      "steamAppId": 570
+      "definition": "《Dota 2》的版本更新、英雄与装备平衡、赛事、战队及社区生态相关新闻。"
     },
     {
       "slug": "pubg-battlegrounds",
       "name": "PUBG",
       "group": "company",
       "entityId": "pubg-battlegrounds",
-      "definition": "《PUBG: BATTLEGROUNDS》（绝地求生）的版本更新、地图与玩法、赛季、反作弊及电竞赛事相关新闻。",
-      "steamAppId": 578080
+      "definition": "《PUBG: BATTLEGROUNDS》（绝地求生）的版本更新、地图与玩法、赛季、反作弊及电竞赛事相关新闻。"
     },
     {
       "slug": "delta-force",
       "name": "三角洲行动",
       "group": "company",
       "entityId": "delta-force",
-      "definition": "《三角洲行动》（Delta Force）的版本更新、赛季内容、玩法调整、运营活动及电竞相关新闻。",
-      "steamAppId": 2507950
+      "definition": "《三角洲行动》（Delta Force）的版本更新、赛季内容、玩法调整、运营活动及电竞相关新闻。"
     },
     {
       "slug": "apex-legends",
       "name": "Apex 英雄",
       "group": "company",
       "entityId": "apex-legends",
-      "definition": "《Apex 英雄》（Apex Legends）的新赛季、传奇与武器平衡、地图、反作弊及 ALGS 赛事相关新闻。",
-      "steamAppId": 1172470
+      "definition": "《Apex 英雄》（Apex Legends）的新赛季、传奇与武器平衡、地图、反作弊及 ALGS 赛事相关新闻。"
     },
     {
       "slug": "league-of-legends",
@@ -116,6 +107,76 @@
       "group": "company",
       "entityId": "honkai-star-rail",
       "definition": "《崩坏：星穹铁道》（Honkai: Star Rail）的版本前瞻、角色与玩法更新、活动、运营公告及社区相关新闻。"
+    },
+    {
+      "slug": "gta-6",
+      "name": "GTA 6",
+      "group": "company",
+      "aliases": [
+        "GTA6",
+        "Grand Theft Auto VI",
+        "Grand Theft Auto 6",
+        "侠盗猎车手6",
+        "侠盗猎车手 6",
+        "侠盗猎车手VI"
+      ],
+      "definition": "《GTA 6》（Grand Theft Auto VI）的开发进展、预告、发售信息与相关新闻。"
+    },
+    {
+      "slug": "phantom-blade-zero",
+      "name": "影之刃零",
+      "group": "company",
+      "aliases": [
+        "Phantom Blade Zero"
+      ],
+      "definition": "《影之刃零》（Phantom Blade Zero）的实机演示、玩法、开发进展与发售相关新闻。"
+    },
+    {
+      "slug": "call-of-duty-modern-warfare-4",
+      "name": "使命召唤：现代战争 4",
+      "group": "company",
+      "aliases": [
+        "使命召唤：现代战争4",
+        "使命召唤:现代战争4",
+        "使命召唤:现代战争 4",
+        "使命召唤 现代战争4",
+        "使命召唤 现代战争 4",
+        "Call of Duty: Modern Warfare 4",
+        "Modern Warfare 4"
+      ],
+      "definition": "《使命召唤：现代战争 4》相关开发消息、玩法报道、官方动态与发售信息；传闻以报道标注为准。"
+    },
+    {
+      "slug": "cyberpunk-2077",
+      "name": "赛博朋克 2077",
+      "group": "company",
+      "aliases": [
+        "赛博朋克2077",
+        "Cyberpunk 2077"
+      ],
+      "definition": "《赛博朋克 2077》（Cyberpunk 2077）的版本更新、资料片、模组及相关新闻。"
+    },
+    {
+      "slug": "mass-effect-5",
+      "name": "质量效应 5",
+      "group": "company",
+      "aliases": [
+        "质量效应5",
+        "Mass Effect 5"
+      ],
+      "definition": "《质量效应 5》相关开发进展、制作团队动态与后续作品报道；正式名称及未确认内容以官方消息为准。"
+    },
+    {
+      "slug": "zelda-ocarina-of-time",
+      "name": "塞尔达传说：时之笛",
+      "group": "company",
+      "aliases": [
+        "塞尔达传说 时之笛",
+        "塞尔达传说:时之笛",
+        "The Legend of Zelda: Ocarina of Time",
+        "Ocarina of Time"
+      ],
+      "definition": "《塞尔达传说：时之笛》的版本、移植、重制消息与相关新闻；传闻以报道标注为准。"
     },
     {
       "slug": "mobile",
