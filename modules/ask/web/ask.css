@@ -210,18 +210,19 @@
  .ask-composer { border-radius:13px; }
  .ask-composer textarea { padding:16px 16px 6px; }
  .ask-composer-toolbar { padding-left:16px; }
- .ask-composer-toolbar > span { max-width:220px; font-size:10px; }
+ .ask-composer-toolbar > span { max-width:220px; font-size:11px; }
  .ask-composer-toolbar { gap:8px; }
  .ask-composer-actions { gap:6px; }
- .ask-mode-picker { min-width:112px; height:40px; }
- .ask-mode-picker select { padding-left:9px; font-size:11px; }
+ .ask-mode-picker { min-width:112px; height:44px; }
+ .ask-mode-picker select { height:44px; padding-left:9px; font-size:11px; }
+ .ask-send { min-width:44px; height:44px; }
  .ask-starters { grid-template-columns:1fr; margin-top:18px; }
  .ask-starters.is-deep > button { border-left:0; }
  .ask-starters.is-deep > button + button { border-top:1px solid var(--line-soft); }
  .ask-starters > button { align-items:center; padding:15px 6px; border-radius:0; min-height:64px; }
  .ask-starters > button + button { border-left:0; border-top:1px solid var(--line-soft); border-radius:0; }
  .ask-starters small { margin-top:3px; }
- .ask-footnote { justify-content:flex-start; font-size:10px; margin-left:2px; }
+ .ask-footnote { justify-content:flex-start; font-size:11px; margin-left:2px; }
  .ask-user > p { font-size:18px; }
  .ask-context { padding:10px 12px; }
  .ask-conversation { margin-top:24px; }

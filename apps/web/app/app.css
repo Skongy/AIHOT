@@ -146,7 +146,7 @@
   --rank-2: #8B6914;
   --rank-3: #8B6914;
   --rank-rest: #626B76;
-  --focus-ring: #B4231840;
+  --focus-ring: #B42318B3;
   --overlay: #20242B73;
   --shadow-card: 0 1px 0 var(--border);
   --shadow-card-hover: 0 4px 16px rgba(26, 26, 26, 0.06);
@@ -216,7 +216,7 @@
   --rank-2: #C4A484;
   --rank-3: #C4A484;
   --rank-rest: #8A857C;
-  --focus-ring: #C4A48466;
+  --focus-ring: #C4A484B3;
   --overlay: #000000A6;
   --shadow-card: none;
   --shadow-card-hover: none;

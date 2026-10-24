@@ -109,7 +109,10 @@ function HeatPanel({ e }: { e: HotEntryView }) {
 
 /** No. 1: the event people are talking about most, with its picture, digest, latest turn and day of heat. */
 function Lead({ e }: { e: HotEntryView }) {
-  const panel = !e.cover && e.spark.filter((v) => v !== null).length >= 3;
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const coverKey = JSON.stringify([e.story.publicId, e.cover?.url, e.cover?.srcSet]);
+  const cover = failedCover === coverKey ? null : e.cover;
+  const panel = !cover && e.spark.filter((v) => v !== null).length >= 3;
   return (
     <article className="card card-hover card-spotlight group relative flex flex-col overflow-hidden p-5 sm:p-6" onMouseMove={onCardSpotlightMove} style={{ viewTransitionName: vtName("hot", String(e.rank)) }}>
       <div className="flex items-center gap-2.5">
@@ -117,16 +120,16 @@ function Lead({ e }: { e: HotEntryView }) {
         <Badges e={e} />
         <Delta trend={e.trend} pct={e.trendPct} className="ml-auto" />
       </div>
-      <div className={`mt-4 grid gap-5 ${e.cover || panel ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)] xl:gap-7" : ""}`}>
+      <div className={`mt-4 grid gap-5 ${cover || panel ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)] xl:gap-7" : ""}`}>
         <div className="min-w-0">
           <h2 className="text-[21px] font-bold leading-[1.4] tracking-[-0.01em] text-ink sm:text-[23px] lg:text-[25px] lg:leading-[1.38]">
             <StoryLink e={e} className="group-hover:text-accent" />
           </h2>
           {e.summary && <p className="mt-3 line-clamp-3 text-[14px] leading-[1.75] text-ink-3">{e.summary}</p>}
         </div>
-        {e.cover ? (
+        {cover ? (
           <div className="order-first overflow-hidden well rounded-panel xl:order-none">
-            <img src={e.cover.url} srcSet={e.cover.srcSet} sizes="(min-width: 1280px) calc(28vw - 96px), (min-width: 1024px) calc(58vw - 180px), (min-width: 640px) 568px, calc(100vw - 74px)" width={e.cover.width ?? undefined} height={e.cover.height ?? undefined} alt="" loading="eager" fetchPriority="high" decoding="async" className="aspect-[16/9] size-full object-cover transition-transform duration-500 group-hover:scale-[1.02] xl:aspect-[16/10]" />
+            <img key={coverKey} ref={(img) => { if (img?.complete && img.naturalWidth === 0) setFailedCover(coverKey); }} onError={() => setFailedCover(coverKey)} src={cover.url} srcSet={cover.srcSet} sizes="(min-width: 1280px) calc(28vw - 96px), (min-width: 1024px) calc(58vw - 180px), (min-width: 640px) 568px, calc(100vw - 74px)" width={cover.width ?? undefined} height={cover.height ?? undefined} alt="" loading="eager" fetchPriority="high" decoding="async" className="aspect-[16/9] size-full object-cover transition-transform duration-500 group-hover:scale-[1.02] xl:aspect-[16/10]" />
           </div>
         ) : (
           panel && <HeatPanel e={e} />
