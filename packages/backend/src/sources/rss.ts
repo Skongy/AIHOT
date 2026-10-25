@@ -146,12 +146,16 @@ export async function fetchRss(source: SourceRow, opts: { force?: boolean } = {}
   const configHash = sha256(stableJson(source.config));
   const previous = !opts.force && source.cursor?.rss?.configHash === configHash ? source.cursor.rss as RssValidator : null;
   const headers: Record<string, string> = { accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8" };
+  if (typeof source.config.userAgent === "string") headers["user-agent"] = source.config.userAgent;
   if (previous?.etag) headers["if-none-match"] = previous.etag;
   if (previous?.lastModified) headers["if-modified-since"] = previous.lastModified;
   let res = await fetchListing(url, { headers, timeoutMs: 25_000 });
   // A redirect may have changed destinations, whose ETag namespace is unrelated to the old one.
   if (res.status === 304 && previous && res.url !== previous.responseUrl) {
-    res = await fetchListing(url, { headers: { accept: headers.accept! }, timeoutMs: 25_000 });
+    const unconditional = { ...headers };
+    delete unconditional["if-none-match"];
+    delete unconditional["if-modified-since"];
+    res = await fetchListing(url, { headers: unconditional, timeoutMs: 25_000 });
   }
   const validator: RssValidator = {
     configHash, responseUrl: res.url,
@@ -176,7 +180,14 @@ export async function fetchRss(source: SourceRow, opts: { force?: boolean } = {}
     const items = arr(doc.rss?.channel?.item ?? doc["rdf:RDF"]?.item);
     for (const it of items) {
       const guid = text(it.guid);
-      const page = text(it.link) || (normalizeUrl(guid) ? guid : "");
+      // Some RSS publishers (Minecraft) supply the article URL through an Atom-namespaced link.
+      // Resolve the namespace, not the publisher's arbitrary prefix, and exclude self/enclosure links.
+      const namespaces = new Map([doc.rss ?? doc["rdf:RDF"], channel, it].flatMap((scope) => Object.entries(scope ?? {})
+        .filter(([key]) => key.startsWith("@xmlns:"))));
+      const alternate = [...namespaces].filter(([, uri]) => uri === "http://www.w3.org/2005/Atom")
+        .flatMap(([key]) => arr<Record<string, string>>(it[`${key.slice("@xmlns:".length)}:link`]))
+        .filter((link) => link && typeof link === "object" && (!link["@rel"] || link["@rel"] === "alternate"));
+      const page = text(it.link) || atomLink(alternate, res.url) || (normalizeUrl(guid) ? guid : "");
       const enclosures = arr(it.enclosure as Record<string, string> | Array<Record<string, string>>);
       // An episode with no page (no <link>, a guid that is no address) links to its audio or video file,
       // which a browser plays. Its identity stays the one its guid gives, and it has no page to read a body from.

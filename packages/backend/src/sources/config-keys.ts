@@ -8,7 +8,7 @@ const PUBLISHER = ["publisherRole", "publisherUrlPrefixes"];
 const COLLECTED = [...PUBLISHER, "_aihot", "allowUrlPrefixes", "denyUrlPrefixes", "ingestNoiseFilter", "itemUrlPrefixRewrite", "sortByPublishedAt", "detail", "fetchPublicContent", "publishedAfter"];
 
 const KEYS: Record<SourceRow["kind"], string[]> = {
-  rss: [...COLLECTED, "feedUrl", "summaryIsBody", "preserveUrlFragment", "allowCategories", "denyCategories"],
+  rss: [...COLLECTED, "feedUrl", "userAgent", "summaryIsBody", "preserveUrlFragment", "allowCategories", "denyCategories"],
   web_list: [
     ...COLLECTED, "url", "baseUrl", "parseMode", "adapter", "cacheToleranceSeconds", "linksStartLine", "preserveUrlFragment",
     "itemSelector", "linkSelector", "titleSelector", "publishedAtSelector", "publishedAtRegex", "publishedAtUtcOffset",
@@ -55,6 +55,7 @@ export function unsupportedConfig(kind: SourceRow["kind"], config: Record<string
   const out: string[] = [];
   for (const [key, value] of Object.entries(config ?? {})) {
     if (!allowed.has(key)) out.push(key);
+    else if (key === "userAgent" && (typeof value !== "string" || !value.trim() || value.length > 256 || /[^\x20-\x7e]/.test(value))) out.push(key);
     else if (key === "publishedAfter" && !utcInstant(value)) out.push(key);
     else if (key === "publisherUrlPrefixes" && (!Array.isArray(value) || !value.every((v) => {
       if (typeof v !== "string") return false;

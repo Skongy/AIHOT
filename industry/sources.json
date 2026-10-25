@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。产品覆盖游戏媒体、重点游戏官方公告和行业资讯。当前启用约 18 个高质量 editorial 信源（机核/游研社/触乐、IGN中国、巴哈姆特GNN、游茶、Gematsu、GamesIndustry.biz、版署、玩加电竞、17173、游戏陀螺、英雄联盟/原神/崩铁/无畏契约与 VCT、Steam·CS2）加 B站/贴吧热榜；其余默认停用，减少无效抓取与分析开销。提高 seed_revision 以便部署时把启停推到已有库；后续部署不会重复覆盖管理员操作。标题规则只用于单游戏公告源。热榜以 hot_signal 接入，几乎不耗 LLM。",
+  "$comment": "游戏信源配置：新增及恢复 9 个媒体/官方 RSS，保留其余信源启停状态。只对本次恢复的 PS 繁中、Xbox、任天堂提高 seed_revision，部署时一次性同步；不重置其他来源的后台配置。新源首次最多导入 8 条、最近 1 个月，默认 120 分钟检查，后续沿用产出自适应调度。任天堂仅收 Topics 文章，Xbox 排除 Games 分类短跳转卡，4Gamers/Minecraft 过滤部分非资讯推广。Steam 总流及 X 采集不启用。",
   "sources": [
     {
       "id": "rss-gcores",
@@ -1502,8 +1502,8 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false,
-      "seed_revision": 4
+      "enabled": true,
+      "seed_revision": 5
     },
     {
       "id": "rss-xbox-wire",
@@ -1518,7 +1518,10 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "denyCategories": [
+          "Games"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "microsoft",
@@ -1530,8 +1533,8 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false,
-      "seed_revision": 4
+      "enabled": true,
+      "seed_revision": 5
     },
     {
       "id": "rss-nintendo-jp",
@@ -1543,7 +1546,11 @@
         "_aihot": {
           "initialBackfillLimit": 8,
           "initialBackfillMonths": 1
-        }
+        },
+        "allowUrlPrefixes": [
+          "https://www.nintendo.com/jp/topics/article/",
+          "https://www.nintendo.co.jp/topics/article/"
+        ]
       },
       "tier": "T1",
       "owner_entity_id": "nintendo",
@@ -1555,8 +1562,8 @@
       ],
       "site_fulltext": true,
       "syndicate_fulltext": false,
-      "enabled": false,
-      "seed_revision": 4
+      "enabled": true,
+      "seed_revision": 5
     },
     {
       "id": "web-nintendo-hk",
@@ -1900,6 +1907,178 @@
       "syndicate_fulltext": false,
       "enabled": true,
       "seed_revision": 4
+    },
+    {
+      "id": "rss-eurogamer",
+      "name": "Eurogamer",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.eurogamer.net/feed",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "英文"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-gameworldobserver",
+      "name": "Game World Observer",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://gameworldobserver.com/feed",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "英文",
+        "行业"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-gamingonlinux",
+      "name": "GamingOnLinux",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.gamingonlinux.com/article_rss.php?newsonly",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "英文",
+        "PC/Steam"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-4gamers-tw",
+      "name": "4Gamers 台湾",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.4gamers.com.tw/rss/latest-news",
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "演唱會",
+            "演唱会",
+            "寫真",
+            "写真",
+            "聲優",
+            "声优"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "媒体",
+        "繁体"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-ps-blog-en",
+      "name": "PlayStation Blog（英文）",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://blog.playstation.com/feed/",
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "sony",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英文"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
+    },
+    {
+      "id": "rss-minecraft",
+      "name": "Minecraft 官方新闻",
+      "kind": "rss",
+      "config": {
+        "fetchPublicContent": true,
+        "feedUrl": "https://www.minecraft.net/en-us/feeds/community-content/rss",
+        "allowUrlPrefixes": [
+          "https://www.minecraft.net/en-us/article/"
+        ],
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "Marketplace Spotlight",
+            "Marketplace Pass",
+            "Realms Plus",
+            "Domino’s",
+            "Domino's"
+          ]
+        },
+        "_aihot": {
+          "initialBackfillLimit": 8,
+          "initialBackfillMonths": 1
+        },
+        "userAgent": "Mozilla/5.0"
+      },
+      "tier": "T1",
+      "owner_entity_id": "microsoft",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "英文",
+        "Minecraft"
+      ],
+      "site_fulltext": true,
+      "syndicate_fulltext": false,
+      "enabled": true,
+      "seed_revision": 1
     }
   ]
 }
