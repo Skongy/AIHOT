@@ -91,7 +91,8 @@ export async function extractFromUrl(url: string, subject: string, utcOffset?: s
   try { const got = await officialBody(url, utcOffset); if (got) return got; }
   catch { /* The ordinary page and budgeted fallback remain available. */ }
   try {
-    const res = await guardedFetch(url, { timeoutMs: 20_000, maxBytes: 6 * 1024 * 1024 });
+    const headers = source?.kind === "rss" && typeof source.config.userAgent === "string" ? { "user-agent": source.config.userAgent } : undefined;
+    const res = await guardedFetch(url, { headers, timeoutMs: 20_000, maxBytes: 6 * 1024 * 1024 });
     if (isVideoPageUrl(res.url)) return null;
     const type = res.headers.get("content-type") ?? "";
     if (res.status === 200 && /html/.test(type)) {

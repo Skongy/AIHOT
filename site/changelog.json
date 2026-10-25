@@ -1,6 +1,16 @@
 {
-  "latestVersion": "2026-10-22T12:00",
+  "latestVersion": "2026-10-25T16:00",
   "releases": [
+    {
+      "date": "2026-10-25",
+      "time": "16:00",
+      "kind": "更新",
+      "title": "扩充海外媒体与游戏官方资讯来源",
+      "body": [
+        "新增 Eurogamer、Game World Observer、GamingOnLinux、4Gamers，以及 PlayStation 英文博客和 Minecraft 官方新闻；恢复 PlayStation 繁中、Xbox Wire 和任天堂官网资讯，补充游戏公告、Steam 生态与行业分析。",
+        "完善 RSS 编码与命名空间链接兼容，确保 Minecraft 等来源可以识别原文地址；针对招聘、娱乐活动、商城推广和短跳转卡实施来源级过滤，保留现有去重、精选、预算与发布流程。"
+      ]
+    },
     {
       "date": "2026-10-22",
       "time": "12:00",

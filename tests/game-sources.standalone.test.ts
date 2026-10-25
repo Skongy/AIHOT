@@ -28,7 +28,7 @@ const byId = new Map(sources.map((s) => [s.id, s]));
 
 const MEDIA = [
   "rss-gcores", "rss-ign-cn", "rss-gnn", "rss-yystv", "rss-chuapp", "rss-youxichaguan", "rss-hltv",
-  "rss-pcgamer", "rss-rockpapershotgun", "rss-gematsu", "rss-automaton-jp", "rss-4gamer", "rss-vgc", "rss-gamesindustry-biz", "rss-game-developer",
+  "rss-pcgamer", "rss-rockpapershotgun", "rss-gematsu", "rss-automaton-jp", "rss-4gamer", "rss-vgc", "rss-gamesindustry-biz", "rss-game-developer", "rss-eurogamer", "rss-gameworldobserver", "rss-gamingonlinux", "rss-4gamers-tw",
   "web-gamersky", "web-3dm", "web-a9vg", "web-17173", "web-sina-esports", "web-wanplus", "web-youxituoluo", "web-indienova", "web-nppa-games",
 ];
 const OFFICIAL = [
@@ -38,7 +38,7 @@ const OFFICIAL = [
   "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp", "web-nintendo-hk", "rss-steam-news", "rss-netease-ir",
   // Steam seed-game news + developer/publisher first-party
   "rss-steam-isaac-rebirth", "rss-steam-sts2", "rss-steam-mewgenics", "rss-steam-bg3",
-  "rss-megacrit-news", "web-larian-news",
+  "rss-megacrit-news", "web-larian-news", "rss-ps-blog-en", "rss-minecraft",
   // Valorant (non-Steam FPS exception): CN CMC + traditional-Chinese official news
   "json-val-news", "json-vct-news", "web-playvalorant-news",
 ];
@@ -54,6 +54,8 @@ const ENABLED_KEEP = new Set([
   "web-wanplus", "web-17173", "web-youxituoluo",
   "json-lol-news", "json-miyoushe-ys", "json-miyoushe-sr", "rss-steam-cs2", "json-val-news", "json-vct-news",
   "json-bilibili-hotword", "json-tieba-hottopic",
+  "rss-eurogamer", "rss-gameworldobserver", "rss-gamingonlinux", "rss-4gamers-tw", "rss-ps-blog-en", "rss-minecraft",
+  "rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp",
 ]);
 const DISABLED_OFFICIAL = new Set(["json-pvp-news", "web-yjwujian", "web-gp-qq", "web-lolesports", "rss-netease-ir", "web-playvalorant-news"]);
 const DISABLED_LOW_YIELD = new Set(["rss-netease-ir"]);
@@ -64,7 +66,9 @@ const UNDATED_LISTING = new Set(["web-17173", "web-sina-esports", "web-wanplus",
 test("the seed holds the media list and the official list, nothing else", () => {
   assert.deepEqual(sources.map((s) => s.id).sort(), [...MEDIA, ...OFFICIAL, ...HOT].sort());
   assert.equal(new Set(sources.map((s) => s.id)).size, sources.length);
-  assert.equal(sources.every((s) => s.seed_revision === SEED_REVISION), true, "every source bumps seed_revision for the quota keep-list");
+  const added = new Set(["rss-eurogamer", "rss-gameworldobserver", "rss-gamingonlinux", "rss-4gamers-tw", "rss-ps-blog-en", "rss-minecraft"]);
+  const restored = new Set(["rss-ps-blog-zh-hant", "rss-xbox-wire", "rss-nintendo-jp"]);
+  for (const source of sources) assert.equal(source.seed_revision, added.has(source.id) ? 1 : restored.has(source.id) ? 5 : SEED_REVISION, `${source.id}: only intentional restores bump existing revisions`);
   assert.deepEqual(sources.filter((s) => s.enabled !== false).map((s) => s.id).sort(), [...ENABLED_KEEP].sort());
 });
 
