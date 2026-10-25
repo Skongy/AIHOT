@@ -11,6 +11,7 @@ import { guardedFetch } from "@aihot/backend/lib/http-fetch";
 const deployment = DEPLOYMENT as unknown as { directFetchHosts?: string[] };
 const previousHosts = deployment.directFetchHosts;
 const previousProxy = config.egressProxyUrl;
+const previousProxyHosts = config.egressProxyHosts;
 const previousPrivate = config.allowPrivateNetworkFetch;
 const previousDispatcher = getGlobalDispatcher();
 const mock = new MockAgent(); mock.disableNetConnect(); setGlobalDispatcher(mock);
@@ -23,10 +24,12 @@ proxy.on("connect", (_req, socket) => {
 await new Promise<void>(resolve => proxy.listen(0, "127.0.0.1", resolve));
 config.egressProxyUrl = `http://127.0.0.1:${(proxy.address() as { port: number }).port}`;
 config.allowPrivateNetworkFetch = true;
+config.egressProxyHosts = [];
 deployment.directFetchHosts = ["domestic.invalid", "localhost"];
 after(async () => {
   deployment.directFetchHosts = previousHosts;
   config.egressProxyUrl = previousProxy;
+  config.egressProxyHosts = previousProxyHosts;
   config.allowPrivateNetworkFetch = previousPrivate;
   setGlobalDispatcher(previousDispatcher);
   await mock.close();
@@ -60,4 +63,45 @@ test("direct host exceptions never grant permission to fetch a private address",
   config.allowPrivateNetworkFetch = false;
   try { await assert.rejects(guardedFetch("http://localhost/metadata"), /Blocked/); }
   finally { config.allowPrivateNetworkFetch = true; }
+});
+
+test("a scoped proxy leaves unrelated hosts direct and matches only exact hostnames", async () => {
+  config.egressProxyHosts = ["abroad.invalid"];
+  try {
+    for (const host of ["other.invalid", "abroad.invalid.evil.invalid", "child.abroad.invalid"]) {
+      mock.get(`https://${host}`).intercept({ path: "/feed" }).reply(200, "direct");
+      const before = proxyHits;
+      assert.equal((await guardedFetch(`https://${host}/feed`)).text(), "direct");
+      assert.equal(proxyHits, before);
+    }
+    const before = proxyHits;
+    await assert.rejects(guardedFetch("https://ABROAD.invalid/feed", { timeoutMs: 1000 }));
+    assert.ok(proxyHits > before);
+  } finally { config.egressProxyHosts = []; }
+});
+
+test("redirect destinations respect proxy scope and out-of-scope requests never reuse its dispatcher", async () => {
+  config.egressProxyHosts = ["abroad.invalid"];
+  try {
+    mock.get("https://other.invalid").intercept({ path: "/move" }).reply(302, "", { headers: { location: "https://abroad.invalid/feed" } });
+    const before = proxyHits;
+    await assert.rejects(guardedFetch("https://other.invalid/move", { timeoutMs: 1000 }));
+    assert.ok(proxyHits > before);
+    // A host removed from scope between requests must not keep using the cached proxy dispatcher.
+    config.egressProxyHosts = ["other.invalid"];
+    mock.get("https://abroad.invalid").intercept({ path: "/move" }).reply(302, "", { headers: { location: "https://domestic.invalid/feed-redirect" } });
+    mock.get("https://domestic.invalid").intercept({ path: "/feed-redirect" }).reply(200, "direct");
+    const afterProxy = proxyHits;
+    assert.equal((await guardedFetch("https://abroad.invalid/move")).text(), "direct");
+    assert.equal(proxyHits, afterProxy);
+  } finally { config.egressProxyHosts = []; }
+});
+
+test("neither a scoped host nor an out-of-scope host bypasses the private-address guard", async () => {
+  config.egressProxyHosts = ["localhost"];
+  config.allowPrivateNetworkFetch = false;
+  try {
+    await assert.rejects(guardedFetch("http://localhost/metadata"), /Blocked/);
+    await assert.rejects(guardedFetch("http://127.0.0.1/metadata"), /Blocked/);
+  } finally { config.egressProxyHosts = []; config.allowPrivateNetworkFetch = true; }
 });
