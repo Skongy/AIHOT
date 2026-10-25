@@ -58,7 +58,7 @@ docker compose up -d --build
 docker compose -f deploy/egress.compose.yml up -d
 ```
 
-该可选容器固定官方镜像摘要、不发布主机端口，只挂接现有应用网络；自动部署主站不会停止它，服务器重启后自动恢复。若修改 Compose 项目名，需同步它的外部网络名称。
+该可选容器固定官方镜像摘要、不发布主机端口，只挂接现有应用网络；自动部署主站不会停止它，服务器重启后自动恢复。容器默认使用 `1000:1000` 非 root 用户读取配置；如文件所有者不同，启动时传入对应的 `EGRESS_UID`、`EGRESS_GID`，不要放宽凭据文件权限。若修改 Compose 项目名，需同步它的外部网络名称。
 
 保留线上 `.env` 的其他配置，仅增加 `EGRESS_PROXY_URL=http://gamehot-egress:7890` 和 `EGRESS_PROXY_HOSTS=gnn.gamer.com.tw`，再执行 `docker compose up -d --no-deps --force-recreate api worker`。先用正常采集任务确认成功，再检查信源状态和新增资料；不要手动清零失败计数伪造成功。
 
