@@ -42,6 +42,8 @@ export const config = {
   // Every generated absolute link uses this address, whatever Host a request arrives with.
   siteUrl: str("SITE_URL", SITE.defaultUrl).replace(/\/+$/, ""),
   egressProxyUrl: env.EGRESS_PROXY_URL || null,
+  /** Empty keeps the default overseas routing; otherwise only these exact hosts use the proxy. */
+  egressProxyHosts: (env.EGRESS_PROXY_HOSTS || "").split(",").map((v) => v.trim().toLowerCase()).filter(Boolean),
   allowPrivateNetworkFetch: bool("ALLOW_PRIVATE_NETWORK_FETCH", false),
   feishuContentPushEnabled: bool("FEISHU_CONTENT_PUSH_ENABLED", false),
   indexNowSubmitEnabled: bool("INDEXNOW_SUBMIT_ENABLED", false),

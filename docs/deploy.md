@@ -45,7 +45,24 @@ docker compose up -d --build
 - 构建时 npm 走国内镜像：`docker compose build --build-arg NPM_REGISTRY=https://registry.npmmirror.com`，然后 `docker compose up -d`。
 - 拉取 Docker 镜像慢，先给 Docker 配置镜像加速。
 - 海外信源抓不到时，在 `.env` 里设置 `EGRESS_PROXY_URL`：抓信源和图片时走这个代理，调用模型接口不走。
+- 如只需修复个别域名，设置 `EGRESS_PROXY_HOSTS=gnn.gamer.com.tw`；仅匹配完整域名，重定向逐跳重新判断，其他来源继续直连。留空保持原有海外代理规则，直连例外和 SSRF/TLS 校验仍然有效。
 - 对外提供网站服务需要先完成 ICP 备案，备案号填在 `site/site.ts` 的 `icp`。
+
+#### 可选的内部代理容器
+
+2026-10-25 实测：巴哈姆特 GNN 在服务器上 DNS 返回受限地址，即使使用可信 IPv4 解析仍被重置；经代理访问 RSS 和正文均为 HTTP 200。不要关闭私网地址校验或 TLS 验证来绕过该问题。
+
+已有合法可用的代理节点时，可将最小 Mihomo 配置保存在服务器 `.data/egress/config.yaml`，目录权限 `0700`、文件 `0600`；不要保存或提交整份订阅。配置使用 `mixed-port: 7890`，仅在容器内监听，关闭外部控制接口。先启动主站创建 `aihot_default` 网络，再执行：
+
+```bash
+docker compose -f deploy/egress.compose.yml up -d
+```
+
+该可选容器固定官方镜像摘要、不发布主机端口，只挂接现有应用网络；自动部署主站不会停止它，服务器重启后自动恢复。若修改 Compose 项目名，需同步它的外部网络名称。
+
+保留线上 `.env` 的其他配置，仅增加 `EGRESS_PROXY_URL=http://gamehot-egress:7890` 和 `EGRESS_PROXY_HOSTS=gnn.gamer.com.tw`，再执行 `docker compose up -d --no-deps --force-recreate api worker`。先用正常采集任务确认成功，再检查信源状态和新增资料；不要手动清零失败计数伪造成功。
+
+节点过期或套餐流量耗尽仍会导致该来源采集失败，需要更新服务器上的节点配置后重启代理。回退时只移除这两个代理配置并重新创建 api/worker，再运行 `docker compose -f deploy/egress.compose.yml down`（不加 `-v`）；不要停用全局安全校验，也不要改变采集或模型开关。
 
 ### 配域名和 HTTPS
 

@@ -1,0 +1,25 @@
+# Optional internal-only proxy for deployments with an unreachable overseas source.
+# Credentials live outside Git in .data/egress/config.yaml (directory 0700, file 0600).
+# Start after the main Compose stack: docker compose -f deploy/egress.compose.yml up -d
+name: gamehot-egress
+services:
+  egress:
+    image: metacubex/mihomo@sha256:bac1a74de365ea59270ba134016762c6be05654d55246518de256113bd1c225e # v1.19.32
+    restart: unless-stopped
+    command: ["-d", "/tmp/mihomo", "-f", "/etc/mihomo/config.yaml"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 64
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    volumes:
+      - ../.data/egress/config.yaml:/etc/mihomo/config.yaml:ro
+    # No published ports or management API. Only the existing application network can connect.
+    networks:
+      app:
+        aliases: [gamehot-egress]
+networks:
+  app:
+    external: true
+    name: aihot_default
