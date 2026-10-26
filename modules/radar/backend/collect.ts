@@ -6,13 +6,15 @@ import { sha256 } from "@aihot/backend/lib/ids";
 import { radarNews } from "@aihot/backend/publication/radar";
 import { z } from "zod";
 import { confirmationPoints, dailyPoints, dayOf, detect, previousDay, RULE_VERSION } from "./detect.ts";
-import { appSchema, chartSchema, historySchema, listSchema, parseCurrent, publicJson, safeCover, RadarHttpError } from "./steam.ts";
+import { appSchema, chartSchema, historySchema, listSchema, officialNewsUrl, parseCurrent, publicJson, safeCover, RadarHttpError } from "./steam.ts";
 import type { RadarPoint } from "../types.ts";
 import type { RadarEvidence } from "../types.ts";
 
 export async function remember(app: { app_id: number; name: string; header_image?: string }, origin: string) {
-  await sql`INSERT INTO radar_games (appid, name, cover_url, origin) VALUES (${app.app_id}, ${app.name}, ${safeCover(app.header_image)}, ${origin})
-    ON CONFLICT (appid) DO UPDATE SET name = excluded.name, cover_url = coalesce(excluded.cover_url, radar_games.cover_url)`;
+  const name = app.name.trim() || `Steam App ${app.app_id}`;
+  await sql`INSERT INTO radar_games (appid, name, cover_url, origin) VALUES (${app.app_id}, ${name}, ${safeCover(app.header_image)}, ${origin})
+    ON CONFLICT (appid) DO UPDATE SET name = CASE WHEN ${app.name.trim() !== ""} THEN excluded.name ELSE radar_games.name END,
+      cover_url = coalesce(excluded.cover_url, radar_games.cover_url)`;
 }
 export async function catalog(): Promise<number> {
   let count = 0;
@@ -171,9 +173,9 @@ export async function explainPending(limit = 3) {
       await publicJson(`https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${event.appid}&count=5&maxlength=1200&enddate=${enddate}&feeds=steam_community_announcements`));
     if (official.appnews.appid !== event.appid) throw new Error("Steam news appid mismatch");
     for (const item of official.appnews.newsitems) {
-      let url: URL; try { url = new URL(item.url); } catch { continue; }
-      if (item.date < enddate - 9 * 86400 || item.date > enddate || item.feedname !== "steam_community_announcements" || url.protocol !== "https:" || !["store.steampowered.com", "steamcommunity.com", "www.steamcommunity.com"].includes(url.hostname)) continue;
-      news.push({ label: item.title.slice(0, 300), url: url.href, note: item.contents.replace(/<[^>]*>|\[[^\]]*\]/g, " ").slice(0, 1200) } satisfies RadarEvidence);
+      const url = officialNewsUrl(item.url);
+      if (!url || item.date < enddate - 9 * 86400 || item.date > enddate || item.feedname !== "steam_community_announcements") continue;
+      news.push({ label: item.title.slice(0, 300), url, note: item.contents.replace(/<[^>]*>|\[[^\]]*\]/g, " ").slice(0, 1200) } satisfies RadarEvidence);
     }
     if (!news.length) { await sql`UPDATE radar_events SET analyzed_at = now() WHERE id = ${event.id}`; continue; }
     const result = await chatJson({ model: await modelFor("summarize"), purpose: "radar_explanation", subject: event.id,

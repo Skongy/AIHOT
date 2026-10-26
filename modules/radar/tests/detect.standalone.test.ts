@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { confirmationPoints, dailyPoints, dayOf, detect } from "../backend/detect.ts";
 import type { RadarPoint } from "../types.ts";
+import { appSchema, officialNewsUrl } from "../backend/steam.ts";
 function series(days = 8, before = 300, after = 6000): RadarPoint[] {
   return Array.from({ length: days * 24 }, (_, h) => ({ at: new Date(Date.parse("2026-10-01T00:00:00+08:00") + h * 3600000).toISOString(), count: h >= (days - 1) * 24 ? after : before }));
 }
@@ -42,4 +43,15 @@ test("watch promotion needs three independently timed readings above the full co
   assert.deepEqual(confirmationPoints(points.slice(0, 2), 1000), []);
   assert.deepEqual(confirmationPoints(points, 0), []);
   assert.deepEqual(confirmationPoints(points.map(p => ({ ...p, count: 4000 })), 1000), []);
+});
+test("real catalog null metadata is accepted without inventing a game name or cover", () => {
+  const game = appSchema.parse({ app_id: 123, name: null, header_image: null, player_count: 100 });
+  assert.equal(game.name, ""); assert.equal(game.header_image, undefined);
+  assert.equal(appSchema.safeParse({ app_id: -1, name: null }).success, false);
+});
+test("actual Steam legacy announcement links keep their identity on the canonical official host", () => {
+  assert.equal(officialNewsUrl("https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1847286114032610"), "https://store.steampowered.com/news/externalpost/steam_community_announcements/1847286114032610");
+  assert.equal(officialNewsUrl("https://steamstore-a.akamaihd.net/elsewhere"), null);
+  assert.equal(officialNewsUrl("https://store.steampowered.com.evil.test/news/123"), null);
+  assert.equal(officialNewsUrl("javascript:alert(1)"), null);
 });

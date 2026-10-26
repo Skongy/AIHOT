@@ -32,7 +32,7 @@ export async function publicJson(url: string): Promise<unknown> {
     throw error;
   }
 }
-export const appSchema = z.object({ app_id: z.number().int().positive(), name: z.string().min(1).max(300), header_image: z.string().optional(), player_count: z.number().int().nonnegative().optional() });
+export const appSchema = z.object({ app_id: z.number().int().positive(), name: z.string().max(300).nullish().transform(value => value?.trim() ?? ""), header_image: z.string().nullish().transform(value => value ?? undefined), player_count: z.number().int().nonnegative().optional() });
 export const listSchema = z.object({ apps: z.array(appSchema).max(100), total: z.number().int().nonnegative(), pages: z.number().int().nonnegative() });
 export const historySchema = z.object({ app_id: z.number().int().positive(), resolution: z.literal("hour"), points: z.array(z.object({ t: z.number().int().positive(), player_count: z.number().int().nonnegative() })).max(2000) });
 export const chartSchema = z.object({ response: z.object({ last_update: z.number().int().positive(), ranks: z.array(z.object({ appid: z.number().int().positive(), rank: z.number().int().positive(), concurrent_in_game: z.number().int().nonnegative() })).min(1).max(100) }) });
@@ -42,4 +42,13 @@ export function parseCurrent(value: unknown): number | null {
 }
 export function safeCover(input: string | undefined): string | null {
   try { const u = new URL(input ?? ""); return u.protocol === "https:" && /(^|\.)steamstatic\.com$/.test(u.hostname) ? u.href : null; } catch { return null; }
+}
+/** Steam's news API still returns this legacy CDN hostname for official announcements. */
+export function officialNewsUrl(input: string): string | null {
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "https:") return null;
+    if (url.hostname === "steamstore-a.akamaihd.net" && /^\/news\/externalpost\/steam_community_announcements\/\d+\/?$/.test(url.pathname)) url.hostname = "store.steampowered.com";
+    return ["store.steampowered.com", "steamcommunity.com", "www.steamcommunity.com"].includes(url.hostname) ? url.href : null;
+  } catch { return null; }
 }
