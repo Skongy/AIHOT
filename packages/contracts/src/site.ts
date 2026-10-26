@@ -89,6 +89,8 @@ export interface ItemSummary {
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
 export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel"> {
+  /** One licensed article image, signed for a small list preview. Older cached lists may omit it. */
+  cover?: Pick<MediaView, "url" | "srcSet" | "width" | "height"> | null;
   /** True only when the source tier is T1 (official first-party). Media reprints are never true. */
   firstParty?: boolean;
   x: (Pick<XPostView, "authorName" | "handle" | "avatarUrl" | "avatarSrcSet" | "media"> & {
