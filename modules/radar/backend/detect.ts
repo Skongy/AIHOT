@@ -27,6 +27,11 @@ export function dailyPoints(points: RadarPoint[]): Daily[] {
   });
 }
 export interface Signal { date: string; peak: number; baseline: number | null; baselineDays: number; status: "confirmed" | "suspected"; kind: "breakout" | "comeback" | "watch"; points: RadarPoint[] }
+export function confirmationPoints(points: RadarPoint[], baseline: number): RadarPoint[] {
+  if (!(baseline > 0 && baseline <= 5000)) return [];
+  const high = dailyPoints(points).flatMap(d => d.points).filter(p => p.count >= baseline * 5 && p.count - baseline >= 2000);
+  return high.length >= 3 && Date.parse(high.at(-1)!.at) - Date.parse(high[0].at) >= 2 * 3600000 ? high : [];
+}
 /** Thresholds are initial product rules, never a claimed calibrated accuracy score. */
 export function detect(points: RadarPoint[], options: { releaseDay?: string | null; established?: boolean } = {}): Signal[] {
   if (options.established) return [];
@@ -48,7 +53,7 @@ export function detect(points: RadarPoint[], options: { releaseDay?: string | nu
       if (before.length < 3 || median(before.map(p => p.count)) > 1000 || d.peak < 5000 || recentRelease) continue;
     }
     if (recentRelease && d.peak >= 40000) continue;
-    const confirmed = baseline !== null && baseline > 0 && history.length === 7 && baseline <= 5000 && d.peak >= baseline * 5 && d.peak - baseline >= 2000 && !recentRelease;
+    const confirmed = baseline !== null && history.length === 7 && confirmationPoints(d.points, baseline).length > 0 && !recentRelease;
     signals.push({ date: d.date, peak: d.peak, baseline, baselineDays: history.length,
       status: confirmed ? "confirmed" : "suspected", kind: confirmed ? "breakout" : baseline !== null && baseline > 5000 ? "comeback" : "watch", points: d.points });
     lastSignal = d.date;

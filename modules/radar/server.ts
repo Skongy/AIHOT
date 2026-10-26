@@ -10,10 +10,10 @@ export const radarQueue = defineQueue<Job>({ name: "radar.collect", options: { p
   run: async jobs => {
     if (!enabled()) return { disabled: true };
     for (const job of jobs) await recordRun(`radar.execute.${job.action}`, async () => {
-      if (job.action === "live") await live();
-      else if (job.action === "catalog") { await catalog(); await newsCandidates(); }
-      else if (job.action === "history" && job.appid) await history(job.appid);
-      else if (job.action === "explain") await explainPending();
+      if (job.action === "live") return live();
+      else if (job.action === "catalog") return { games: await catalog(), ...await newsCandidates() };
+      else if (job.action === "history" && job.appid) return { events: await history(job.appid) };
+      else if (job.action === "explain") return explainPending();
     });
     return { done: jobs.length };
   } });

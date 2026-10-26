@@ -5,7 +5,7 @@ import { modelFor } from "@aihot/backend/editorial/models";
 import { sha256 } from "@aihot/backend/lib/ids";
 import { radarNews } from "@aihot/backend/publication/radar";
 import { z } from "zod";
-import { dailyPoints, dayOf, detect, previousDay, RULE_VERSION } from "./detect.ts";
+import { confirmationPoints, dailyPoints, dayOf, detect, previousDay, RULE_VERSION } from "./detect.ts";
 import { appSchema, chartSchema, historySchema, listSchema, parseCurrent, publicJson, safeCover, RadarHttpError } from "./steam.ts";
 import type { RadarPoint } from "../types.ts";
 import type { RadarEvidence } from "../types.ts";
@@ -65,12 +65,13 @@ export async function evaluate(appid: number, origin: "historical" | "live", sin
   if (!game) return 0;
   const rows = await sql`SELECT observed_at, max(count)::int AS count FROM radar_samples WHERE appid = ${appid} AND observed_at > now() - interval '40 days' GROUP BY observed_at ORDER BY observed_at`;
   const points = rows.map(r => ({ at: new Date(r.observed_at).toISOString(), count: r.count }));
-  const options = { releaseDay: game.release_day ? new Date(game.release_day).toISOString().slice(0, 10) : null, established: game.established };
+  let options = { releaseDay: game.release_day ? new Date(game.release_day).toISOString().slice(0, 10) : null, established: game.established };
   let signals = detect(points, options).filter(s => s.date >= since && (origin === "historical" || s.date === dayOf(new Date())));
   if (signals.length && !game.metadata_at) {
     await metadata(appid); // If metadata is unavailable, retry rather than publish an unchecked launch.
     const [fresh] = await sql`SELECT release_day, established FROM radar_games WHERE appid = ${appid}`;
-    signals = detect(points, { releaseDay: fresh.release_day ? new Date(fresh.release_day).toISOString().slice(0, 10) : null, established: fresh.established }).filter(s => s.date >= since && (origin === "historical" || s.date === dayOf(new Date())));
+    options = { releaseDay: fresh.release_day ? new Date(fresh.release_day).toISOString().slice(0, 10) : null, established: fresh.established };
+    signals = detect(points, options).filter(s => s.date >= since && (origin === "historical" || s.date === dayOf(new Date())));
   }
   let added = 0;
   for (const signal of signals) {
@@ -90,6 +91,21 @@ export async function evaluate(appid: number, origin: "historical" | "live", sin
   // Refresh a discovery-day trace even when the current rule no longer emits the same signal.
   const today = dayOf(new Date()), todayPoints = points.filter(p => dayOf(p.at) === today);
   if (todayPoints.length) await sql`UPDATE radar_events SET peak = greatest(peak, ${Math.max(...todayPoints.map(p => p.count))}), points = ${sql.json(todayPoints)} WHERE appid = ${appid} AND event_day = ${today}::date`;
+  // A watched signal can mature using its original, frozen pre-growth baseline. Never move the
+  // baseline forward into the surge, and never rewrite the historical discovery date or proof.
+  if (origin === "live" && !options.established) {
+    const pending = await sql`SELECT id, event_day, baseline, baseline_days, proof FROM radar_events
+      WHERE appid = ${appid} AND status = 'suspected' AND kind = 'watch' AND baseline > 0 AND baseline <= 5000
+        AND baseline_days >= 3 AND event_day >= ${today}::date - 7`;
+    for (const event of pending) {
+      const eventDay = new Date(event.event_day).toISOString().slice(0, 10);
+      if (options.releaseDay && options.releaseDay >= previousDay(eventDay, 14)) continue;
+      const confirming = confirmationPoints(todayPoints, event.baseline);
+      if (!confirming.length) continue;
+      const proof = { ...event.proof, confirmedAt: new Date().toISOString(), confirmation: "three fresh hourly readings against frozen pre-growth baseline", confirmationPoints: confirming };
+      await sql`UPDATE radar_events SET status = 'confirmed', kind = 'breakout', proof = ${sql.json(proof)} WHERE id = ${event.id}`;
+    }
+  }
   return added;
 }
 export async function ingestHistory(appid: number, raw: unknown, fetchedAt = new Date().toISOString()): Promise<number> {

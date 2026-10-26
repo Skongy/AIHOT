@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dailyPoints, dayOf, detect } from "../backend/detect.ts";
+import { confirmationPoints, dailyPoints, dayOf, detect } from "../backend/detect.ts";
 import type { RadarPoint } from "../types.ts";
 function series(days = 8, before = 300, after = 6000): RadarPoint[] {
   return Array.from({ length: days * 24 }, (_, h) => ({ at: new Date(Date.parse("2026-10-01T00:00:00+08:00") + h * 3600000).toISOString(), count: h >= (days - 1) * 24 ? after : before }));
@@ -34,4 +34,12 @@ test("sustained surge is one event during cooldown; established low periods can 
   const ps = series(8);
   for (let i = 0; i < 4 * 24; i++) ps.push({ at: new Date(Date.parse(ps.at(-1)!.at) + 3600000).toISOString(), count: 6500 });
   assert.equal(detect(ps).length, 1);
+});
+test("watch promotion needs three independently timed readings above the full confirmation threshold", () => {
+  const at = Date.parse("2026-10-26T01:00:00Z");
+  const points = [5000, 5100, 5200].map((count, i) => ({ at: new Date(at + i * 3600000).toISOString(), count }));
+  assert.equal(confirmationPoints(points, 1000).length, 3);
+  assert.deepEqual(confirmationPoints(points.slice(0, 2), 1000), []);
+  assert.deepEqual(confirmationPoints(points, 0), []);
+  assert.deepEqual(confirmationPoints(points.map(p => ({ ...p, count: 4000 })), 1000), []);
 });
