@@ -43,3 +43,12 @@ export function parseCurrent(value: unknown): number | null {
 export function safeCover(input: string | undefined): string | null {
   try { const u = new URL(input ?? ""); return u.protocol === "https:" && /(^|\.)steamstatic\.com$/.test(u.hostname) ? u.href : null; } catch { return null; }
 }
+/** Steam's news API still returns this legacy CDN hostname for official announcements. */
+export function officialNewsUrl(input: string): string | null {
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "https:") return null;
+    if (url.hostname === "steamstore-a.akamaihd.net" && /^\/news\/externalpost\/steam_community_announcements\/\d+\/?$/.test(url.pathname)) url.hostname = "store.steampowered.com";
+    return ["store.steampowered.com", "steamcommunity.com", "www.steamcommunity.com"].includes(url.hostname) ? url.href : null;
+  } catch { return null; }
+}
