@@ -21,6 +21,27 @@ export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummar
   return <span className={`min-w-0 truncate ${className}`}>{item.source.name}</span>;
 }
 
+/** A compact article preview. Its keyed parent resets errors when the report or image changes. */
+export function FeedCover({ cover }: { cover: NonNullable<FeedItemSummary["cover"]> }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img
+      ref={(img) => { if (img?.complete && img.naturalWidth === 0) setFailed(true); }}
+      onError={() => setFailed(true)}
+      src={cover.url}
+      srcSet={cover.srcSet}
+      sizes="(min-width: 961px) 176px, (min-width: 640px) 128px, 88px"
+      width={176}
+      height={110}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="feed-cover mt-2 h-[66px] w-[88px] shrink-0 rounded-control border border-line-soft bg-bg-sunk object-cover sm:h-20 sm:w-32 lg:h-[110px] lg:w-44"
+    />
+  );
+}
+
 /** Up to four media thumbnails, kept small in lists (the detail page shows them larger). Videos are stills. */
 export function MediaThumbs({ media, className = "" }: { media: MediaView[]; className?: string }) {
   const [index, setIndex] = useState<number | null>(null);

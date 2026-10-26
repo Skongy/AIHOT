@@ -9,6 +9,7 @@ import { isEmptyOrLinkOnly } from "../content/posts.ts";
 import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { displayTags, publicSourceName } from "./rules.ts";
 import { seatedCondition } from "./scope.ts";
+import { isNonArticleImage } from "../lib/image-url.ts";
 
 export interface ItemRow {
   id: string;
@@ -44,6 +45,8 @@ export interface ItemRow {
   zh_text: string | null;
   /** Chinese translation of the post an X post quotes. */
   quoted_zh: string | null;
+  /** Images are read only for news whose body may be shown publicly. */
+  article_media?: Array<Record<string, any>> | null;
 }
 
 /** Columns every item listing selects. Internal judgement details never leave this layer. */
@@ -52,6 +55,7 @@ export const ITEM_COLUMNS = sql`
   p.selected, p.seat, p.channel, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
   p.body_mode, p.indexable, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode, s.tier AS source_tier,
   a.x_post, a.author, a.language,
+  CASE WHEN p.channel = 'news' AND p.body_mode = 'full' THEN a.media END AS article_media,
   st.public_id::text AS story_public_id, st.title AS story_title,
   CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh`;
 
@@ -168,6 +172,24 @@ export function toItemSummary(row: ItemRow): ItemSummary {
   };
 }
 
+/** Use this report's own image, with the same full-text permission boundary as hot covers. */
+function feedCover(row: ItemRow): FeedItemSummary["cover"] {
+  if (row.channel !== "news" || row.body_mode !== "full" || !Array.isArray(row.article_media)) return null;
+  for (const m of row.article_media.slice(0, 12)) {
+    if (!m || m.kind !== "image" || typeof m.url !== "string" || !/^https?:\/\//i.test(m.url)) continue;
+    if (isNonArticleImage(m.url, m.width == null ? undefined : String(m.width), m.height == null ? undefined : String(m.height))) continue;
+    if ((typeof m.width === "number" && m.width < 160) || (typeof m.height === "number" && m.height < 90)) continue;
+    const url = proxiedImage(m.url, "card");
+    if (!url) continue;
+    return {
+      url, srcSet: proxiedImageSet(m.url, "card") ?? undefined,
+      width: typeof m.width === "number" ? m.width : null,
+      height: typeof m.height === "number" ? m.height : null,
+    };
+  }
+  return null;
+}
+
 /** Project the shared public article into the exact fields a site card renders. */
 export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
   const item = toItemSummary(row);
@@ -179,6 +201,7 @@ export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
   });
   return {
     id: item.id, title: item.title, summary: item.summary ?? (x?.text || null), reason: item.reason,
+    cover: feedCover(row),
     source: item.source, publishedAt: item.publishedAt, timelineAt: item.timelineAt,
     category: item.category, tags: item.tags, score: item.score, selected: item.selected, channel: item.channel,
     ...(row.source_tier === "T1" ? { firstParty: true } : {}),
