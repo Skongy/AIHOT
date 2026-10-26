@@ -1,6 +1,7 @@
 // Building blocks of the Agent page: panel heads, numbered steps, copyable asks and addresses,
 // quiet tip tiles, callouts, tables and the fold-away details under each panel.
 import type { ReactNode } from "react";
+import { Fragment, useId, useState } from "react";
 import { CopyButton } from "./CodeBlock";
 import { IconChevronDown } from "../../components/icons";
 
@@ -132,7 +133,17 @@ export function Mono({ children }: { children: ReactNode }) {
 }
 
 /** A plain table on a card; long rows scroll sideways on phones. Group rows name a block of rows. */
-export function Table({ head, rows, minWidth = 560 }: { head: string[]; rows: Array<{ group: string } | ReactNode[]>; minWidth?: number }) {
+export function Table({ head, rows, minWidth = 560, rowDetails }: {
+  head: string[]; rows: Array<{ group: string } | ReactNode[]>; minWidth?: number;
+  rowDetails?: Array<{ label: string; description?: string }>;
+}) {
+  const detailId = useId();
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+  const toggle = (index: number) => setExpanded(current => {
+    const next = new Set(current);
+    if (next.has(index)) next.delete(index); else next.add(index);
+    return next;
+  });
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-surface">
       <table className="w-full text-left text-[13.5px]" style={{ minWidth }}>
@@ -146,9 +157,26 @@ export function Table({ head, rows, minWidth = 560 }: { head: string[]; rows: Ar
                 <td colSpan={head.length} className="bg-bg-sunk/40 px-3.5 pb-1.5 pt-3 text-[12px] font-semibold text-ink-3">{r.group}</td>
               </tr>
             ) : (
-              <tr key={i} className="border-t border-line-soft align-top">
-                {r.map((c, j) => <td key={j} className="px-3.5 py-2.5">{c}</td>)}
-              </tr>
+              <Fragment key={i}>
+                <tr className="border-t border-line-soft align-top">
+                  {r.map((c, j) => <td key={j} className="px-3.5 py-2.5">
+                    {j === 0 && rowDetails?.[i]?.description ? (
+                      <button type="button" className="inline-flex min-h-6 items-center gap-1.5 rounded-mark text-left align-top hover:text-accent"
+                        aria-expanded={expanded.has(i)} aria-controls={`${detailId}-${i}`}
+                        aria-label={`${expanded.has(i) ? "收起" : "展开"} ${rowDetails[i]!.label} 的工具描述`}
+                        onClick={() => toggle(i)}>
+                        {c}<IconChevronDown size={13} className={`shrink-0 text-ink-4 transition-transform duration-150 motion-reduce:transition-none ${expanded.has(i) ? "rotate-180" : ""}`} />
+                      </button>
+                    ) : c}
+                  </td>)}
+                </tr>
+                {rowDetails?.[i]?.description && <tr id={`${detailId}-${i}`} hidden={!expanded.has(i)}>
+                  <td colSpan={head.length} className="border-t border-line-soft bg-bg-sunk/40 px-3.5 py-3">
+                    <div className="mb-1 text-[12px] font-medium text-ink-3">工具描述 · 与 MCP 定义一致</div>
+                    <p className="m-0 max-w-[min(56rem,calc(100vw-6rem))] whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-ink-2">{rowDetails[i]!.description}</p>
+                  </td>
+                </tr>}
+              </Fragment>
             ),
           )}
         </tbody>
