@@ -1,3 +1,4 @@
+import { researchSnapshotAvailable } from "@aihot/backend/publication/research";
 import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { resolveStory, v1Story } from "@aihot/backend/publication/stories";
 import { dailyWithNotes } from "@aihot/backend/publication/reports";
@@ -18,6 +19,15 @@ export async function currentEvidence(task: TaskRow) {
       available = story?.kind === "found" && !!(await v1Story(story.storyId));
     } else if (available && e.kind === "tool_note") {
       available = !!e.object_id && !!(await dailyWithNotes(e.object_id));
+    }
+    if (available && e.kind === "research_snapshot") {
+      const raw = e.raw_ref ?? {};
+      if (Array.isArray(raw.articleIds)) available = await researchSnapshotAvailable(raw.articleIds.filter((v): v is string => typeof v === "string"));
+      else if (typeof raw.storyId === "string") {
+        let story = await resolveStory(raw.storyId);
+        if (story.kind === "merged") story = await resolveStory(story.target);
+        available = story.kind === "found" && !!(await v1Story(story.storyId));
+      } else available = false;
     }
     if (!available) {
       await markInvalidated(task.id);

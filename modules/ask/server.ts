@@ -1,4 +1,5 @@
 import { defineServerModule } from "@aihot/backend/modules";
+import { researchAbilities } from "./src/tools/public-research.ts";
 import { z } from "zod";
 import { explainSelection, explainSelectionMarkdown } from "./src/tools/explain-selection.ts";
 import { explainHot, explainHotMarkdown } from "./src/tools/explain-hot.ts";
@@ -15,6 +16,7 @@ export default defineServerModule({
   retention: async (now) => retentionCleanup(now),
   agent: {
     abilities: [
+      ...researchAbilities(),
       {
         path: "/explain-selection",
         title: "入选解释",
@@ -61,7 +63,8 @@ export default defineServerModule({
     api: [
       "- GET /api/v1/agent/explain-selection?article_id= — 资讯入选解释（Markdown）",
       "- GET /api/v1/agent/explain-hot?public_id= — 事件上榜解释（Markdown）",
-      "- /ask — 站内 AI 问答（八工具白名单，含文章上下文）",
+      ...researchAbilities().map(a => `- GET /api/v1/agent${a.path} — ${a.title}；参数：${a.query?.join(", ")}`),
+      "- /ask — 站内 AI 问答（十一工具白名单，含文章上下文）",
     ],
     pages: ["- [AI 问答](/ask)：基于站内只读工具的流式问答"],
     usage: [

@@ -3167,6 +3167,381 @@
           }
         }
       }
+    },
+    "/api/v1/agent/article": {
+      "get": {
+        "operationId": "agentResearchArticle",
+        "summary": "阅读公开正文段落",
+        "description": "只读，读取公开数据，不调用付费模型。研究统计/趋势最长31天，超限明确报错。",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "question",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "研究资料（Markdown）",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或研究范围无效"
+          },
+          "503": {
+            "description": "服务暂时不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/agent/search-news": {
+      "get": {
+        "operationId": "agentResearchSearchNews",
+        "summary": "按日期和来源检索游戏资讯",
+        "description": "只读，读取公开数据，不调用付费模型。研究统计/趋势最长31天，超限明确报错。",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "firstParty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "研究资料（Markdown）",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或研究范围无效"
+          },
+          "503": {
+            "description": "服务暂时不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/agent/search-events": {
+      "get": {
+        "operationId": "agentResearchSearchEvents",
+        "summary": "检索公开关联事件",
+        "description": "只读，读取公开数据，不调用付费模型。研究统计/趋势最长31天，超限明确报错。",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "firstParty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "研究资料（Markdown）",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或研究范围无效"
+          },
+          "503": {
+            "description": "服务暂时不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/agent/news-stats": {
+      "get": {
+        "operationId": "agentResearchNewsStats",
+        "summary": "统计本站公开资讯，非全网热度",
+        "description": "只读，读取公开数据，不调用付费模型。研究统计/趋势最长31天，超限明确报错。",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "firstParty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "研究资料（Markdown）",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或研究范围无效"
+          },
+          "503": {
+            "description": "服务暂时不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/agent/attention-trend": {
+      "get": {
+        "operationId": "agentResearchAttentionTrend",
+        "summary": "读取本站事件关注指数，缺测保留空值",
+        "description": "只读，读取公开数据，不调用付费模型。研究统计/趋势最长31天，超限明确报错。",
+        "parameters": [
+          {
+            "name": "public_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "研究资料（Markdown）",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数或研究范围无效"
+          },
+          "503": {
+            "description": "服务暂时不可用"
+          }
+        }
+      }
     }
   },
   "components": {

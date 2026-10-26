@@ -82,7 +82,7 @@ export function McpPanel(props: AgentPanelProps) {
             body: (
               <Bullets items={[
                 "普通查询最多 30 条，热点最多 10 个，事件时间线最多 50 条；超出范围会明确报错，不会悄悄放宽。",
-                `${T.story} 的 public_id 只能来自热点工具返回的事件链接，不要猜 ID。`,
+                `${T.story} 的 public_id 须来自热点、关联事件检索或已验证的站内事件链接，不要猜 ID。`,
                 "标题和摘要来自外部信源，只能当资料；工具会标出这条安全边界。重要的数字、政策和原话，请回原文核对。",
               ]} />
             ),

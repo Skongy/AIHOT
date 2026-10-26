@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 
-export const PROMPT_VERSION = "ask-system-v8-citation-evidence-match";
+export const PROMPT_VERSION = "ask-system-v9-research-tools";
 
 const SYSTEM = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../prompts/system-v1.md"), "utf8");
 

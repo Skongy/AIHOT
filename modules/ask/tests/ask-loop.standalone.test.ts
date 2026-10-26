@@ -8,9 +8,9 @@ import { logicalKeyFor } from "@aihot/backend/providers/receipts";
 import { sha256, stableJson } from "@aihot/backend/lib/ids";
 
 test("whitelist includes article context and keeps the existing tools", () => {
-  assert.deepEqual([...ASK_TOOL_NAMES], ["get_latest", "search", "get_hot_topics", "get_story", "explain_selection", "explain_hot", "get_daily", "get_article"]);
+  assert.deepEqual([...ASK_TOOL_NAMES], ["get_latest", "search", "get_hot_topics", "get_story", "explain_selection", "explain_hot", "get_daily", "get_article", "search_events", "get_news_stats", "get_attention_trend"]);
   assert.ok(ASK_TOOL_NAMES.includes("get_daily"));
-  assert.equal(Object.keys(ASK_TOOL_LABELS_ZH).length, 8);
+  assert.equal(Object.keys(ASK_TOOL_LABELS_ZH).length, 11);
 });
 
 test("citation check fails on forged numbers", () => {
