@@ -1,3 +1,4 @@
+import { ASK_PUBLIC_TOOL_DESCRIPTIONS } from "./tool-descriptions.ts";
 import { defineServerModule } from "@aihot/backend/modules";
 import { researchAbilities } from "./src/tools/public-research.ts";
 import { z } from "zod";
@@ -28,8 +29,7 @@ export default defineServerModule({
         mcp: {
           tool: "explain_selection",
           use: "to explain why an article was selected or met the score threshold",
-          description:
-            "Explain why a public GAMEHOT article was selected or met the selection threshold. Use article_id from get_latest/search or a verified /items/ link. Do not guess ids. Distinguishes metThreshold from selected; axes may be null.",
+          description: ASK_PUBLIC_TOOL_DESCRIPTIONS.explain_selection!,
           input: z.object({ article_id: z.string().min(1).max(128) }).strict(),
           run: async (args) => {
             const r = await explainSelection(String(args.article_id ?? ""));
@@ -48,8 +48,7 @@ export default defineServerModule({
         mcp: {
           tool: "explain_hot",
           use: "to explain why a story is on the hot list and its ranking snapshot",
-          description:
-            "Explain why a public GAMEHOT story is on the hot ranking (or not). Use public_id from get_hot_topics/get_story. Distinguishes ranking snapshot time from stats-as-of; does not return internal heat scores.",
+          description: ASK_PUBLIC_TOOL_DESCRIPTIONS.explain_hot!,
           input: z.object({ public_id: z.string().min(1).max(128) }).strict(),
           run: async (args) => {
             const r = await explainHot(String(args.public_id ?? ""));

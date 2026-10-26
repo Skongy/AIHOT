@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
 import * as cheerio from 'cheerio';
-import { MCP_TOOL_NAMES } from '@aihot/contracts/mcp';
+import { MCP_TOOL_NAMES, MCP_TOOL_DESCRIPTIONS, mcpToolName } from '@aihot/contracts/mcp';
+import { ASK_PUBLIC_TOOL_DESCRIPTIONS } from '../../../modules/ask/tool-descriptions.ts';
 import { startWebServer, type WebServer } from './web-server.ts';
 
 let web: WebServer;
@@ -17,6 +18,27 @@ const api = createServer((req, res) => {
 });
 before(async () => { web = await startWebServer(api); });
 after(() => web.stop());
+
+test('all tool descriptions match their MCP definitions and are collapsed in the initial table', async () => {
+  const response = await fetch(`${web.origin}/agent`);
+  assert.equal(response.status, 200);
+  const $ = cheerio.load(await response.text());
+  const expected = new Map(Object.entries(MCP_TOOL_DESCRIPTIONS));
+  for (const tool of ['get_article','search_news','search_events','get_news_stats','get_attention_trend','explain_selection','explain_hot']) {
+    expected.set(mcpToolName(tool), ASK_PUBLIC_TOOL_DESCRIPTIONS[tool]!);
+  }
+  const buttons = $('#agent-panel table button[aria-controls]');
+  assert.equal(buttons.length, expected.size);
+  buttons.each((_index, element) => {
+    const button = $(element);
+    const name = button.find('code').text();
+    assert.equal(button.attr('aria-expanded'), 'false');
+    const row = $(`[id="${button.attr('aria-controls')}"]`);
+    assert.ok(row.is('[hidden]'), name);
+    assert.equal(row.find('p').text(), expected.get(name), name);
+    assert.equal(row.find('td').attr('colspan'), '3');
+  });
+});
 
 for (const [tab, names] of [
   ['rss', ['/feed/daily.xml', '/feed/weekly.xml', '/feed/monthly.xml']],

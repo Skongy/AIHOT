@@ -8,7 +8,7 @@ import { createMcpHandler, McpServer, type McpHttpHandler } from "@modelcontextp
 import { z } from "zod";
 import { POLICY, SITE } from "@aihot/site";
 import { PUBLIC_INTERFACE_VERSION } from "@aihot/contracts/http-policy";
-import { MCP_TOOL_NAMES as T, mcpToolName } from "@aihot/contracts/mcp";
+import { MCP_TOOL_NAMES as T, MCP_TOOL_DESCRIPTIONS, mcpToolName } from "@aihot/contracts/mcp";
 import { PUBLIC_API_CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { isValidDate } from "@aihot/contracts/time";
 import { config } from "@aihot/backend/config";
@@ -130,7 +130,7 @@ function registerTools(server: McpServer, say: typeof ok) {
   server.registerTool(
     T.latest,
     {
-      description: `Get the latest ${SITE.name} items for a 24-hour or 7-day briefing. Prefer selected mode unless the user explicitly asks for every public item. Do not use this for named-topic search or multi-source event context.`,
+      description: MCP_TOOL_DESCRIPTIONS[T.latest]!,
       inputSchema: LATEST_INPUT,
       annotations: ANNOTATIONS,
     },
@@ -144,7 +144,7 @@ function registerTools(server: McpServer, say: typeof ok) {
   server.registerTool(
     T.search,
     {
-      description: `Search ${SITE.name}'s latest 7 days by a 2–200 character topic, company, model, product, or person. It searches editorial picks first and automatically expands to all public items only when picks have no result.`,
+      description: MCP_TOOL_DESCRIPTIONS[T.search]!,
       inputSchema: SEARCH_INPUT,
       annotations: ANNOTATIONS,
     },
@@ -159,7 +159,7 @@ function registerTools(server: McpServer, say: typeof ok) {
   server.registerTool(
     T.hot,
     {
-      description: `Get the current ${SITE.name} Top 10 with each event's one-based rank. Use this for 'what is hot now' and to discover valid story public IDs; use ${T.latest} for a chronological news list. Internal heat scores are not returned.`,
+      description: MCP_TOOL_DESCRIPTIONS[T.hot]!,
       inputSchema: HOT_INPUT,
       annotations: ANNOTATIONS,
     },
@@ -173,7 +173,7 @@ function registerTools(server: McpServer, say: typeof ok) {
   server.registerTool(
     T.story,
     {
-      description: `Get the evolving timeline, latest development, AI digest, and related events for one public story. Only pass a public_id obtained from ${T.hot} links.story; never invent or infer IDs.`,
+      description: MCP_TOOL_DESCRIPTIONS[T.story]!,
       inputSchema: STORY_INPUT,
       annotations: ANNOTATIONS,
     },
@@ -190,7 +190,7 @@ function registerTools(server: McpServer, say: typeof ok) {
   server.registerTool(
     T.daily,
     {
-      description: `Get ${SITE.name}'s edited daily overview, either the latest issue or a real YYYY-MM-DD date. Use this when the user asks for a daily report rather than a raw chronological list.`,
+      description: MCP_TOOL_DESCRIPTIONS[T.daily]!,
       inputSchema: DAILY_INPUT,
       annotations: ANNOTATIONS,
     },
@@ -204,9 +204,9 @@ function registerTools(server: McpServer, say: typeof ok) {
 
   for (const p of [
     { kind: "weekly", tool: T.weekly, input: WEEKLY_INPUT, key: (a: { week?: string }) => a.week, name: "周报", form: "真实的 ISO 周（例如 2026-W39）",
-      description: `Get ${SITE.name}'s edited weekly report: the week's most important events chosen from its dailies, grouped by section, with an overview. Use this for what happened this week or in a given ISO week; omit week for the latest.` },
+      description: MCP_TOOL_DESCRIPTIONS[T.weekly]! },
     { kind: "monthly", tool: T.monthly, input: MONTHLY_INPUT, key: (a: { month?: string }) => a.month, name: "月报", form: "真实的月份（例如 2026-09）",
-      description: `Get ${SITE.name}'s edited monthly report: the month's most important events chosen from its dailies, grouped by section, with an overview. Use this for what happened this month or in a given month; omit month for the latest.` },
+      description: MCP_TOOL_DESCRIPTIONS[T.monthly]! },
   ] as const) {
     server.registerTool(
       p.tool,

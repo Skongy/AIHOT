@@ -1,3 +1,4 @@
+import { ASK_PUBLIC_TOOL_DESCRIPTIONS } from "../tool-descriptions.ts";
 import type { AgentPart } from "@aihot/web/modules";
 import { mcpToolName, MCP_TOOL_NAMES } from "@aihot/contracts/mcp";
 
@@ -10,7 +11,7 @@ const part: AgentPart = {
     { name: mcpToolName("get_attention_trend"), does: "读取事件小时关注指数，保留缺测点", ask: "这个事件最近一天的关注度怎样变化？" },
     { name: MCP_TOOL_NAMES.explainSelection, does: "解释资讯为何入选／达门槛", ask: "这篇为什么进精选？" },
     { name: MCP_TOOL_NAMES.explainHot, does: "解释事件为何上榜及排名快照", ask: "这个热点为什么排第 N？" },
-  ],
+  ].map(tool => ({ ...tool, description: ASK_PUBLIC_TOOL_DESCRIPTIONS[tool.name.slice(mcpToolName("").length)] })),
   api: {
     group: "研究与解释",
     rows: [

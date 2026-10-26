@@ -86,7 +86,7 @@ export interface AgentPart {
   /** The aside's resources, after the engine's: [label, address, what it is for]. */
   resources?: Array<[label: string, href: string, note: string]>;
   /** The MCP panel's tool table: its tools. */
-  tools?: Array<{ name: string; does: string; ask: string }>;
+  tools?: Array<{ name: string; does: string; ask: string; description?: string }>;
   /** The MCP panel's 连不上怎么办: entries after the engine's first. */
   mcpTroubles?: ReactNode[];
   /** What the RSS panel's opening sentence goes on to say, a clause each after "；". */
