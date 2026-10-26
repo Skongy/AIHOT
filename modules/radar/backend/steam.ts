@@ -32,7 +32,7 @@ export async function publicJson(url: string): Promise<unknown> {
     throw error;
   }
 }
-export const appSchema = z.object({ app_id: z.number().int().positive(), name: z.string().min(1).max(300), header_image: z.string().optional(), player_count: z.number().int().nonnegative().optional() });
+export const appSchema = z.object({ app_id: z.number().int().positive(), name: z.string().max(300).nullish().transform(value => value?.trim() ?? ""), header_image: z.string().nullish().transform(value => value ?? undefined), player_count: z.number().int().nonnegative().optional() });
 export const listSchema = z.object({ apps: z.array(appSchema).max(100), total: z.number().int().nonnegative(), pages: z.number().int().nonnegative() });
 export const historySchema = z.object({ app_id: z.number().int().positive(), resolution: z.literal("hour"), points: z.array(z.object({ t: z.number().int().positive(), player_count: z.number().int().nonnegative() })).max(2000) });
 export const chartSchema = z.object({ response: z.object({ last_update: z.number().int().positive(), ranks: z.array(z.object({ appid: z.number().int().positive(), rank: z.number().int().positive(), concurrent_in_game: z.number().int().nonnegative() })).min(1).max(100) }) });

@@ -11,8 +11,10 @@ import type { RadarPoint } from "../types.ts";
 import type { RadarEvidence } from "../types.ts";
 
 export async function remember(app: { app_id: number; name: string; header_image?: string }, origin: string) {
-  await sql`INSERT INTO radar_games (appid, name, cover_url, origin) VALUES (${app.app_id}, ${app.name}, ${safeCover(app.header_image)}, ${origin})
-    ON CONFLICT (appid) DO UPDATE SET name = excluded.name, cover_url = coalesce(excluded.cover_url, radar_games.cover_url)`;
+  const name = app.name.trim() || `Steam App ${app.app_id}`;
+  await sql`INSERT INTO radar_games (appid, name, cover_url, origin) VALUES (${app.app_id}, ${name}, ${safeCover(app.header_image)}, ${origin})
+    ON CONFLICT (appid) DO UPDATE SET name = CASE WHEN ${app.name.trim() !== ""} THEN excluded.name ELSE radar_games.name END,
+      cover_url = coalesce(excluded.cover_url, radar_games.cover_url)`;
 }
 export async function catalog(): Promise<number> {
   let count = 0;
