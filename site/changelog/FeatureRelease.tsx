@@ -1,3 +1,4 @@
+import { RadarRelease } from "./RadarRelease";
 import { useEffect, useRef, useState } from "react";
 import type { ChangelogRelease } from "@aihot/contracts/site";
 
@@ -5,7 +6,7 @@ const ASK_FLOW = ["提问", "检索", "引用", "回答"];
 const ASK_CAPABILITIES = ["主动检索", "来源可追溯", "连续追问"];
 
 /** The editorial feature card used for changelog milestones that deserve more than a timeline row. */
-export function FeatureRelease({ release, id }: { release: ChangelogRelease; id?: string }) {
+function AskFeatureRelease({ release, id }: { release: ChangelogRelease; id?: string }) {
   const [, month, day] = release.date.split("-");
   const root = useRef<HTMLElement>(null);
   const [entered, setEntered] = useState(false);
@@ -78,4 +79,9 @@ export function FeatureRelease({ release, id }: { release: ChangelogRelease; id?
       </div>
     </section>
   );
+}
+
+export function FeatureRelease(props: { release: ChangelogRelease; id?: string }) {
+  const feature = props.release.feature as { type?: string } | undefined;
+  return feature?.type === "radar" ? <RadarRelease {...props}/> : <AskFeatureRelease {...props}/>;
 }
