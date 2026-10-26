@@ -13,6 +13,9 @@ import { createSession, createTask, getTask, insertEvidence } from '../src/db/st
 import { buildApp } from '../../../apps/api/src/app.ts';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpToolName } from '@aihot/contracts/mcp';
+import { installModules } from '@aihot/backend/modules';
+import { SERVER_MODULES } from '@aihot/site/modules/server';
+import { listEvidence } from '../src/db/store.ts';
 
 const tag = newUuid(), source = `research-${tag}`, media = `media-${tag}`, publicId = newUuid();
 const ids: string[] = [];
@@ -78,20 +81,31 @@ test('article tool exposes real public passages and rejects withdrawn articles',
 });
 
 test('MCP lists and executes all research abilities; REST rejects invalid filters', async () => {
+  installModules(SERVER_MODULES);
   const app = await buildApp();
   const client = new Client({name:'research-test',version:'1.0.0'});
   try {
     const origin = await app.listen({host:'127.0.0.1',port:0});
     await client.connect(new StreamableHTTPClientTransport(new URL(origin+'/api/mcp')));
     const names = (await client.listTools()).tools.map(t=>t.name);
-    for(const tool of ['get_article','search_news','search_events','get_news_stats','get_attention_trend']) assert.ok(names.includes(mcpToolName(tool)));
+    for(const tool of ['get_article','search_news','search_events','get_news_stats','get_attention_trend']) assert.ok(names.includes(mcpToolName(tool)),`missing ${tool}: ${names.join(',')}`);
     const result = await client.callTool({name:mcpToolName('get_news_stats'),arguments:{q:'CS2',from:from.toISOString(),until:until.toISOString()}});
     assert.ok(!result.isError); assert.equal((result.structuredContent as Record<string, unknown>)?.reports,3);
     const search = await client.callTool({name:mcpToolName('search_news'),arguments:{q:'CS2',firstParty:true}});
     assert.ok(!search.isError);
     const response = await app.inject('/api/v1/agent/news-stats?q=CS2&firstParty=invalid');
     assert.equal(response.statusCode,400);
-  } finally { await client.close(); await app.close(); }
+  } finally { await client.close(); await app.close(); installModules([]); }
+});
+
+test('reading multiple excerpts keeps one citation and preserves all inspected text', async () => {
+  const session=await createSession(); const task=await createTask({sessionId:session.sessionId,clientRequestId:newUuid(),message:'阅读公告'});
+  const evidence={kind:'item',objectId:ids[0]!,title:'公告',sourceName:'Research official',publishedAt:null,siteUrl:`/items/${ids[0]}`,originalUrl:null,toolName:'get_article'};
+  const first=await insertEvidence(task.id,[{...evidence,rawRef:{bodyExcerpt:'第一段公开原文'}}]);
+  const second=await insertEvidence(task.id,[{...evidence,rawRef:{bodyExcerpt:'第二段公开原文'}}]);
+  assert.deepEqual(first,second);
+  const rows=await listEvidence(task.id);assert.equal(rows.length,1);
+  assert.match(String(rows[0]?.raw_ref?.bodyExcerpt),/第一段公开原文\n第二段公开原文/);
 });
 
 test('withdrawal invalidates a statistics snapshot, without fabricating current counts', async () => {
