@@ -1,6 +1,7 @@
 // Building blocks of the Agent page: panel heads, numbered steps, copyable asks and addresses,
 // quiet tip tiles, callouts, tables and the fold-away details under each panel.
 import type { ReactNode } from "react";
+import type { ToolDescriptionTranslations } from "@aihot/contracts/mcp";
 import { Fragment, useId, useState } from "react";
 import { CopyButton } from "./CodeBlock";
 import { IconChevronDown } from "../../components/icons";
@@ -135,7 +136,7 @@ export function Mono({ children }: { children: ReactNode }) {
 /** A plain table on a card; long rows scroll sideways on phones. Group rows name a block of rows. */
 export function Table({ head, rows, minWidth = 560, rowDetails }: {
   head: string[]; rows: Array<{ group: string } | ReactNode[]>; minWidth?: number;
-  rowDetails?: Array<{ label: string; description?: string }>;
+  rowDetails?: Array<{ label: string; description?: string; translations?: ToolDescriptionTranslations }>;
 }) {
   const detailId = useId();
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
@@ -172,8 +173,19 @@ export function Table({ head, rows, minWidth = 560, rowDetails }: {
                 </tr>
                 {rowDetails?.[i]?.description && <tr id={`${detailId}-${i}`} hidden={!expanded.has(i)}>
                   <td colSpan={head.length} className="border-t border-line-soft bg-bg-sunk/40 px-3.5 py-3">
-                    <div className="mb-1 text-[12px] font-medium text-ink-3">工具描述 · 与 MCP 定义一致</div>
-                    <p className="m-0 max-w-[min(56rem,calc(100vw-6rem))] whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-ink-2">{rowDetails[i]!.description}</p>
+                    <div className="mb-2 text-[12px] font-medium text-ink-3">工具描述 · {rowDetails[i]!.translations ? "中英对照，保留 MCP 原文" : "与 MCP 定义一致"}</div>
+                    {rowDetails[i]!.translations ? (
+                      <dl className="m-0 max-w-[min(56rem,calc(100vw-6rem))] space-y-3 text-[13px] leading-[1.8] text-ink-2">
+                        <div>
+                          <dt className="mb-0.5 text-[12px] font-medium text-ink-3">中文</dt>
+                          <dd className="m-0"><p lang="zh-CN" className="m-0 whitespace-pre-wrap break-words">{rowDetails[i]!.translations!.zh}</p></dd>
+                        </div>
+                        <div>
+                          <dt className="mb-0.5 text-[12px] font-medium text-ink-3">English</dt>
+                          <dd className="m-0"><p lang="en" className="m-0 whitespace-pre-wrap break-words">{rowDetails[i]!.translations!.en}</p></dd>
+                        </div>
+                      </dl>
+                    ) : <p className="m-0 max-w-[min(56rem,calc(100vw-6rem))] whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-ink-2">{rowDetails[i]!.description}</p>}
                   </td>
                 </tr>}
               </Fragment>

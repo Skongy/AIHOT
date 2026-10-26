@@ -15,8 +15,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { INTRO_WALL } from "./images";
+import { INTRO_STORAGE_KEY } from "./boot";
 
-const STORAGE_KEY = "gamehot-intro-seen-v1";
+const STORAGE_KEY = INTRO_STORAGE_KEY;
 const ENTER_MS = 900;
 const SETTLE_MS = 1300;
 const EXIT_MS = 480;
@@ -114,6 +115,11 @@ export function IntroSplash() {
       window.clearTimeout(t2);
     };
   }, []);
+
+  // Hand off only after the real splash has committed; no home-page frame in between.
+  useEffect(() => {
+    if (active || alreadySeen()) document.documentElement.removeAttribute("data-intro-pending");
+  }, [active]);
 
   const dismiss = useCallback(() => {
     setPhase((p) => {

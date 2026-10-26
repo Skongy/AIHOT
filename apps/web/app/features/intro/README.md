@@ -19,6 +19,7 @@ Extraction notes: `/workspace/darc-motion-extract/FINDINGS.md`.
 - Only home `/` first session (`sessionStorage` `gamehot-intro-seen-v1`).
 - Primary UX: click **「进入」** to dismiss. `Esc` remains as a hidden keyboard hatch (no visible Skip / Esc UI).
 - Footer tagline: **游戏热点 · 精选资讯** (subtle, bottom-center; clear of GAME|HOT corners).
+- Before the first paint, a head script covers eligible home visits with the splash background until the splash mounts. The splash loads with the app to avoid an extra hydration/chunk-download waterfall. Returning visits and other routes stay uncovered. The cover releases after 8 seconds if client scripts fail.
 - Force replay: `/?intro=1`
 - `prefers-reduced-motion`: settled marks + static rings.
 
