@@ -19,6 +19,8 @@ export interface AskItemsQuery {
   rangeKey: string;
   /** Keyword remains the public-layer default; the Ask worker opts into bounded hybrid retrieval. */
   engine?: AskSearchEngine;
+  firstParty?: boolean;
+  source?: string;
 }
 
 export interface AskRetrievalMeta {
@@ -42,7 +44,7 @@ const RRF_K = 60;
 const EMBEDDING_MIN = 0.3;
 const LEXICAL_MIN = 0.3;
 
-function scopeFor(mode: AskItemsQuery["mode"], now: Date) {
+export function scopeFor(mode: AskItemsQuery["mode"], now: Date) {
   return mode === "selected" ? seatedCondition(now) : listedCondition(now);
 }
 
@@ -72,9 +74,14 @@ function askMatchCondition(groups: string[][]) {
   }, sql``);
 }
 
-function matchFor(queries: string[]) {
+export function matchFor(queries: string[]) {
   const alternatives = queries.map((q) => sql`(TRUE ${askMatchCondition(askSearchGroups(q))})`);
   return alternatives.length ? sql`AND (${alternatives.reduce((a, b) => sql`${a} OR ${b}`)})` : sql``;
+}
+
+export function askSourceFilter(query: Pick<AskItemsQuery, "firstParty" | "source">) {
+  return sql`${query.firstParty === undefined ? sql`` : sql`AND p.first_party = ${query.firstParty}`}
+    ${query.source ? sql`AND p.source_id IN (SELECT id FROM sources WHERE name = ${query.source})` : sql``}`;
 }
 
 function reportText(title: string, summary: string | null | undefined): string {
@@ -125,14 +132,14 @@ async function keywordRows(db: Db, query: AskItemsQuery, now: Date, from: Date |
   const sort = sql`p.timeline_at`;
   return db<AskRow[]>`
     SELECT ${API_ITEM_COLUMNS}, ${sort} AS sort_at, p.first_party ${API_ITEM_FROM}
-    WHERE ${scopeFor(query.mode, now)} ${publicCategoryCondition(query.category)} ${matchFor(query.queries)}
+    WHERE ${scopeFor(query.mode, now)} ${publicCategoryCondition(query.category)} ${matchFor(query.queries)} ${askSourceFilter(query)}
       ${from ? sql`AND ${sort} >= ${from}` : sql``} AND ${sort} < ${until}
       ${before ? sql`AND (${sort}, p.article_id) < (${before.at}, ${before.id})` : sql``}
     ORDER BY ${sort} DESC, p.article_id DESC LIMIT ${limit}`;
 }
 
 async function keywordPage(query: AskItemsQuery, now: Date) {
-  const binding = queryBinding({ queries: query.queries, mode: query.mode, category: query.category ?? null, range: query.rangeKey });
+  const binding = queryBinding({ queries: query.queries, mode: query.mode, category: query.category ?? null, firstParty: query.firstParty ?? null, source: query.source ?? null, range: query.rangeKey });
   let from = query.from;
   let until = query.until;
   let before: { at: Date; id: string } | null = null;
@@ -163,7 +170,7 @@ async function keywordPage(query: AskItemsQuery, now: Date) {
 }
 
 async function hybridPage(query: AskItemsQuery, now: Date) {
-  const binding = queryBinding({ queries: query.queries, mode: query.mode, category: query.category ?? null, range: query.rangeKey, engine: "hybrid-v1", pageSize: query.limit });
+  const binding = queryBinding({ queries: query.queries, mode: query.mode, category: query.category ?? null, firstParty: query.firstParty ?? null, source: query.source ?? null, range: query.rangeKey, engine: "hybrid-v1", pageSize: query.limit });
   let from = query.from;
   let until = query.until;
   let offset = 0;
@@ -183,7 +190,7 @@ async function hybridPage(query: AskItemsQuery, now: Date) {
       SELECT ${API_ITEM_COLUMNS}, ${sort} AS sort_at, p.first_party,
         e.vector AS embedding, e.text_hash AS embedding_hash ${API_ITEM_FROM}
       LEFT JOIN embeddings e ON e.kind = 'article' AND e.ref_id = p.article_id AND e.model = ${EMBEDDING_MODEL}
-      WHERE ${scopeFor(query.mode, now)} ${publicCategoryCondition(query.category)}
+      WHERE ${scopeFor(query.mode, now)} ${publicCategoryCondition(query.category)} ${askSourceFilter(query)}
         ${from ? sql`AND ${sort} >= ${from}` : sql``} AND ${sort} < ${until}
       ORDER BY ${sort} DESC, p.article_id DESC LIMIT ${HYBRID_POOL_LIMIT}`,
   ]));

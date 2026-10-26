@@ -216,11 +216,20 @@ export async function insertEvidence(taskId: string, items: Array<{
   for (const it of items) {
     // Repeated searches in one turn reuse the same citation number instead of showing the
     // same article several times under「参考来源」.
-    const [existing] = it.objectId ? await sql<{ id: number }[]>`
-      SELECT id FROM ask_evidence
+    const [existing] = it.objectId ? await sql<{ id: number; raw_ref: Record<string, unknown> | null }[]>`
+      SELECT id, raw_ref FROM ask_evidence
       WHERE task_id = ${taskId}::uuid AND kind = ${it.kind} AND object_id = ${it.objectId}
       ORDER BY id LIMIT 1` : [];
     if (existing) {
+      // Reading another paragraph of the same article keeps its citation and both inspected excerpts.
+      const body = it.rawRef?.bodyExcerpt;
+      if (it.kind === "item" && typeof body === "string" && body) {
+        const previous = typeof existing.raw_ref?.bodyExcerpt === "string" ? existing.raw_ref.bodyExcerpt : "";
+        if (!previous.includes(body)) {
+          const raw = { ...existing.raw_ref, ...it.rawRef, bodyExcerpt: [previous, body].filter(Boolean).join("\n") };
+          await sql`UPDATE ask_evidence SET raw_ref=${sql.json(raw)} WHERE task_id=${taskId}::uuid AND id=${existing.id}`;
+        }
+      }
       out.push(existing.id);
       continue;
     }

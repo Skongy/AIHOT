@@ -26,7 +26,7 @@ const USES = [
   `${T.latest} for briefings`,
   `${T.search} for a named subject`,
   `${T.hot} for the current ranked events`,
-  `${T.story} only with a public ID returned by hot topics`,
+  `${T.story} with a verified public ID from hot topics, search_events or an existing story link`,
   `${T.daily} for an edited daily overview`,
   `${T.weekly} and ${T.monthly} for the edited weekly and monthly reports`,
 ];
