@@ -4,7 +4,7 @@
 import { Fragment, useState } from "react";
 import { Link } from "react-router";
 import { PUBLIC_INTERFACE_VERSION } from "@aihot/contracts/http-policy";
-import { MCP_TOOL_NAMES as T, MCP_TOOLS, MCP_TOOL_DESCRIPTIONS } from "@aihot/contracts/mcp";
+import { MCP_TOOL_NAMES as T, MCP_TOOLS, MCP_TOOL_DESCRIPTIONS, MCP_TOOL_DESCRIPTION_TRANSLATIONS } from "@aihot/contracts/mcp";
 import { feedCategoryLabel, PUBLIC_API_CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { ACCESS, AGENT, EDITION_WHEN, POLICY, REPORTS, SITE, subjectAfter, withSubject } from "@aihot/site";
 import { CodeBlock, CopyButton } from "./CodeBlock";
@@ -63,8 +63,8 @@ export function McpPanel(props: AgentPanelProps) {
           head={["工具", "能做什么", "可以这样问"]}
           minWidth={600}
           rowDetails={[
-            ...MCP_TOOLS.map(tool => ({ label: tool.name, description: MCP_TOOL_DESCRIPTIONS[tool.name] })),
-            ...AGENT_PARTS.flatMap(part => part.tools ?? []).map(tool => ({ label: tool.name, description: tool.description })),
+            ...MCP_TOOLS.map(tool => ({ label: tool.name, description: MCP_TOOL_DESCRIPTIONS[tool.name], translations: MCP_TOOL_DESCRIPTION_TRANSLATIONS[tool.name] })),
+            ...AGENT_PARTS.flatMap(part => part.tools ?? []).map(tool => ({ label: tool.name, description: tool.description, translations: tool.descriptionTranslations })),
           ]}
           rows={[
             [<Mono>{T.latest}</Mono>, "过去 24 小时或最近 7 天的精选、全部资讯", `${subjectAfter("今天有什么", "新闻")}？`],

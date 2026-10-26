@@ -22,6 +22,7 @@ import { useHydratedFlag } from "./lib/hydration";
 import { titled } from "./lib/seo";
 import { webModules } from "./site-modules";
 import { IntroGate } from "./features/intro/IntroGate";
+import { INTRO_BOOT_SCRIPT, INTRO_BOOT_STYLE } from "./features/intro/boot";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -67,6 +68,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content={SITE.name} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {webModules().map((m) => m.root?.bootScript && <script key={m.name} dangerouslySetInnerHTML={{ __html: m.root.bootScript }} />)}
+        <style dangerouslySetInnerHTML={{ __html: INTRO_BOOT_STYLE }} />
+        <script dangerouslySetInnerHTML={{ __html: INTRO_BOOT_SCRIPT }} />
         <Meta />
         <Links />
       </head>
