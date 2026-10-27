@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { mkdir } from "node:fs/promises";
 import { before, after, test } from "node:test";
@@ -10,6 +11,7 @@ const fixture: RadarEvent = { id: "123-2026-10-10", appid: 123, name: "测试游
 const api = createServer((req, res) => {
   const u = new URL(req.url!, "http://local"); res.setHeader("content-type", "application/json");
   if (u.pathname === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
+  if (u.pathname === "/api/site/changelog") return res.end(readFileSync(new URL("../../../site/changelog.json", import.meta.url)));
   if (u.pathname === "/api/radar/month") { const month = u.searchParams.get("month") ?? "2026-10";
     return res.end(JSON.stringify({ month, events: month === "2026-10" ? [fixture] : [], coverage: month === "2026-10" ? [{ date: "2026-10-10", games: 10, samples: 240 }] : [], status: { healthy: true, lastSuccess: "2026-10-26T12:00:00Z", lastAttempt: "2026-10-26T12:00:00Z", tracked: 10 } })); }
   res.statusCode = u.pathname === "/api/test/broken.jpg" ? 502 : 404; res.end("{}");
@@ -42,6 +44,28 @@ test("A2 month navigation, inline detail, truthful chart interaction and empty m
       await page.locator(".file-trajectory svg").focus(); await page.keyboard.press("Home");
       await expect(page.locator(".radar-chart-readout")).toContainText("09:00");
       await expect(page.locator(".radar-chart-readout")).toContainText("1,000");
+      const chart = page.locator(".file-trajectory svg");
+      await chart.scrollIntoViewIfNeeded();
+      await expect(chart.locator(".radar-chart-axis text").first()).toBeVisible();
+      // Test the actual rendered coordinates, including a transformed ancestor and non-square viewports.
+      await page.locator(".file-trajectory .radar-chart-surface").evaluate(node => { (node as HTMLElement).style.transform = "scale(.87)"; });
+      for (const [index, value, time] of [[0, "1,000", "09:00"], [1, "5,000", "10:00"], [2, "3,000", "13:00"]] as const) {
+        const dot = await chart.locator(`.radar-observation[data-index="${index}"]`).boundingBox();
+        assert.ok(dot);
+        const position = { x: dot.x + dot.width / 2, y: dot.y + dot.height / 2 };
+        await page.mouse.move(position.x, position.y);
+        await expect(page.locator(".radar-chart-tooltip strong")).toContainText(value);
+        await expect(page.locator(".radar-chart-tooltip time")).toContainText(time);
+        await expect.poll(() => chart.evaluate((node, i) => {
+          const marker = node.querySelector(".radar-chart-marker")!.getBoundingClientRect();
+          const dot = node.querySelector(`.radar-observation[data-index="${i}"]`)!.getBoundingClientRect();
+          return Math.max(Math.abs(marker.x + marker.width / 2 - dot.x - dot.width / 2), Math.abs(marker.y + marker.height / 2 - dot.y - dot.height / 2));
+        }, index)).toBeLessThan(1);
+        const tip = await page.locator(".radar-chart-tooltip").boundingBox();
+        assert.ok(tip && tip.x >= 0 && tip.x + tip.width <= width);
+      }
+      await page.locator(".file-trajectory .radar-chart-surface").evaluate(node => { (node as HTMLElement).style.transform = ""; });
+
       await page.screenshot({ path: `.taste-skill/radar-live/detail-${width}-${theme}.png`, fullPage: true });
       await page.getByRole("button", { name: "返回月度事件流" }).click();
       await page.getByRole("button", { name: "上个月" }).click();
@@ -53,4 +77,48 @@ test("A2 month navigation, inline detail, truthful chart interaction and empty m
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
+});
+
+test("radar milestone shares AI heading typography, has its own reveal and respects reduced motion", async () => {
+  for (const width of [1440, 390]) for (const theme of ["light", "dark"] as const) {
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, colorScheme: theme, reducedMotion: "no-preference" });
+    try {
+      await context.addInitScript(t => localStorage.setItem("aihot-theme", t), theme);
+      const page = await context.newPage();
+      await page.route("https://fonts.googleapis.com/**", route => route.abort());
+      await page.goto(web.origin + "/changelog");
+      const card = page.locator(".radar-release");
+      await expect(card).toHaveClass(/is-entered/);
+      const typography = await page.locator(".radar-release h2, .changelog-feature__heading").evaluateAll(nodes => nodes.map(n => {
+        const s = getComputedStyle(n); return [s.fontFamily, s.fontSize, s.fontWeight, s.lineHeight, s.letterSpacing];
+      }));
+      assert.equal(typography.length, 2); assert.deepEqual(typography[0], typography[1]);
+      assert.equal(await card.evaluate(n => getComputedStyle(n).animationName), "radar-release-enter");
+      assert.equal(await page.locator(".radar-release-signal").evaluate(n => getComputedStyle(n).animationName), "radar-release-signal-enter");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await page.waitForTimeout(1100);
+      await card.screenshot({ path: `.taste-skill/radar-live/release-polish-${width}-${theme}.png` });
+    } finally { await context.close(); }
+  }
+  const context = await browser.newContext({ reducedMotion: "reduce" });
+  try {
+    const page = await context.newPage(); await page.goto(web.origin + "/changelog");
+    await expect(page.locator(".radar-release")).toHaveClass(/is-entered/);
+    for (const selector of [".radar-release", ".radar-release-signal", ".radar-release-signal i"]) assert.equal(await page.locator(selector).first().evaluate(n => getComputedStyle(n).animationName), "none");
+  } finally { await context.close(); }
+});
+
+test("phone tapping a recorded point keeps its nearby tooltip available", async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+  try {
+    const page = await context.newPage();
+    await page.goto(web.origin + "/radar?month=2026-10");
+    await page.locator(".monthly-hit").click();
+    const chart = page.locator(".file-trajectory svg"); await chart.scrollIntoViewIfNeeded();
+    const dot = await chart.locator('.radar-observation[data-index="1"]').boundingBox(); assert.ok(dot);
+    await page.touchscreen.tap(dot.x + dot.width / 2, dot.y + dot.height / 2);
+    await expect(page.locator(".radar-chart-tooltip strong")).toContainText("5,000");
+    await expect(page.locator(".radar-chart-tooltip time")).toContainText("10:00");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  } finally { await context.close(); }
 });
