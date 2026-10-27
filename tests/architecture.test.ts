@@ -57,18 +57,19 @@ test("packages never import the apps, and nothing below the admin imports it", (
   assert.deepEqual(found, [], "admin/ is the top layer: move what others need to the folder that owns it");
 });
 
-// Public routes read through the public read faces; the rest are the reader's own writes (feedback) and
+// Public routes read through the public read faces; the rest are the reader's own writes (feedback/visits) and
 // the image proxy. Admin and ingest routes may call any backend use case.
 const PRIVATE_ROUTES = new Set(["admin.ts", "admin-auth.ts", "ingest.ts"]);
 const PUBLIC_READS = [
   /^publication\//, /^site\//, /^lib\//, /^config\.ts$/, /^operations\/feedback\.ts$/, /^media\//, /^jobs\/queue\.ts$/, /^modules\.ts$/,
 ];
+const PUBLIC_WRITES = new Map([["apps/api/src/routes/visits.ts", "operations/visits.ts"]]);
 
 test("public routes read content only through the public read layer", () => {
   const routes = sources("apps/api/src/routes").filter(({ file }) => !PRIVATE_ROUTES.has(path.posix.basename(file)));
   const found = violations(routes, (file, spec) => {
     const target = backendPath(file, spec);
-    return target !== null && !PUBLIC_READS.some((allowed) => allowed.test(target));
+    return target !== null && target !== PUBLIC_WRITES.get(file) && !PUBLIC_READS.some((allowed) => allowed.test(target));
   });
   assert.deepEqual(found, [], "a public route imports backend internals; add or reuse a function in publication/");
 });

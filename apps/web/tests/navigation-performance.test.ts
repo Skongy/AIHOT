@@ -38,7 +38,7 @@ const api=createServer((req,res)=>{
   const p=url.pathname;
   res.setHeader('Content-Type','application/json');
   if(p==='/api/site/meta') return res.end(JSON.stringify({changelogVersion:'fixture'}));
-  if(p==='/api/site/track'){res.statusCode=204;return res.end();}
+  if(p==='/api/site/track'||p==='/api/site/visit'){res.statusCode=204;return res.end();}
   hits.push(req.url!);
   if(p===failing){res.statusCode=503;return res.end(JSON.stringify({code:'unavailable'}));}
   if(p==='/api/health')return res.end('{}');

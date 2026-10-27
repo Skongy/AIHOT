@@ -52,7 +52,7 @@ flowchart LR
 | `packages/backend/src/reports/` | 日报、周报、月报 |
 | `packages/backend/src/providers/` | 模型、向量、X、公众号、Jina 的调用，回执与预算 |
 | `packages/backend/src/notify/` | 飞书推送 |
-| `packages/backend/src/operations/` | 告警、备份、清理、IndexNow |
+| `packages/backend/src/operations/` | 告警、备份、清理、IndexNow、访客记录写入 |
 | `packages/backend/src/admin/` | 后台接口 |
 | `apps/web/app/routes/` | 每个页面一个文件，路由表在 `apps/web/app/routes.ts` |
 | `database/migrations/` | 数据库迁移，按完整文件名排序执行和记账 |
@@ -106,3 +106,5 @@ npm run build -w @aihot/web && node --test apps/web/tests/*.test.ts
 ```
 
 `DATABASE_URL` 指向的库名必须以 `_test` 或 `_ci` 结尾；没有会自动创建并迁移。每个测试文件在它的一份副本上并行运行，所以数据库账号要有建库权限（`CREATEDB`）。测试不访问任何外部服务：模型和付费接口都由本地假服务回答。
+
+访客记录的公开入口 /api/site/visit 只调用 operations/visits.ts 写入浏览记录，不提供读取能力；读取位于 dmin/visits.ts，沿用管理员认证。此写入入口与反馈同属读者操作，不改变资讯必须通过 publication/ 读取的边界。
