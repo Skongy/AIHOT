@@ -44,10 +44,14 @@ for (const colorScheme of ["light", "dark"] as const) {
       const paper = page.locator(".report-shell > div");
       const beforeWidth = (await paper.boundingBox())!.width;
       const toggle = panel.getByRole("button", { name: "收起往期列表" });
+      await expect(panel.getByText("往期刊物", { exact: true })).toBeVisible();
+      assert.ok((await toggle.boundingBox())!.width > 40);
       await toggle.focus();
       await page.keyboard.press("Enter");
       const expand = panel.getByRole("button", { name: "展开往期列表" });
       await expect(expand).toHaveAttribute("aria-expanded", "false");
+      await expect(expand.getByText("往期", { exact: true })).toBeVisible();
+      assert.ok((await expand.boundingBox())!.height >= 80);
       await expect(expand).toBeFocused();
       await expect(history).toBeHidden();
       await expect(panel).toHaveCSS("width", "52px");

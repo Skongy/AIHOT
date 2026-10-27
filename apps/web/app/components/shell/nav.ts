@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconPlug, IconUser,
+  IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconInfo, IconHistory, IconList, IconPlug, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -18,49 +18,40 @@ export interface NavItem {
 
 const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
-    title: "内容",
+    title: "资讯",
     items: [
       { to: "/", label: "精选", icon: IconBolt, end: true },
       { to: "/all", label: "全部动态", icon: IconList, end: true },
-      { to: "/hot", label: "热点", icon: IconFlame },
-      { to: "/daily", label: "AI 日报", icon: IconDoc },
-      { to: "/topics", label: "主题", icon: IconGrid },
-      { to: "/starred", label: "收藏", icon: IconBookmark },
+      { to: "/hot", label: "热点事件", icon: IconFlame },
+      { to: "/daily", label: "游戏日报", icon: IconDoc },
     ],
   },
   {
-    title: "更多",
-    items: [
-      { to: "/agent", label: "Agent", icon: IconPlug },
-      { to: "/about", label: "关于", icon: IconHeart },
-      { to: "/changelog", label: "更新日志", icon: IconHistory, changelog: true },
-    ],
+    title: "探索", items: [],
   },
+  { title: "助手", items: [] },
 ];
 
-/**
- * The sidebar: the engine's sections with the modules' between 内容 and 更多; a module naming a section
- * that is already there adds to it (including 更多 — e.g. AI 问答 after Agent).
- */
+export const SIDEBAR_SAVED: NavItem = { to: "/starred", label: "我的收藏", icon: IconBookmark };
+export const SIDEBAR_OTHER: NavItem[] = [
+  { to: "/agent", label: "Agent 接入", icon: IconPlug },
+  { to: "/about", label: "关于", icon: IconInfo },
+  { to: "/changelog", label: "更新日志", icon: IconHistory, changelog: true },
+];
+
+/** Enabled modules join their group; the topic index follows game discovery. */
 export function sidebar(): Array<{ title: string; items: NavItem[] }> {
   const sections = SECTIONS.map((s) => ({ ...s, items: [...s.items] }));
-  const moreIdx = sections.findIndex((s) => s.title === "更多");
   for (const m of webModules()) {
     if (!m.sidebar) continue;
     const section = sections.find((s) => s.title === m.sidebar!.section);
     if (section) {
-      if (section.title === "更多") {
-        const agentIdx = section.items.findIndex((i) => i.to === "/agent");
-        const at = agentIdx >= 0 ? agentIdx + 1 : section.items.length;
-        section.items.splice(at, 0, ...m.sidebar.items);
-      } else {
-        section.items.push(...m.sidebar.items);
-      }
+      section.items.push(...m.sidebar.items);
     } else {
-      const insertAt = moreIdx >= 0 ? moreIdx : sections.length;
-      sections.splice(insertAt, 0, { title: m.sidebar.section, items: [...m.sidebar.items] });
+      sections.push({ title: m.sidebar.section, items: [...m.sidebar.items] });
     }
   }
+  sections.find((s) => s.title === "探索")!.items.push({ to: "/topics", label: "游戏主题", icon: IconGrid });
   return sections;
 }
 
