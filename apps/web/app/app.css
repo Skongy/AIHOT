@@ -782,11 +782,6 @@
 }
 @keyframes aihot-sheen { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 
-/* Sidebar: one active marker slides between links. */
-.nav-indicator {
-  transition: transform var(--dur-3) var(--ease-out-quart), height var(--dur-3) var(--ease-out-quart), opacity var(--dur-2);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll, .spark-draw, .ticker-col > span, .skeleton-shimmer::after { animation: none !important; }
   .text-shimmer { animation: none; color: var(--ink-3); background: none; }
@@ -914,19 +909,8 @@
 }
 .tab-bump svg { animation: aihot-bump 320ms var(--ease-out-quart) both; }
 
-/* Sidebar icon micro-motion on hover (once). */
-.nav-ico { transition: transform 300ms var(--ease-spring); }
-.group\/nav:hover .nav-ico-flame { transform: rotate(-8deg) scale(1.08); }
-.group\/nav:hover .nav-ico-bolt { transform: translateY(-1px); }
-.group\/nav:hover .nav-ico-doc { transform: translateY(-1px) rotate(3deg); }
-.group\/nav:hover .nav-ico-grid { transform: scale(1.06); }
-.group\/nav:hover .nav-ico-heart { transform: scale(1.1); }
-.group\/nav:hover .nav-ico-plug { transform: rotate(12deg); }
-.group\/nav:hover .nav-ico-bookmark { transform: translateY(-1px); }
-.group\/nav:hover .nav-ico-ask { transform: rotate(-6deg); }
-
 @media (prefers-reduced-motion: reduce) {
-  .theme-icon-spin svg, .tab-bump svg, .nav-ico { animation: none !important; transform: none !important; }
+  .theme-icon-spin svg, .tab-bump svg { animation: none !important; transform: none !important; }
   .topic-card:hover { transform: none; }
   :root[data-vt="fade"]::view-transition-old(root),
   :root[data-vt="fade"]::view-transition-new(root) { animation: none !important; }
@@ -1470,43 +1454,6 @@
 
 /* Desktop navigation and news share one inset workspace. Mobile and reading routes keep their layout. */
 @media (min-width: 961px) {
-  .gamehot-sidebar {
-    top: 12px;
-    width: 224px;
-    height: calc(100dvh - 24px);
-    margin: 12px 0 12px 12px;
-    padding: 20px 12px 12px;
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    box-shadow: var(--shadow-soft);
-  }
-  .sidebar-brand { gap: 10px; height: 56px; margin-bottom: 12px; padding: 0 4px; }
-  .sidebar-brand-mark { width: 30px; height: 38px; object-fit: contain; flex-shrink: 0; }
-  .sidebar-brand-copy { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
-  .sidebar-brand-caption { color: var(--ink-4); font-size: 11px; line-height: 16px; letter-spacing: .04em; }
-  .sidebar-section-label { padding-top: 17px; padding-bottom: 7px; font-size: 11px; letter-spacing: .06em; }
-  .gamehot-sidebar .sidebar-link { border: 1px solid transparent; border-radius: 11px; }
-  .gamehot-sidebar .sidebar-link[aria-current="page"] {
-    background: var(--surface);
-    border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
-    box-shadow: var(--shadow-soft);
-  }
-  .gamehot-sidebar .sidebar-link[aria-current="page"] .nav-ico {
-    height: 26px;
-    width: 26px;
-    margin-left: -3px;
-    margin-right: -3px;
-    align-items: center;
-    border-radius: 7px;
-    background: var(--accent-soft);
-  }
-  .gamehot-sidebar .nav-indicator { left: 0; border-radius: 3px; }
-  .sidebar-tools { margin-top: 12px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
-  .sidebar-tools-label { display: block; padding: 0 5px; color: var(--ink-4); font-size: 11px; line-height: 16px; }
-  .sidebar-tools [role="radiogroup"] { margin: 0; height: 36px; border-radius: 11px; }
-  .sidebar-tools [role="radiogroup"] > span { border-radius: 8px; }
-  .sidebar-tools > a { margin-inline: 0; border-radius: 11px; }
-
   #main.news-workspace {
     min-height: calc(100dvh - 24px);
     margin: 12px 12px 12px 14px;
@@ -1547,28 +1494,14 @@
   .news-workspace .hot-workspace section[aria-label="热度前三"] > div:first-child > article { border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
 }
 @media (min-width: 961px) and (max-width: 1199px) {
-  .gamehot-sidebar { width: 204px; margin-left: 10px; padding-inline: 10px; }
-  .sidebar-brand { gap: 7px; padding-inline: 0; }
-  .sidebar-brand-mark { width: 24px; height: 32px; }
   #main.news-workspace { margin-inline: 10px; padding-inline: 16px; }
   .workspace-heading-note { display: none; }
   .news-workspace .workspace-filters form { width: 200px; }
-}
-@media (max-width: 960px) {
-  .sidebar-brand-mark, .sidebar-brand-caption, .sidebar-tools-label { display: none; }
 }
 
 /* Light desktop: pearl-grey chrome, white reading surfaces, neutral editorial notes. */
 @media (min-width: 961px) {
   :root:not([data-theme="dark"]) .gamehot-shell:has(> .news-workspace) { background: #ECEFF2; }
-  :root:not([data-theme="dark"]) .gamehot-sidebar {
-    background: #F6F7F9;
-    border-color: #D9DFE6;
-    box-shadow: 0 1px 2px #20242B04, 0 6px 18px #20242B05;
-  }
-  :root:not([data-theme="dark"]) .gamehot-sidebar .sidebar-link[aria-current="page"] {
-    border-color: color-mix(in srgb, var(--accent) 12%, var(--line));
-  }
   :root:not([data-theme="dark"]) #main.news-workspace {
     --bg-elevated: #F2F4F6;
     --line: #DDE2E8;

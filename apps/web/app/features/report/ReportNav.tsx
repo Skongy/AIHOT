@@ -6,6 +6,7 @@ import type { ReportNavigationEntry, ReportNavigationResponse, ReportKind } from
 import { PillTabs } from "../../components/ui/Tabs";
 import { IconChevronLeft, IconChevronRight, IconList } from "../../components/icons";
 import { KINDS, KIND_LABEL, KIND_PATH, archiveGroups, archiveMark, chipLabel, reportPath } from "./format";
+import "./report-navigation.css";
 
 /** 日报 / 周报 / 月报 as the site's pill switch: spread across the archive column, or compact in the phone bar (opening at the top). */
 export function KindSwitch({ kind, phone = false }: { kind: ReportKind; phone?: boolean }) {
@@ -28,9 +29,9 @@ export function ReportArchive({ kind, index, current }: { kind: ReportKind; inde
   const groups = archiveGroups(kind, index);
   const openId = groups.find((g) => g.entries.some((e) => e.key === current))?.id ?? groups[0]?.id;
   return (
-    <aside aria-label="往期列表面板" className={`sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-line bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--surface))] pt-6 transition-[width,padding] duration-200 ease-out motion-reduce:transition-none lg:flex dark:bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--bg))] ${collapsed ? "w-[52px] px-2" : "w-[280px] pl-5 pr-3"}`}>
-      <div className="mb-2 flex h-8 shrink-0 items-center justify-between">
-        {!collapsed && <span className="pl-1 text-[11.5px] font-semibold tracking-[0.3em] text-ink">往期</span>}
+    <aside aria-label="往期列表面板" className={`report-archive-panel sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-line bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--surface))] pt-6 transition-[width,padding] duration-200 ease-out motion-reduce:transition-none lg:flex dark:bg-[color-mix(in_srgb,var(--sidebar)_50%,var(--bg))] ${collapsed ? "is-collapsed w-[52px] px-2" : "w-[280px] pl-5 pr-3"}`}>
+      <div className="report-archive-header">
+        {!collapsed && <span className="report-archive-title"><IconList size={16} />往期刊物</span>}
         <button
           type="button"
           aria-label={collapsed ? "展开往期列表" : "收起往期列表"}
@@ -38,9 +39,9 @@ export function ReportArchive({ kind, index, current }: { kind: ReportKind; inde
           aria-controls={archiveId}
           title={collapsed ? "展开往期列表" : "收起往期列表"}
           onClick={() => setCollapsed((value) => !value)}
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-3 shadow-sm transition-colors hover:border-line-strong hover:bg-bg-sunk hover:text-ink"
+          className="report-archive-toggle"
         >
-          {collapsed ? <IconList size={17} /> : <IconChevronLeft size={17} />}
+          {collapsed ? <><IconList size={17} /><span className="report-archive-tab-label">往期</span><IconChevronRight size={13} /></> : <><IconChevronLeft size={14} /><span>收起</span></>}
         </button>
       </div>
       <div id={archiveId} hidden={collapsed} className={`min-h-0 flex-1 flex-col ${collapsed ? "" : "flex"}`}>

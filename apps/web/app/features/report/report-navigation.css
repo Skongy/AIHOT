@@ -1,0 +1,11 @@
+.report-archive-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; min-height: 32px; margin: 0 0 12px; gap: 8px; padding-inline: 4px 0; }
+.report-archive-title { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12px; font-weight: 550; letter-spacing: .04em; }
+.report-archive-title svg { color: var(--ink-4); }
+.report-archive-toggle { display: inline-flex; justify-content: center; align-items: center; gap: 3px; flex-shrink: 0; min-height: 30px; padding: 0 8px 0 5px; border: 1px solid transparent; border-radius: 8px; color: var(--ink-4); font-size: 11px; line-height: 16px; transition: color 160ms, background 160ms, border-color 160ms; }
+.report-archive-toggle:hover { color: var(--ink); background: var(--surface); border-color: var(--line); }
+.report-archive-panel.is-collapsed { background: transparent; border-color: transparent; }
+.report-archive-panel.is-collapsed .report-archive-header { padding: 0; justify-content: center; }
+.report-archive-panel.is-collapsed .report-archive-toggle { flex-direction: column; width: 34px; min-height: 92px; padding: 12px 0 8px; gap: 9px; border-color: var(--line); border-radius: 12px; background: var(--surface); }
+.report-archive-panel.is-collapsed .report-archive-toggle:hover { border-color: var(--line-strong); background: var(--bg-elevated); color: var(--accent); }
+.report-archive-tab-label { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: .16em; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .report-archive-toggle { transition: none; } }

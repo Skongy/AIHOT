@@ -1,0 +1,83 @@
+/* GameHot navigation. Shared widths and height tiers keep every entry visible without scrolling. */
+.sd-panel { display: none; }
+.sd-panel { --sd-hover: color-mix(in srgb, var(--ink) 4%, transparent); --sd-row: 40px; }
+.sd-brand { display: flex; align-items: center; gap: 12px; height: 64px; flex-shrink: 0; padding: 0 12px 14px; color: var(--ink); }
+.sd-brand > img { width: 26px; height: 34px; object-fit: contain; flex-shrink: 0; }
+.sd-brand-copy { display: flex; flex-direction: column; gap: 9px; white-space: nowrap; }
+.sd-brand-copy > span:last-child { color: var(--ink-4); font-size: 11px; line-height: 1; letter-spacing: .045em; }
+.sd-navigation { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: visible; padding: 0 2px; }
+.sd-primary, .sd-group, .sd-personal, .sd-secondary { width: 100%; min-width: 0; flex-shrink: 0; }
+.sd-group + .sd-group { margin-top: 14px; }
+.sd-group-label { margin: 0; padding: 0 13px 4px; color: var(--ink-4); font-size: 11px; line-height: 16px; font-weight: 450; letter-spacing: .06em; }
+.sd-link { position: relative; display: flex; align-items: center; gap: 12px; box-sizing: border-box; width: 100%; height: var(--sd-row); min-height: var(--sd-row); flex-shrink: 0; margin: 1px 0; padding: 0 12px; color: var(--ink-3); border: 1px solid transparent; border-radius: 11px; font-size: 14px; line-height: 20px; font-weight: 450; white-space: nowrap; transition: background 160ms, color 160ms, border-color 160ms, box-shadow 160ms; }
+.sd-icon { display: flex; justify-content: center; align-items: center; width: 21px; height: 24px; flex-shrink: 0; color: var(--ink-4); }
+.sd-icon svg { stroke-width: 1.65; }
+.sd-link:hover { background: var(--sd-hover); color: var(--ink); }
+.sd-link:hover .sd-icon { color: var(--ink-2); }
+.sd-link.is-current { color: var(--ink); font-weight: 600; background: var(--surface); border-color: var(--line); box-shadow: 0 1px 2px #00000004, 0 3px 7px #00000003; }
+.sd-link.is-current .sd-icon { color: var(--accent); }
+.sd-active-dot { width: 4px; height: 4px; margin-left: auto; border-radius: 50%; background: var(--accent); opacity: .8; }
+.sd-unread { width: 5px; height: 5px; margin-left: auto; border-radius: 50%; background: var(--hot); }
+.sd-personal { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.sd-secondary { padding-top: 10px; margin-top: auto; }
+.sd-secondary .sd-link { font-size: 12px; color: var(--ink-4); }
+.sd-secondary .sd-icon svg { width: 16px; height: 16px; }
+.sd-secondary .sd-link.is-current { color: var(--ink); }
+.sd-footer { flex-shrink: 0; margin: 12px 2px 0; padding: 10px 3px 0; border-top: 1px solid var(--line); }
+.sd-appearance-label { margin: 0 6px 9px; color: var(--ink-4); font-size: 11px; line-height: 16px; }
+.sd-footer-controls { display: flex; gap: 9px; align-items: center; }
+.sd-theme-switch { flex: 1; height: 32px !important; }
+.sd-collapse { display: flex; justify-content: center; align-items: center; width: 33px; height: 33px; border-radius: 9px; color: var(--ink-4); flex-shrink: 0; transition: background 160ms, color 160ms; }
+.sd-collapse:hover { background: var(--sd-hover); color: var(--ink); }
+.sd-theme-menu [role="menu"] { top: auto; bottom: 42px; left: 0; right: auto; }
+@media (min-width: 961px) {
+  .sd-panel { position: sticky; display: flex; flex-direction: column; top: 12px; width: 246px; height: calc(100dvh - 24px); flex-shrink: 0; margin: 12px 0 12px 12px; padding: 16px 13px 12px; border: 1px solid var(--line); border-radius: 22px; background: var(--sidebar); box-shadow: var(--shadow-soft); transition: width 240ms cubic-bezier(.22,1,.36,1); }
+  :root:not([data-theme="dark"]) .sd-panel { background: #F6F7F9; border-color: #D9DFE6; box-shadow: 0 1px 2px #20242B04, 0 6px 18px #20242B05; }
+  .sd-panel .sd-brand-copy { overflow: hidden; }
+  .sd-panel.is-collapsed { width: 76px; padding-inline: 9px; }
+  .is-collapsed .sd-brand { justify-content: center; padding-inline: 0; }
+  .is-collapsed .sd-brand-copy, .is-collapsed .sd-link-label, .is-collapsed .sd-active-dot { display: none; }
+  .is-collapsed .sd-group-label { width: 18px; height: 1px; padding: 0; margin: 0 auto 11px; overflow: hidden; color: transparent; background: var(--line); }
+  .is-collapsed .sd-group:first-child .sd-group-label { visibility: hidden; }
+  .is-collapsed .sd-group + .sd-group { margin-top: 17px; }
+  .is-collapsed .sd-link { justify-content: center; padding-inline: 0; }
+  .is-collapsed .sd-unread { position: absolute; top: 5px; right: 6px; }
+  .is-collapsed .sd-footer { margin-inline: 0; padding-inline: 0; }
+  .is-collapsed .sd-footer-controls { flex-direction: column; gap: 7px; }
+}
+@media (max-height: 820px) and (min-width: 961px) {
+  .sd-panel { --sd-row: 32px; padding-top: 12px; padding-bottom: 10px; }
+  .sd-brand { height: 52px; padding-bottom: 10px; }
+  .sd-group + .sd-group, .is-collapsed .sd-group + .sd-group { margin-top: 8px; }
+  .sd-group-label { line-height: 14px; }
+  .sd-personal { margin-top: 10px; padding-top: 8px; }
+  .sd-secondary { padding-top: 6px; }
+  .sd-footer { padding-top: 8px; margin-top: 8px; }
+  .sd-appearance-label { display: none; }
+}
+@media (max-height: 660px) and (min-width: 961px) {
+  .sd-panel { --sd-row: 30px; padding-block: 8px; }
+  .sd-brand { height: 48px; }
+  .sd-group + .sd-group, .is-collapsed .sd-group + .sd-group { margin-top: 6px; }
+  .sd-group-label { padding-bottom: 2px; }
+  .sd-personal { margin-top: 7px; padding-top: 6px; }
+  .sd-secondary { padding-top: 4px; }
+  .sd-footer { padding-top: 6px; margin-top: 6px; }
+}
+@media (max-height: 560px) {
+  .sd-panel { --sd-row: 26px; }
+  .sd-panel { padding-block: 4px; }
+  .sd-brand { height: 38px; padding-bottom: 4px; }
+  .sd-brand-copy > span:last-child { display: none; }
+  .sd-group + .sd-group, .is-collapsed .sd-group + .sd-group { margin-top: 4px; }
+  .sd-group-label { padding-bottom: 0; line-height: 14px; }
+  .sd-link { margin-block: 0; }
+  .sd-personal { margin-top: 5px; padding-top: 4px; }
+  .sd-footer { margin-top: 4px; padding-top: 4px; }
+  .is-collapsed .sd-group-label { margin-bottom: 4px; }
+  .is-collapsed .sd-footer-controls { flex-direction: row; justify-content: space-between; gap: 0; }
+  .is-collapsed .sd-collapse, .is-collapsed .sd-theme-menu > div > button { width: 24px; height: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sd-panel, .sd-link, .sd-collapse, .sd-theme-switch * { transition: none !important; animation: none !important; }
+}

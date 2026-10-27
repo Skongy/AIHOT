@@ -1,138 +1,76 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
-import { SITE } from "@aihot/site";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
-import { useChangelogSeen } from "../../lib/local-state";
-import { sidebar, sidebarIsActive, type NavItem } from "./nav";
+import { SITE } from "@aihot/site";
+import { useChangelogSeen, readRaw, writeRaw, applyTheme, resolvedTheme, setThemePreference, useThemePreference, type ThemePreference } from "../../lib/local-state";
+import { sidebar, sidebarIsActive, SIDEBAR_SAVED, SIDEBAR_OTHER, type NavItem } from "./nav";
 import { ThemeSwitch } from "./ThemeSwitch";
-import { IconGithub } from "../icons";
+import { Menu, MenuItem } from "../ui/Menu";
+import { IconChevronLeft, IconChevronRight, IconSun, IconMoon, IconMonitor, IconCheck } from "../icons";
+import "./sidebar.css";
 
 /** True while the changelog has an entry newer than the one this reader last opened. */
 export function useChangelogDot(latestVersion: string | null): boolean {
   const seen = useChangelogSeen();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted || !latestVersion) return false;
-  return !seen || seen < latestVersion;
+  return mounted && !!latestVersion && (!seen || seen < latestVersion);
 }
 
-
-const NAV_ICO: Record<string, string> = {
-  "/": "nav-ico-bolt",
-  "/hot": "nav-ico-flame",
-  "/daily": "nav-ico-doc",
-  "/topics": "nav-ico-grid",
-  "/starred": "nav-ico-bookmark",
-  "/agent": "nav-ico-plug",
-  "/about": "nav-ico-heart",
-  "/ask": "nav-ico-ask",
-};
-
-function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
+function SideLink({ item, collapsed, dot }: { item: NavItem; collapsed: boolean; dot: boolean }) {
   const { pathname } = useLocation();
-  const isActive = sidebarIsActive(item, pathname);
+  const active = sidebarIsActive(item, pathname);
   const Icon = item.icon;
-  return (
-    <Link
-      to={item.to}
-      prefetch="intent"
-      aria-current={isActive ? "page" : undefined}
-      className={`sidebar-link group/nav relative flex h-10 items-center gap-2.5 rounded-tile px-3 text-[14px] transition-colors duration-150 press ${
-        isActive
-          ? "bg-accent-muted font-semibold text-ink"
-          : "font-medium text-ink-4 hover:bg-surface-hover hover:text-ink"
-      }`}
-    >
-      <span className={`nav-ico flex w-[20px] shrink-0 justify-center ${NAV_ICO[item.to] ?? ""} ${isActive ? "text-accent" : "text-ink-4"}`}>
-        <Icon size={18} />
-      </span>
-      <span className="min-w-0 truncate">{item.label}</span>
-      {dot && item.changelog && <span className="ml-auto size-1.5 shrink-0 rounded-[2px] bg-hot" aria-label="有新的更新" />}
-    </Link>
-  );
+  return <Link to={item.to} prefetch="intent" className={`sd-link${active ? " is-current" : ""}`} aria-label={item.label}
+    aria-current={active ? "page" : undefined} title={collapsed ? item.label : undefined}>
+    <span className="sd-icon"><Icon size={19} /></span>
+    <span className="sd-link-label">{item.label}</span>
+    {active && <span className="sd-active-dot" aria-hidden="true" />}
+    {dot && item.changelog && <span className="sd-unread" aria-label="有新的更新" />}
+  </Link>;
 }
 
-/** One copper marker that slides to the active link (replaces a per-link bar; same place and size). */
-function useNavIndicator() {
-  const nav = useRef<HTMLElement>(null);
-  const bar = useRef<HTMLSpanElement>(null);
-  const { pathname } = useLocation();
-  const useIso = typeof window === "undefined" ? useEffect : useLayoutEffect;
-  useIso(() => {
-    const n = nav.current;
-    const b = bar.current;
-    if (!n || !b) return;
-    const place = () => {
-      const a = n.querySelector<HTMLElement>('a[aria-current="page"]');
-      if (!a) {
-        b.style.opacity = "0";
-        return;
-      }
-      const top = a.offsetTop + 6;
-      const h = a.offsetHeight - 12;
-      const first = !b.dataset.placed;
-      if (first) b.style.transition = "none";
-      b.style.transform = `translateY(${top}px)`;
-      b.style.height = `${h}px`;
-      b.style.opacity = "1";
-      if (first) {
-        b.dataset.placed = "1";
-        void b.offsetHeight;
-        b.style.transition = "";
-      }
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [pathname]);
-  return { nav, bar };
+function RailAppearance() {
+  const preference = useThemePreference();
+  const icon = preference === "light" ? <IconSun /> : preference === "dark" ? <IconMoon /> : <IconMonitor />;
+  return <div className="sd-theme-menu"><Menu trigger={icon} label="切换外观">{close => <>
+    {([{ value: "light", label: "浅色", Icon: IconSun }, { value: null, label: "跟随系统", Icon: IconMonitor }, { value: "dark", label: "深色", Icon: IconMoon }] as const).map(({ value, label, Icon }) =>
+      <MenuItem key={label} icon={<Icon size={16} />} onSelect={() => { const p: ThemePreference = value; setThemePreference(p); applyTheme(resolvedTheme(p), p === null); close(); }}>
+        <span className="flex-1">{label}</span>{preference === value && <IconCheck size={14} />}
+      </MenuItem>)}
+  </>}</Menu></div>;
 }
 
 export function Sidebar({ changelogVersion }: { changelogVersion: string | null }) {
+  const [collapsed, setCollapsed] = useState(false);
   const dot = useChangelogDot(changelogVersion);
-  const { nav, bar } = useNavIndicator();
-  return (
-    <aside className="gamehot-sidebar sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-border-strong bg-sidebar px-4 pb-3.5 pt-6 lg:flex">
-      <Link to="/" className="sidebar-brand mb-5 flex h-[50px] items-center px-1 text-ink" aria-label={`${SITE.name} 首页`}>
-        <img src="/logo-mark.png" width={32} height={40} alt="" className="sidebar-brand-mark" />
-        <span className="sidebar-brand-copy">
-          <Wordmark size={22} />
-          <span className="sidebar-brand-caption">游戏情报 · 看见重点</span>
-        </span>
-      </Link>
-      <nav ref={nav} className="scrollbar-thin relative -mx-1 flex-1 overflow-y-auto px-1" aria-label="主导航">
-        <span ref={bar} aria-hidden="true" className="nav-indicator pointer-events-none absolute left-1 top-0 z-10 w-0.5 bg-accent opacity-0" />
-        {sidebar().map((section) => (
-          <div key={section.title}>
-            <div className="sidebar-section-label px-3 pb-1 pt-4 text-[11px] uppercase tracking-[0.08em] text-ink-4">{section.title}</div>
-            <div className="flex flex-col gap-0.5">
-              {section.items.map((item) => (
-                <SideLink key={item.to} item={item} dot={dot} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-      <div className="sidebar-tools mt-2 space-y-2.5 px-1 pt-1">
-        <span className="sidebar-tools-label">外观</span>
-        {SITE.github && (
-          <a
-            href={SITE.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mx-1 flex h-[34px] items-center justify-center gap-1.5 rounded-full border border-line text-[12.5px] text-ink-4 transition-colors hover:bg-surface-hover hover:text-ink"
-          >
-            <IconGithub size={14} />
-            GitHub 开源
-          </a>
-        )}
-        <ThemeSwitch className="mx-1" />
-        {SITE.icp && (
-          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="block px-2 text-[10px] text-ink-4 hover:text-ink-3">
-            {SITE.icp}
-          </a>
-        )}
+  useEffect(() => setCollapsed(readRaw("gamehot-sidebar-collapsed", "session") === "true"), []);
+  const toggle = () => {
+    const next = !collapsed;
+    writeRaw("gamehot-sidebar-collapsed", String(next), "session");
+    setCollapsed(next);
+  };
+  return <aside className={`sd-panel${collapsed ? " is-collapsed" : ""}`} aria-label="GameHot 导航面板">
+    <Link to="/" className="sd-brand" aria-label={`${SITE.name} 首页`}>
+      <img src="/logo-mark.png" width="28" height="36" alt="" />
+      <span className="sd-brand-copy"><Wordmark size={23} /><span>游戏情报 · 看见重点</span></span>
+    </Link>
+    <nav className="sd-navigation" aria-label="主导航">
+      <div className="sd-primary">{sidebar().map(group => <section className="sd-group" key={group.title} aria-label={group.title}>
+        <h2 className="sd-group-label">{group.title}</h2>
+        {group.items.map(item => <SideLink key={item.to} item={item} collapsed={collapsed} dot={dot} />)}
+      </section>)}</div>
+      <div className="sd-personal"><SideLink item={SIDEBAR_SAVED} collapsed={collapsed} dot={dot} /></div>
+      <div className="sd-secondary" aria-label="更多入口">{SIDEBAR_OTHER.map(item => <SideLink key={item.to} item={item} collapsed={collapsed} dot={dot} />)}</div>
+    </nav>
+    <footer className="sd-footer">
+      {!collapsed && <div className="sd-appearance-label">外观</div>}
+      <div className="sd-footer-controls">
+        {collapsed ? <RailAppearance /> : <ThemeSwitch className="sd-theme-switch" />}
+        <button className="sd-collapse" type="button" aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"} title={collapsed ? "展开侧边栏" : "收起侧边栏"} aria-expanded={!collapsed} onClick={toggle}>
+          {collapsed ? <IconChevronRight size={18} /> : <IconChevronLeft size={18} />}
+        </button>
       </div>
-    </aside>
-  );
+    </footer>
+  </aside>;
 }
