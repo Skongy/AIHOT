@@ -387,3 +387,11 @@ export interface AdminSelectBenchCases {
   rows: Array<{ case_id: string; title: string; stratum: string | null; gold: "select" | "reject" | "either"; by_model: Record<string, AdminSelectBenchDecision> }>;
   strata: Array<{ stratum: string | null; n: number }>;
 }
+export interface AdminVisits {
+  date: string;
+  ip: string | null;
+  page: number;
+  hasMore: boolean;
+  summary: { views: number; ips: number };
+  rows: Array<{ id: number; visited_at: Timestamp; ip: string; path: string; referrer_origin: string | null; user_agent: string }>;
+}

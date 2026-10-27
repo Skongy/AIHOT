@@ -55,6 +55,7 @@ export default [
     route("admin/selectbench/:runId", "routes/admin/selectbench-run.tsx"),
     route("admin/settings", "routes/admin/settings.tsx"),
     route("admin/audit", "routes/admin/audit.tsx"),
+    route("admin/visits", "routes/admin/visits.tsx"),
     ...moduleAdminPages,
   ]),
 ] satisfies RouteConfig;

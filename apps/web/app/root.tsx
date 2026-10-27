@@ -22,6 +22,7 @@ import { useHydratedFlag } from "./lib/hydration";
 import { titled } from "./lib/seo";
 import { webModules } from "./site-modules";
 import { IntroGate } from "./features/intro/IntroGate";
+import { useVisitTracking } from "./lib/visits";
 import { INTRO_BOOT_SCRIPT, INTRO_BOOT_STYLE } from "./features/intro/boot";
 
 export const links: Route.LinksFunction = () => [
@@ -127,6 +128,7 @@ export default function App() {
   useThemeSync();
   const { pathname, search } = useLocation();
   useEffect(() => rememberPage(pathname + search), [pathname, search]);
+  useVisitTracking(pathname);
   usePageTransition();
   // iOS Safari only shows :active (pressed) styles once the document listens for touches.
   useEffect(() => {

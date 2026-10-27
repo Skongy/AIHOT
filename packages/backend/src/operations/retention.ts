@@ -6,6 +6,7 @@ import { config } from "../config.ts";
 import { sql } from "../db.ts";
 import { screenshotsForwarded } from "./feedback.ts";
 import { serverModules } from "../modules.ts";
+import { pruneVisits } from "./visits.ts";
 
 /** Removes files under `dir` last written more than `maxAgeMs` ago. */
 async function removeOlderThan(dir: string, maxAgeMs: number, now: number): Promise<number> {
@@ -37,6 +38,7 @@ export async function dailyRetention(now = new Date()) {
   // Scheduled-task history: 30 days (failures 90) is enough for the runs view.
   const runs = await sql`DELETE FROM job_runs WHERE started_at < ${new Date(now.getTime() - 30 * 86400_000)} AND (status IS DISTINCT FROM 'failed' OR started_at < ${new Date(now.getTime() - 90 * 86400_000)})`;
   const monthMs = 30 * 86400_000;
+  const deletedVisits = await pruneVisits(now);
   // Feedback screenshots that only wait to be forwarded (the database then keeps just the Feishu image
   // key). The forwarding sweep gives up after a week; anything older is removed, whether or not
   // forwarding ever ran for it. Without the internal chat they are the screenshots themselves and stay.
@@ -46,6 +48,7 @@ export async function dailyRetention(now = new Date()) {
   return {
     ...modules,
     deletedLeases: leases.count,
+    deletedVisits,
     deletedJobRuns: runs.count,
     deletedScreenshots,
     prunedCache,
