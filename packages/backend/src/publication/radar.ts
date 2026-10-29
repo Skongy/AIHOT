@@ -32,11 +32,12 @@ export async function loadRadarMonth(month: string): Promise<RadarMonth> {
     const date = new Date(row.event_day).toISOString().slice(0, 10);
     events.push({ id: row.id, appid: row.appid, name: row.name, zh: row.name, date, genre: row.origin === "historical" ? "历史回溯" : "持续监控",
       kind: row.kind, status: row.status, baseline: row.baseline, baselineDays: row.baseline_days, peak: row.peak,
-      rankBefore: null, rankAfter: null, coverage: new Set((row.points as Array<{ at: string }>).map(p => p.at.slice(0, 13))).size >= 20 ? "complete" : "partial", points: row.points,
-      headline: row.status === "confirmed" ? "此前低关注，在线人数持续显著增长。" : "发现增长信号，仍需更多记录确认。",
+      rankBefore: null, rankAfter: row.kind === "launch" ? row.proof.launch?.qualification?.at(-1)?.rank ?? null : null, coverage: new Set((row.points as Array<{ at: string }>).map(p => p.at.slice(0, 13))).size >= 20 ? "complete" : "partial", points: row.points,
+      headline: row.kind === "launch" ? "发售 14 天内进入 Steam 在线 Top 100，已由多次榜单记录核验。" : row.status === "confirmed" ? "此前低关注，在线人数持续显著增长。" : "发现增长信号，仍需更多记录确认。",
       reason: current.length === evidence.length ? row.reason : null,
       evidence: [{ label: row.origin === "historical" ? "SteamData 历史小时记录" : "Steam 官方在线记录", url: row.proof.source, note: "统计依据；不单独证明爆火原因。历史响应及统计依据已归档。" }, ...current],
-      coverUrl: proxiedImage(row.cover_url, "card"), source: row.origin, detectedAt: new Date(row.detected_at).toISOString(), timezone: "Asia/Shanghai" });
+      coverUrl: proxiedImage(row.cover_url, "card"), source: row.origin, detectedAt: new Date(row.detected_at).toISOString(), timezone: "Asia/Shanghai",
+      ...(row.kind === "launch" && row.proof.launch ? { launch: { releaseDay: row.proof.launch.releaseDay, qualifiedAt: row.proof.launch.qualifiedAt, peak: row.proof.launch.peak, peakDay: row.proof.launch.peakDay } } : {}) });
   }
   const coverage = await sql`SELECT day::text AS date, count(*)::int AS games, sum(samples)::int AS samples FROM radar_daily
     WHERE day >= ${month + "-01"}::date AND day < ${month + "-01"}::date + interval '1 month' GROUP BY day ORDER BY day`;

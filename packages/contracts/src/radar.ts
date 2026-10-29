@@ -1,4 +1,4 @@
-export type RadarKind = "breakout" | "comeback" | "watch";
+export type RadarKind = "breakout" | "comeback" | "watch" | "launch";
 export interface RadarPoint { at: string; count: number }
 export interface RadarEvidence { label: string; url: string; note: string; articleId?: string }
 export interface RadarEvent {
@@ -8,6 +8,7 @@ export interface RadarEvent {
   coverage: "complete" | "partial"; points: RadarPoint[]; headline: string;
   reason: string | null; evidence: RadarEvidence[]; coverUrl: string | null;
   source: "historical" | "live"; detectedAt: string; timezone: "Asia/Shanghai";
+  launch?: { releaseDay: string; qualifiedAt: string; peak: number; peakDay: string };
 }
 export interface RadarMonth {
   month: string; events: RadarEvent[];

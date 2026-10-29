@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode } f
 import { useNavigate, useSearchParams } from 'react-router';
 import { useReducedMotion } from 'motion/react';
 import { IconArrowRight, IconArrowUpRight, IconChevronLeft, IconChevronRight } from '../../../apps/web/app/components/icons';
-import { cover, fmt, kindLabels, multiplier, stamp, store, type RadarEvent } from './data';
+import { cover, fmt, eventLabel, multiplier, stamp, store, type RadarEvent } from './data';
 import { monthDays, moveMonth } from './dates';
 import type { RadarMonth } from '../types';
 import { onCardSpotlightMove } from '../../../apps/web/app/lib/spotlight';
@@ -150,8 +150,8 @@ export function Monthly({ data, renderImage, renderChart }: Props) {
         <div className="monthly-day-events">{dayEvents.map(e => <article className="monthly-event card-spotlight" key={e.id} onMouseMove={onCardSpotlightMove}>
           <button id={`open-${e.id}`} className="monthly-hit" onClick={() => open(e)} aria-label={`展开 ${e.name}，${stamp(e.date)}发现`}><span>查看事件详情</span></button>
           <div className="monthly-art">{renderImage(e)}</div>
-          <div className="monthly-copy"><div className="monthly-meta"><span className={`monthly-kind ${e.kind}`}>{kindLabels[e.kind]}</span><span>{e.genre}</span><span className="monthly-sim">{e.status === "confirmed" ? "规则确认" : "待确认"}</span></div><h3>{e.name}</h3><p>{e.headline}</p><span className="monthly-cause">{e.reason ? '报道背景 · 附来源' : '原因未知 · 保留未知，不做推断'}</span></div>
-          <div className="monthly-stat"><span>当天最高在线记录</span><div><strong>{fmt(e.peak)}</strong><small>人</small><b>{multiplier(e)}</b></div><div className="monthly-chart">{renderChart(e)}</div><span className="monthly-baseline">{e.baseline === null ? '历史记录不足 · 观察中' : `此前 ${e.baselineDays} 日参考 ${fmt(e.baseline)} 人`}</span></div>
+          <div className="monthly-copy"><div className="monthly-meta"><span className={`monthly-kind ${e.kind}`}>{eventLabel(e)}</span><span>{e.genre}</span><span className="monthly-sim">{e.kind === 'launch' ? '榜单核验' : e.status === "confirmed" ? "规则确认" : "待确认"}</span></div><h3>{e.name}</h3><p>{e.headline}</p><span className="monthly-cause">{e.reason ? '报道背景 · 附来源' : '原因未知 · 保留未知，不做推断'}</span></div>
+          <div className="monthly-stat"><span>当天最高在线记录</span><div><strong>{fmt(e.peak)}</strong><small>人</small><b>{multiplier(e)}</b></div><div className="monthly-chart">{renderChart(e)}</div><span className="monthly-baseline">{e.kind === 'launch' ? `首发期最高 ${fmt(e.launch?.peak ?? e.peak)} 人 · ${stamp(e.launch?.peakDay ?? e.date)}` : e.baseline === null ? '历史记录不足 · 观察中' : `此前 ${e.baselineDays} 日参考 ${fmt(e.baseline)} 人`}</span></div>
           <a href={store(e)} className="monthly-steam" target="_blank" rel="noreferrer" aria-label={`在 Steam 查看 ${e.name}`} title="Steam 商店"><IconArrowUpRight size={19}/></a>
         </article>)}</div>
       </section>)}</div>}
