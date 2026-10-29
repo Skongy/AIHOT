@@ -31,6 +31,7 @@ test("legacy official snapshots backfill once; 50k upgrade retains discovery dat
   assert.equal((await evaluateLaunch(id)).added, 0);
   const rows = await sql`SELECT * FROM radar_events WHERE appid = ${id}`;
   assert.equal(rows.length, 1); assert.equal(rows[0].peak, 21000); assert.equal(rows[0].proof.launch.peak, 71000);
+  assert.equal(rows[0].proof.launch.peakObservation.count, 71000); assert.equal(rows[0].proof.launch.peakObservation.source, "steam-chart");
   assert.deepEqual(rows[0].proof.launch.qualification, before.proof.launch.qualification);
   assert.equal(new Date(rows[0].event_day).toISOString().slice(0, 10), day);
   const view = await loadRadarMonth(day.slice(0, 7)); const event = view.events.find(e => e.appid === id)!;

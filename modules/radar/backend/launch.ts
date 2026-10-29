@@ -39,7 +39,8 @@ export async function evaluateLaunch(appid: number) {
     const priorLaunch = existing?.proof.launch;
     const peak = Math.max(highest.count, Number(priorLaunch?.peak ?? 0));
     const launch = { ...(priorLaunch ?? { releaseDay, qualifiedAt: signal!.qualifiedAt, qualification: signal!.qualification,
-      firstObservedAt: signal!.qualification[0].at }), peak, peakDay: highest.count >= Number(priorLaunch?.peak ?? 0) ? dayOf(highest.at) : priorLaunch.peakDay };
+      firstObservedAt: signal!.qualification[0].at }), peak, peakDay: highest.count >= Number(priorLaunch?.peak ?? 0) ? dayOf(highest.at) : priorLaunch.peakDay,
+      peakObservation: highest.count >= Number(priorLaunch?.peak ?? 0) ? highest : priorLaunch.peakObservation };
     const proof = { ...(existing?.proof ?? { rule: LAUNCH_RULE_VERSION, source: "https://api.steampowered.com/ISteamChartsService/GetGamesByConcurrentPlayers/v1/",
       timezone: "Asia/Shanghai", evaluatedAt: new Date().toISOString(), initialThresholdsUncalibrated: true }), launch };
     const inserted = await db`INSERT INTO radar_events (id, appid, event_day, origin, status, kind, peak, baseline, baseline_days, points, rule_version, proof)
