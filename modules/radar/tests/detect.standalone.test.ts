@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { confirmationPoints, dailyPoints, dayOf, detect } from "../backend/detect.ts";
+import { confirmationPoints, dailyPoints, dayOf, detect, detectLaunch } from "../backend/detect.ts";
 import type { RadarPoint } from "../types.ts";
 import { appSchema, officialNewsUrl } from "../backend/steam.ts";
 function series(days = 8, before = 300, after = 6000): RadarPoint[] {
@@ -54,4 +54,25 @@ test("actual Steam legacy announcement links keep their identity on the canonica
   assert.equal(officialNewsUrl("https://steamstore-a.akamaihd.net/elsewhere"), null);
   assert.equal(officialNewsUrl("https://store.steampowered.com.evil.test/news/123"), null);
   assert.equal(officialNewsUrl("javascript:alert(1)"), null);
+});
+
+test("new launch needs independent Top100 observations, no low baseline or publisher exclusion", () => {
+  const first = { at: "2026-10-29T01:00:00Z", count: 110000, rank: 3 };
+  const second = { at: "2026-10-29T01:15:00Z", count: 300000, rank: 2 };
+  assert.equal(detectLaunch([first, second], "2026-10-28", "game")?.date, "2026-10-29");
+  assert.equal(detectLaunch([first, first], "2026-10-28", "game"), null);
+  assert.equal(detectLaunch([first], "2026-10-28", "game"), null);
+  assert.equal(detectLaunch([first, { ...second, at: "2026-10-29T02:00:00Z" }], "2026-10-28", "game"), null);
+  for (const type of ["dlc", "demo", null]) assert.equal(detectLaunch([first, second], "2026-10-28", type), null);
+  for (const date of [null, "2026-02-30", "2026-10-01", "2026-10-30"]) assert.equal(detectLaunch([first, second], date, "game"), null);
+  assert.equal(detectLaunch([first, second].map(p => ({ ...p, rank: 101 })), "2026-10-28", "game"), null);
+  assert.equal(detectLaunch([first, second].map(p => ({ ...p, rank: null, count: 9000 })), "2026-10-28", "game")?.qualification.length, 2);
+  assert.ok(detectLaunch([first, second], "2026-10-16", "game"));
+  assert.equal(detectLaunch([first, second], "2026-10-15", "game"), null);
+});
+
+test("launch confirmation crossing Shanghai midnight retains the first observation day", () => {
+  const points = [{ at: "2026-10-28T15:50:00Z", count: 12000, rank: 99 }, { at: "2026-10-28T16:05:00Z", count: 15000, rank: 95 }];
+  const signal = detectLaunch(points, "2026-10-28", "game")!;
+  assert.equal(signal.date, "2026-10-28"); assert.equal(dayOf(signal.qualifiedAt), "2026-10-29");
 });

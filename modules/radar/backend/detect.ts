@@ -1,4 +1,6 @@
 import type { RadarPoint } from "../types.ts";
+import { isValidDate } from "@aihot/contracts/time";
+export const LAUNCH_RULE_VERSION = "radar-launch-v1";
 export const RULE_VERSION = "radar-v1";
 export function dayOf(at: string | Date): string {
   return new Date(new Date(at).getTime() + 8 * 3600000).toISOString().slice(0, 10);
@@ -9,6 +11,24 @@ export function previousDay(day: string, offset: number): string {
 export function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b), mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/** Input is restricted to official Top 100 snapshots, including legacy snapshots with no saved rank. */
+export interface LaunchPoint extends RadarPoint { rank: number | null }
+export function detectLaunch(points: LaunchPoint[], releaseDay: string | null, appType: string | null) {
+  if (appType !== "game" || !releaseDay || !isValidDate(releaseDay)) return null;
+  const lastDay = previousDay(releaseDay, -13); // Fourteen calendar days, counting release day as day one.
+  const snapshots = [...new Map(points.filter(p => Number.isSafeInteger(p.count) && p.count > 0 && Number.isFinite(Date.parse(p.at))
+    && (p.rank === null || (Number.isInteger(p.rank) && p.rank >= 1 && p.rank <= 100))
+    && dayOf(p.at) >= releaseDay && dayOf(p.at) <= lastDay).map(p => [p.at, p])).values()].sort((a, b) => a.at.localeCompare(b.at));
+  let start = 0;
+  for (let i = 1; i < snapshots.length; i++) {
+    if (Date.parse(snapshots[i].at) - Date.parse(snapshots[i - 1].at) > 30 * 60000) start = i;
+    if (Date.parse(snapshots[i].at) - Date.parse(snapshots[start].at) >= 15 * 60000) {
+      return { date: dayOf(snapshots[start].at), qualifiedAt: snapshots[i].at, qualification: snapshots.slice(start, i + 1) };
+    }
+  }
+  return null;
 }
 export interface Daily { date: string; peak: number; hours: number; points: RadarPoint[] }
 export function dailyPoints(points: RadarPoint[]): Daily[] {
