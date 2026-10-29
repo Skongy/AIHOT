@@ -65,7 +65,7 @@ export async function metadata(appid: number) {
 }
 export async function evaluate(appid: number, origin: "historical" | "live", since = "2026-10-01"): Promise<number> {
   const [game] = await sql`SELECT * FROM radar_games WHERE appid = ${appid}`;
-  if (!game) return 0;
+  if (!game || (game.app_type && game.app_type !== "game")) return 0;
   const launch = await evaluateLaunch(appid);
   if (launch.handled) return launch.added;
   const rows = await sql`SELECT observed_at, max(count)::int AS count FROM radar_samples WHERE appid = ${appid} AND observed_at > now() - interval '40 days' GROUP BY observed_at ORDER BY observed_at`;

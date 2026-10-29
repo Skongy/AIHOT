@@ -6,7 +6,7 @@ import { sql, closeDb } from "@aihot/backend/db";
 import { config } from "@aihot/backend/config";
 import { loadRadarMonth } from "@aihot/backend/publication/radar";
 import { beijingDate, beijingMidnight, addDays } from "@aihot/contracts/time";
-import { remember, insertPoints, live, metadata } from "../backend/collect.ts";
+import { remember, insertPoints, live, metadata, evaluate } from "../backend/collect.ts";
 import { evaluateLaunch } from "../backend/launch.ts";
 const { MockAgent, getGlobalDispatcher, setGlobalDispatcher } = createRequire(new URL("../../../packages/backend/package.json", import.meta.url))("undici");
 const previousDispatcher = getGlobalDispatcher(), mock = new MockAgent(); mock.disableNetConnect(); setGlobalDispatcher(mock);
@@ -45,6 +45,10 @@ test("off-chart counts, DLCs and cached duplicates cannot fabricate new launches
   }
   await game(999100004); await insertPoints(999100004, [point(0, 90000), point(0, 90000)], "steam-chart");
   assert.equal((await evaluateLaunch(999100004)).added, 0);
+  const dlc = 999100011; await game(dlc, "dlc");
+  const old = start - 7 * 86400000;
+  await insertPoints(dlc, Array.from({ length: 8 * 24 }, (_, h) => ({ at: new Date(old + h * 3600000).toISOString(), count: h < 7 * 24 ? 100 : 10000 })), "steamdata-hourly");
+  assert.equal(await evaluate(dlc, "historical"), 0, "a known DLC must not fall through into the old growth rule");
 });
 
 test("live collection enriches a high-starting new game before evaluation and saves actual ranks", async () => {
