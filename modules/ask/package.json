@@ -11,8 +11,8 @@
     "@aihot/backend": "*",
     "@aihot/contracts": "*",
     "@aihot/site": "*",
-    "fastify": "5.12.5",
-    "zod": "4.6.5"
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
   },
   "peerDependencies": {
     "react": "*",

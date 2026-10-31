@@ -4,7 +4,7 @@ import { sql } from "@aihot/backend/db";
 import { askRunQueue } from "../../server-queue.ts";
 import {
   createSession, createTask, findTaskByClientRequest, getSession, getTask, hasActiveTask,
-  listEvidence, listEventsAfter, listMessages, markTaskEnqueueFailed, maxEventSeq,
+  listEvidence, listEventsAfter, listMessages, maxEventSeq,
   redactEventPayload, redactedAnswer, requestCancel,
 } from "../db/store.ts";
 import { sendAskProblem } from "./problem.ts";
@@ -68,39 +68,44 @@ export function registerAskRoutes(app: FastifyInstance) {
 
     if (!config.modelCallsEnabled) return sendAskProblem(req, reply, { status: 503, code: "service_disabled", detail: "问答暂未开放，仍可浏览站内资讯与历史对话。" });
 
-    const body = (req.body ?? {}) as { message?: string; clientRequestId?: string; mode?: unknown };
-    const existing = body.clientRequestId ? await findTaskByClientRequest(sessionId, body.clientRequestId.trim()) : null;
+    const body = (req.body ?? {}) as { message?: unknown; clientRequestId?: unknown; mode?: unknown };
     const decision = decideAskPost({
       message: body.message ?? "",
       clientRequestId: body.clientRequestId ?? "",
       mode: body.mode,
-      existing,
-      active: existing ? false : await hasActiveTask(sessionId),
+      existing: null,
+      active: false,
     });
     if (decision.kind === "problem") return sendAskProblem(req, reply, decision);
-    if (decision.kind === "replay") {
-      return reply.header("Cache-Control", "no-store").send({ taskId: decision.taskId, status: decision.status, resumeFromSeq: 0 });
-    }
+    if (decision.kind !== "create") return;
 
-    let task;
+    let result;
     try {
-      task = await sql.begin(async (tx) => {
+      result = await sql.begin(async (tx) => {
+        // Serialize creation per session: retries must not fail the winner's queued task,
+        // and two different questions must not both pass the active-task check.
+        const [locked] = await tx`SELECT id FROM ask_sessions WHERE id = ${sessionId}::uuid AND expires_at > now() FOR UPDATE`;
+        if (!locked) return { kind: "problem" as const, status: 404, code: "session_not_found", detail: "会话不存在或已过期" };
+        const existing = await findTaskByClientRequest(sessionId, decision.clientRequestId, tx);
+        const current = decideAskPost({ ...decision, existing, active: existing ? false : await hasActiveTask(sessionId, undefined, tx) });
+        if (current.kind !== "create") return current;
         const t = await createTask({ sessionId, clientRequestId: decision.clientRequestId, message: decision.message, mode: decision.mode }, tx);
         // ask.run uses policy "short": created jobs that share a singleton key collapse to one row.
         // An empty key made two sessions enqueue as the same job, and the loser stayed queued with no job.
         const jobId = await enqueueOn(askRunQueue, { taskId: t.id }, { singletonKey: t.id }, tx);
         if (!jobId) throw new Error("ask.run enqueue returned no job");
-        return t;
+        return { kind: "created" as const, task: t };
       });
     } catch (e) {
-      // Compensation if create somehow left a queued row without job.
-      const orphan = await findTaskByClientRequest(sessionId, decision.clientRequestId);
-      if (orphan?.status === "queued") await markTaskEnqueueFailed(orphan.id, String(e).slice(0, 300));
+      // Task, message and queue entry roll back together. Never mark a concurrent winner failed.
+      req.log.error({ err: e }, "ask task creation failed");
       return sendAskProblem(req, reply, { status: 500, code: "internal_error", detail: "创建任务失败" });
     }
+    if (result.kind === "problem") return sendAskProblem(req, reply, result);
+    if (result.kind === "replay") return reply.header("Cache-Control", "no-store").send({ taskId: result.taskId, status: result.status, resumeFromSeq: 0 });
 
     return reply.header("Cache-Control", "no-store").send({
-      taskId: task.id,
+      taskId: result.task.id,
       status: "queued",
       resumeFromSeq: 0,
     });

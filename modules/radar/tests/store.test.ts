@@ -2,6 +2,7 @@ import "../../../tests/setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { sql, closeDb } from "@aihot/backend/db";
+import { upsertMaterial } from "@aihot/backend/content/materials";
 import { installModules } from "@aihot/backend/modules";
 import { loadRadarMonth } from "@aihot/backend/publication/radar";
 import { ingestHistory, insertPoints, remember } from "../backend/collect.ts";
@@ -50,4 +51,30 @@ test("radar REST validates month and only reads existing rows", async () => {
     assert.equal(result.statusCode, 200); assert.equal(result.json().month, "2026-10");
     assert.equal(Array.isArray(result.json().coverage), true);
   } finally { await app.close(); installModules([]); }
+});
+
+test("batch citation checks keep public sources but redact withdrawn and unreleased explanations", async () => {
+  const source = 'radar-evidence-fixture', day = new Date().toISOString().slice(0, 10);
+  await sql`INSERT INTO sources (id,name,kind,tier) VALUES (${source},'Radar evidence','rss','T1')`;
+  const ids: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const { articleId } = await upsertMaterial({ sourceId: source, url: `https://example.org/radar-citation-${i}`, title: '测试游戏报道', publishedAt: new Date(), via: 'fetch' });
+    await sql`INSERT INTO publications (article_id,source_id,title,url,channel,discovered_at,timeline_at,sort_at,eligible,visibility,selected,visible_after)
+      VALUES (${articleId},${source},'测试游戏报道','https://example.org/report','news',now(),now(),now(),true,${i === 1 ? 'withdrawn' : 'public'},${i === 2},now()+interval '1 day')`;
+    ids.push(articleId);
+  }
+  for (let i = 0; i < 3; i++) {
+    const appid = 999300001 + i;
+    await remember({ app_id: appid, name: `Evidence ${i}` }, 'test');
+    await sql`INSERT INTO radar_events (id,appid,event_day,origin,status,kind,peak,baseline_days,points,rule_version,proof,reason,evidence)
+      VALUES (${`${appid}-${day}`},${appid},${day},'live','suspected','watch',6000,0,'[]','test',${sql.json({ source: 'https://api.steampowered.com/' })},'待核验的原因',
+        ${sql.json([{ articleId: ids[0], label: '公开报道', url: 'https://example.org/public' }, ...(i ? [{ articleId: ids[i], label: '受限报道', url: 'https://example.org/restricted' }] : [])])})`;
+  }
+  const events = (await loadRadarMonth(day.slice(0, 7))).events;
+  for (let i = 0; i < 3; i++) {
+    const event = events.find(e => e.appid === 999300001 + i)!;
+    assert.equal(event.reason, i === 0 ? '待核验的原因' : null);
+    assert.equal(event.evidence.filter(e => e.articleId).length, 1);
+    assert.equal(event.evidence[1].articleId, ids[0]);
+  }
 });
