@@ -10,8 +10,10 @@ import { publishArticle } from "../publication/publish.ts";
 export async function mergeStoryInto(fromId: number, intoId: number, reason: string, actor: string): Promise<{ moved: number } | null> {
   if (fromId === intoId) throw new Error("cannot merge a story into itself");
   const articles = await sql.begin(async (tx) => {
-    const [from] = await tx<{ public_id: string; merged_into: number | null; origin: string }[]>`SELECT public_id, merged_into, origin FROM stories WHERE id = ${fromId} FOR UPDATE`;
-    const [into] = await tx<{ merged_into: number | null; origin: string }[]>`SELECT merged_into, origin FROM stories WHERE id = ${intoId} FOR UPDATE`;
+    // Admin merges can oppose a grouping merge; both must lock stories in the same order.
+    const locked = await tx<{ id: number; public_id: string; merged_into: number | null; origin: string }[]>`
+      SELECT id, public_id, merged_into, origin FROM stories WHERE id IN (${fromId}, ${intoId}) ORDER BY id FOR UPDATE`;
+    const from = locked.find(row => row.id === fromId), into = locked.find(row => row.id === intoId);
     if (!from || !into || from.merged_into || into.merged_into) return null;
     if (actor === "grouping" && (from.origin === "manual" || into.origin === "manual")) return null;
     await tx`UPDATE facts SET story_id = ${intoId}, updated_at = now() WHERE story_id = ${fromId}`;

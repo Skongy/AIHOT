@@ -17,19 +17,19 @@ export function parseAskMode(value: unknown): AskRequestMode | null {
 }
 
 export function decideAskPost(input: {
-  message: string;
-  clientRequestId: string;
+  message: unknown;
+  clientRequestId: unknown;
   mode: unknown;
   existing: { id: string; status: string } | null;
   active: boolean;
 }): AskPostDecision {
-  const clientRequestId = input.clientRequestId.trim();
+  const clientRequestId = typeof input.clientRequestId === "string" ? input.clientRequestId.trim() : "";
   if (!clientRequestId || !UUID_RE.test(clientRequestId)) {
     return { kind: "problem", status: 400, code: "invalid_request", detail: "clientRequestId 必须是 uuid" };
   }
   const mode = parseAskMode(input.mode);
   if (!mode) return { kind: "problem", status: 400, code: "invalid_request", detail: "mode 只能是 normal 或 deep" };
-  const message = input.message.trim();
+  const message = typeof input.message === "string" ? input.message.trim() : "";
   const len = [...message].length;
   if (len < 1 || len > 2000) {
     return { kind: "problem", status: 400, code: "invalid_request", detail: "message 长度须为 1–2000 字" };

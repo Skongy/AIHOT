@@ -37,15 +37,15 @@ export async function getSession(sessionId: string) {
   return row ?? null;
 }
 
-export async function findTaskByClientRequest(sessionId: string, clientRequestId: string) {
-  const [row] = await sql<TaskRow[]>`
+export async function findTaskByClientRequest(sessionId: string, clientRequestId: string, db: Db = sql) {
+  const [row] = await db<TaskRow[]>`
     SELECT ${taskCols} FROM ask_tasks
     WHERE session_id = ${sessionId}::uuid AND client_request_id = ${clientRequestId}`;
   return row ?? null;
 }
 
-export async function hasActiveTask(sessionId: string, excludeId?: string): Promise<boolean> {
-  const [row] = await sql<{ n: number }[]>`
+export async function hasActiveTask(sessionId: string, excludeId?: string, db: Db = sql): Promise<boolean> {
+  const [row] = await db<{ n: number }[]>`
     SELECT count(*)::int AS n FROM ask_tasks
     WHERE session_id = ${sessionId}::uuid AND status IN ('queued','running')
       AND (${excludeId ?? null}::uuid IS NULL OR id <> ${excludeId ?? null}::uuid)`;
@@ -102,12 +102,6 @@ export async function createTask(input: {
     INSERT INTO ask_messages (id, session_id, role, content, task_id)
     VALUES (${msgId}::uuid, ${input.sessionId}::uuid, 'user', ${input.message}, ${id}::uuid)`;
   return task!;
-}
-
-export async function markTaskEnqueueFailed(taskId: string, message: string): Promise<void> {
-  await sql`
-    UPDATE ask_tasks SET status = 'failed', error_code = 'enqueue_failed', error_message = ${message},
-      finished_at = now() WHERE id = ${taskId}::uuid AND status = 'queued'`;
 }
 
 export async function getTask(taskId: string): Promise<TaskRow | null> {

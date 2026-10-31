@@ -24,10 +24,12 @@ export async function loadRadarMonth(month: string): Promise<RadarMonth> {
     WHERE e.event_day >= ${month + "-01"}::date AND e.event_day < ${month + "-01"}::date + interval '1 month'
     ORDER BY e.event_day DESC, e.peak DESC LIMIT 300`;
   const events: RadarEvent[] = [];
+  const articleIds = [...new Set(rows.flatMap(row => (row.evidence as RadarEvidence[]).flatMap(e => e.articleId ? [e.articleId] : [])))];
+  const now = new Date();
+  // Recheck all cited reports once, rather than issuing one visibility query per event.
+  const visible = articleIds.length ? new Set((await sql`SELECT p.article_id FROM publications p WHERE p.article_id = ANY(${articleIds}) AND ${listedCondition(now)}`).map(r => r.article_id)) : new Set<string>();
   for (const row of rows) {
     const evidence = row.evidence as RadarEvidence[];
-    const articleIds = evidence.flatMap(e => e.articleId ? [e.articleId] : []);
-    const visible = articleIds.length ? new Set((await sql`SELECT p.article_id FROM publications p WHERE p.article_id = ANY(${articleIds}) AND ${listedCondition(new Date())}`).map(r => r.article_id)) : new Set<string>();
     const current = evidence.filter(e => !e.articleId || visible.has(e.articleId));
     const date = new Date(row.event_day).toISOString().slice(0, 10);
     events.push({ id: row.id, appid: row.appid, name: row.name, zh: row.name, date, genre: row.origin === "historical" ? "历史回溯" : "持续监控",

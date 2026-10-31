@@ -5,7 +5,7 @@ import { closeDb, sql } from "@aihot/backend/db";
 import { installModules } from "@aihot/backend/modules";
 import askServer from "../server.ts";
 import {
-  createSession, createTask, findTaskByClientRequest, getTask, hasActiveTask, markTaskEnqueueFailed,
+  createSession, createTask, findTaskByClientRequest, getTask, hasActiveTask,
   appendEvent, maxEventSeq, listEventsAfter, finishTask, claimTask, redactedAnswer, markInvalidated,
   insertEvidence, requestCancel, retentionCleanup,
 } from "../src/db/store.ts";
@@ -52,16 +52,6 @@ test("session create and message idempotency", async () => {
   const again = await findTaskByClientRequest(sessionId, clientRequestId);
   assert.equal(again!.id, t1.id);
   assert.equal(await hasActiveTask(sessionId), true);
-});
-
-test("enqueue failure compensation clears queued slot", async () => {
-  const { sessionId } = await createSession();
-  const t = await createTask({ sessionId, clientRequestId: newUuid(), message: "q" });
-  await markTaskEnqueueFailed(t.id, "boom");
-  const cur = await getTask(t.id);
-  assert.equal(cur!.status, "failed");
-  assert.equal(cur!.error_code, "enqueue_failed");
-  assert.equal(await hasActiveTask(sessionId), false);
 });
 
 test("snapshotSeq tracks max event seq", async () => {

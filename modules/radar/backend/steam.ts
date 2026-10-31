@@ -1,5 +1,6 @@
 import { sql } from "@aihot/backend/db";
 import { guardedFetch } from "@aihot/backend/lib/http-fetch";
+import { parseRetryAfterSeconds } from "@aihot/backend/providers/receipts";
 import { z } from "zod";
 
 const allowedHosts = new Set(["api.steampowered.com", "store.steampowered.com", "api.steamdata.dev"]);
@@ -15,15 +16,17 @@ export async function publicJson(url: string): Promise<unknown> {
     await tx`SELECT pg_advisory_xact_lock(726138012)`;
     const [budget] = await tx`SELECT count(*)::int AS n FROM radar_requests WHERE at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
     if (budget.n >= 8000) throw new Error("Radar daily HTTP budget exhausted");
-    const recent = await tx`SELECT status, error, retry_at FROM radar_requests WHERE host = ${target.hostname} AND at > now() - interval '15 minutes' ORDER BY at DESC LIMIT 3`;
-    if (recent.some(r => r.retry_at && new Date(r.retry_at).getTime() > Date.now()) || (recent.length === 3 && recent.every(r => r.error || (r.status && r.status >= 500)))) throw new Error("Radar upstream cooling down");
+    const [limited] = await tx`SELECT 1 FROM radar_requests WHERE host = ${target.hostname} AND retry_at > now() LIMIT 1`;
+    const recent = await tx`SELECT status, error FROM radar_requests WHERE host = ${target.hostname} AND at > now() - interval '15 minutes' ORDER BY at DESC, id DESC LIMIT 3`;
+    // Missing app histories are normal 404s, not a failure of the whole upstream host.
+    if (limited || (recent.length === 3 && recent.every(r => (r.status !== null && r.status >= 500) || (r.error && (r.status === null || r.status === 200))))) throw new Error("Radar upstream cooling down");
     const [row] = await tx`INSERT INTO radar_requests (host, path) VALUES (${target.hostname}, ${target.pathname}) RETURNING id`;
     return row.id;
   });
   try {
     const response = await guardedFetch(url, { timeoutMs: 15000, maxBytes: 2 * 1024 * 1024, maxRedirects: 2 });
-    const wait = response.headers.get("retry-after");
-    const retryAt = response.status === 429 ? new Date(Math.max(Date.now() + 60000, /^\d+$/.test(wait ?? "") ? Date.now() + Number(wait) * 1000 : Date.parse(wait ?? "") || Date.now() + 3600000)) : null;
+    const wait = parseRetryAfterSeconds(response.headers.get("retry-after")) ?? 3600;
+    const retryAt = response.status === 429 ? new Date(Date.now() + Math.max(60, wait) * 1000) : null;
     await sql`UPDATE radar_requests SET status = ${response.status}, retry_at = ${retryAt}, finished_at = now() WHERE id = ${id}`;
     if (response.status !== 200) throw new RadarHttpError(target.hostname, response.status);
     return JSON.parse(response.text());
