@@ -1,40 +1,44 @@
-# Parallel GitHub-hosted CI jobs: backend tests against a fresh PostgreSQL, browser tests,
-# and a Docker Compose integration smoke check. The entire Check workflow gates production Deploy.
-# Only GitHub-owned actions, pinned to a full commit SHA.
+# Official GitHub actions, pinned to full commits. Complete Check still gates Deploy.
 name: Check
-
 on:
   push:
     branches: [main]
+    paths-ignore: ['README', 'README.md', 'README.*.md', 'README.txt', 'README.rst', 'docs/**', '.github/ISSUE_TEMPLATE/**', '.github/pull_request_template.md']
+  # Workflow-level PR path filters would leave required checks pending.
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
+  actions: read # Browser preparation overlaps the producer, then checks its exact artifact readiness.
 concurrency:
-  group: check-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
+  # A shared main group also discards older pending runs, even with cancellation disabled.
+  group: check-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  SITE_URL: http://127.0.0.1:3000
+  API_BASE_URL: http://127.0.0.1:3001
+  SESSION_SECRET: ci-session-secret-0123456789abcdef
+  IMG_PROXY_SIGN_SECRET: ci-img-secret-0123456789abcdef
 jobs:
-  check:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: aihot_ci
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 30
-    env:
-      DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/aihot_ci
-      SITE_URL: http://127.0.0.1:3000
-      API_BASE_URL: http://127.0.0.1:3001
-      SESSION_SECRET: ci-session-secret-0123456789abcdef
-      IMG_PROXY_SIGN_SECRET: ci-img-secret-0123456789abcdef
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: scope
+        # Runner's Node 22+ supports native type stripping; this script imports only Node builtins.
+        run: node scripts/ci/changes.ts
+
+  verify:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,92 +46,149 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          package-manager-cache: false
-
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci --no-audit --no-fund
       - name: Online migration safety
-        # Compare the entire push (or PR) with its base; comparing a push with itself misses unsafe migrations.
         env:
           MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || format('{0}^', github.sha) }}
         run: node scripts/check-migrations.ts --base "$MIGRATION_BASE"
-      - name: PostgreSQL backup tools
-        # 恢复测试需要与 PostgreSQL 17 服务匹配的客户端，不能依赖 runner 的默认版本。
-        run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          . /etc/os-release
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client-17
-          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-          /usr/lib/postgresql/17/bin/pg_dump --version
-          /usr/lib/postgresql/17/bin/pg_restore --version
       - name: Typecheck
         run: npm run typecheck
       - name: Build web
         run: npm run build -w @aihot/web
+      - name: Share the exact production build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          # A failed-job rerun may reuse the successful build from this same immutable run/SHA.
+          name: web-${{ github.run_id }}
+          overwrite: true
+          path: apps/web/build/
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
 
-      # Each test file runs on its own copy of aihot_ci (tests/databases.ts), which the run migrates and
-      # leaves empty; the smoke check then reads that empty database.
-      - name: Backend tests
-        run: npm test
-      - name: Smoke check of the built site
-        # The site itself runs with collection and model calls off (the tests above use local stubs).
-        env:
-          COLLECT_ENABLED: "false"
-          MODEL_CALLS_ENABLED: "false"
-        run: |
-          node apps/api/src/main.ts > "$RUNNER_TEMP/api.log" 2>&1 &
-          (cd apps/web && NODE_ENV=production exec node server.ts) > "$RUNNER_TEMP/web.log" 2>&1 &
-          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 1; done
-          node scripts/smoke.ts --base http://127.0.0.1:3000
-          node scripts/mcp-check.ts http://127.0.0.1:3000/api/mcp
-      - name: Server logs
-        if: failure()
-        run: tail -n 60 "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/web.log" 2>/dev/null || true
-
-  # Browser tests use a dedicated runner; keep them parallel to backend tests.
-  # Check remains the deploy gate: the whole workflow must succeed, including this job.
-  web:
+  backend:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: aihot_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 30
     env:
-      SITE_URL: http://127.0.0.1:3000
-      API_BASE_URL: http://127.0.0.1:3001
-      SESSION_SECRET: ci-session-secret-0123456789abcdef
-      IMG_PROXY_SIGN_SECRET: ci-img-secret-0123456789abcdef
+      DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/aihot_ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install
         run: npm ci --no-audit --no-fund
-      - name: Build web
-        run: npm run build -w @aihot/web
-      - name: Browser test engines
-        run: npx playwright install --with-deps chromium webkit
-      - name: Web tests
-        run: node --test apps/web/tests/*.test.ts
+      - name: PostgreSQL backup tools
+        run: |
+          set -euo pipefail
+          if [ ! -x /usr/lib/postgresql/17/bin/pg_dump ] || [ ! -x /usr/lib/postgresql/17/bin/pg_restore ]; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            . /etc/os-release
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client-17
+          fi
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_restore --version
+      - name: Backend tests
+        # Node options must precede file patterns; npm test -- would append them after the globs.
+        run: node --test-global-setup=tests/databases.ts --import ./tests/databases.ts --test --test-concurrency=6 --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 "tests/*.test.ts" "modules/*/tests/*.test.ts"
 
-  docker:
+  browser:
+    # Prepare browsers in parallel with verify; only the artifact read depends on its build.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      options: --ipc=host
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Wait for this run's production build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NAME: web-${{ github.run_id }}
+        run: |
+          node - <<'NODE'
+          const api = async path => {
+            const r = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${path}`, {
+              headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000)
+            });
+            if (!r.ok) throw new Error(`Build readiness HTTP ${r.status}`);
+            return r.json();
+          };
+          let ready = false;
+          for (let i = 0; i < 60; i++) {
+            const { artifacts } = await api(`actions/runs/${process.env.GITHUB_RUN_ID}/artifacts`);
+            if (artifacts.some(a => a.name === process.env.BUILD_NAME && !a.expired)) { ready = true; break; }
+            const { jobs } = await api(`actions/runs/${process.env.GITHUB_RUN_ID}/jobs`);
+            if (jobs.some(j => j.name === 'verify' && ['failure','cancelled','skipped','timed_out'].includes(j.conclusion))) throw new Error('Production build failed');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          if (!ready) throw new Error('Production build artifact did not arrive');
+          NODE
+      - name: Restore the production build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: web-${{ github.run_id }}
+          path: apps/web/build/
+      - name: Web tests
+        run: node --test --test-shard=${{ matrix.shard }}/3 apps/web/tests/*.test.ts
+
+  docker:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install MCP check dependencies
+        run: npm ci --no-audit --no-fund
       - name: Configure a throwaway site
         run: |
           node scripts/init-env.ts --llm-key ci-not-a-real-key
-          # No outside calls in CI: nothing is collected and no model is asked.
           sed -i 's/^COLLECT_ENABLED=.*/COLLECT_ENABLED=false/; s/^MODEL_CALLS_ENABLED=.*/MODEL_CALLS_ENABLED=false/' .env
-          # The smoke check reaches the site by its compose service name.
-          echo "MCP_ALLOWED_HOSTS=web" >> .env
+          echo "MCP_ALLOWED_HOSTS=web,127.0.0.1" >> .env
       - name: Build and start with docker compose
         run: docker compose up -d --build
       - name: Smoke check
@@ -135,6 +196,7 @@ jobs:
           for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 2; done
           docker compose ps
           docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
+          node scripts/mcp-check.ts http://127.0.0.1:3000/api/mcp
           docker compose exec -T db psql -U aihot -d aihot -Atc "select count(*) from sources" | grep -qx "$(node -p "require('./industry/sources.json').sources.length")"
       - name: Logs
         if: failure()
@@ -142,3 +204,39 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose down -v
+
+  # Preserve stable status names, including documentation-only PRs.
+  web:
+    if: always()
+    needs: [changes, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all browser shards or an explicit documentation skip
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node - <<'NODE'
+          const r = JSON.parse(process.env.RESULTS);
+          const expected = r.changes.outputs.code === 'true' ? 'success' : 'skipped';
+          if (r.changes.result !== 'success' || r.browser.result !== expected) process.exit(1);
+          console.log(expected === 'skipped' ? 'Documentation only; browser checks not needed.' : 'All browser shards passed.');
+          NODE
+
+  check:
+    if: always()
+    needs: [changes, verify, backend, browser, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node - <<'NODE'
+          const r = JSON.parse(process.env.RESULTS);
+          if (r.changes.result !== 'success') process.exit(1);
+          const expected = r.changes.outputs.code === 'true' ? 'success' : 'skipped';
+          for (const name of ['verify', 'backend', 'browser', 'docker']) if (r[name].result !== expected) process.exit(1);
+          console.log(expected === 'skipped' ? 'Documentation only; required checks completed.' : 'All validations passed.');
+          NODE

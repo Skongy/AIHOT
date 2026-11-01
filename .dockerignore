@@ -1,4 +1,6 @@
 node_modules
+**/node_modules
+.taste-skill
 apps/web/node_modules
 apps/web/build
 apps/web/.react-router
