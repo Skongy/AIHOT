@@ -22,7 +22,7 @@
 
 - 后端原生 Node 分片三台 runner，保留全局建库、隔离副本、120s 用例超时和全部测试模式；浏览器三片，继续运行 Chromium、WebKit、双主题和响应式测试。`fail-fast: false`，一片失败不取消其他片的验证。
 - Node 参数必须放在文件模式之前；把 `--test-shard` 追加到原 npm test 脚本末尾会被忽略。
-- setup-node 内建 npm 缓存，依赖锁文件做键；不缓存 node_modules。Playwright 浏览器按实际版本和操作系统缓存；系统库仍安装核验，缓存命中不能跳过必需 OS 依赖。
+- setup-node 内建 npm 缓存，依赖锁文件做键；不缓存 node_modules。对比试验使用匹配锁文件版本的官方 Playwright 镜像，镜像已经包含 Chromium、WebKit 和系统库；实际浏览器测试继续验证所有依赖。版本一致性由测试断言，不以跳过宿主校验代替准备。
 - 类型、迁移和前端构建只在 verify 跑一次；同一构建通过一天有效期 artifact 传给浏览器。Docker 仍从源码构建生产镜像，这是包装与运行时校验，不能用前端 artifact 代替。
 - 实测发现浏览器准备串在 verify 后会延迟约 22 秒。第二轮调整为同时准备，只有读取产物时才等待同一 run 的构建；产物缺失或构建失败仍失败，汇总门禁始终要求 verify 成功。没有重复构建来换取并行。产物键按 run_id 固定，失败 job 重跑可复用同一不可变提交的成功产物，重跑 verify 则覆盖，避免按 run_attempt 命名导致单独重跑浏览器找不到产物。
 - 完整冒烟和 MCP 客户端检查集中在 Compose 集成 job。MCP SDK 客户端为开发依赖，必须在 runner 调用生产服务，而不是在已 npm prune 的镜像里调用。

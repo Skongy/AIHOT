@@ -42,4 +42,6 @@ test('main runs cannot coalesce and all original validation commands remain pres
   assert.match(workflow, /format\('run-\{0\}', github.run_id\)/);
   for (const command of ['--test-global-setup=tests/databases.ts', '--test-shard=${{ matrix.shard }}/3 "tests/*.test.ts" "modules/*/tests/*.test.ts"', 'node --test --test-shard=', 'npm run typecheck', 'scripts/check-migrations.ts', 'scripts/mcp-check.ts', 'scripts/smoke.ts', 'docker compose up -d --build']) assert.ok(workflow.includes(command), command);
   assert.match(workflow, /check:\n    if: always\(\)/);
+  const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  assert.ok(workflow.includes(`mcr.microsoft.com/playwright:v${lock.packages['node_modules/@playwright/test'].version}-noble`), 'browser image must match the locked Playwright version');
 });
