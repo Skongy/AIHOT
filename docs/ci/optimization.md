@@ -20,10 +20,11 @@
 
 ## 调整
 
-- 后端原生 Node 分片三台 runner，保留全局建库、隔离副本、120s 用例超时和全部测试模式；浏览器两片，继续运行 Chromium、WebKit、双主题和响应式测试。`fail-fast: false`，一片失败不取消其他片的验证。
+- 后端原生 Node 分片三台 runner，保留全局建库、隔离副本、120s 用例超时和全部测试模式；浏览器三片，继续运行 Chromium、WebKit、双主题和响应式测试。`fail-fast: false`，一片失败不取消其他片的验证。
 - Node 参数必须放在文件模式之前；把 `--test-shard` 追加到原 npm test 脚本末尾会被忽略。
 - setup-node 内建 npm 缓存，依赖锁文件做键；不缓存 node_modules。Playwright 浏览器按实际版本和操作系统缓存；系统库仍安装核验，缓存命中不能跳过必需 OS 依赖。
 - 类型、迁移和前端构建只在 verify 跑一次；同一构建通过一天有效期 artifact 传给浏览器。Docker 仍从源码构建生产镜像，这是包装与运行时校验，不能用前端 artifact 代替。
+- 实测发现浏览器准备串在 verify 后会延迟约 22 秒。第二轮调整为同时准备，只有读取产物时才等待同一 run/attempt 的构建；产物缺失或构建失败仍失败，汇总门禁始终要求 verify 成功。没有重复构建来换取并行。
 - 完整冒烟和 MCP 客户端检查集中在 Compose 集成 job。MCP SDK 客户端为开发依赖，必须在 runner 调用生产服务，而不是在已 npm prune 的镜像里调用。
 - PostgreSQL 17 客户端优先使用 runner 已有预编译工具，缺少时才从官方 apt 安装，仍检查 dump/restore 版本。
 - PR 使用 PR 编号并发组并取消旧运行；main/手动运行使用独立 run_id，避免一个 main 的 pending 运行被另一个 pending 覆盖。
