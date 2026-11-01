@@ -1,4 +1,4 @@
-# Official GitHub/Docker actions, pinned to full commits. Complete Check still gates Deploy.
+# Official GitHub actions, pinned to full commits. Complete Check still gates Deploy.
 name: Check
 on:
   push:
@@ -30,7 +30,8 @@ jobs:
           fetch-depth: 0
       - name: Classify changed paths
         id: scope
-        run: node scripts/ci/changes.mjs
+        # Runner's Node 22+ supports native type stripping; this script imports only Node builtins.
+        run: node scripts/ci/changes.ts
 
   verify:
     needs: changes
@@ -164,30 +165,23 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          package-manager-cache: false # No host npm install: dependencies are image layers.
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install MCP check dependencies
+        run: npm ci --no-audit --no-fund
       - name: Configure a throwaway site
         run: |
           node scripts/init-env.ts --llm-key ci-not-a-real-key
           sed -i 's/^COLLECT_ENABLED=.*/COLLECT_ENABLED=false/; s/^MODEL_CALLS_ENABLED=.*/MODEL_CALLS_ENABLED=false/' .env
-          echo "MCP_ALLOWED_HOSTS=web" >> .env
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: Build the production image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: .
-          load: true
-          tags: aihot-app:latest
-          cache-from: type=gha,scope=gamehot-linux-amd64
-          cache-to: type=gha,scope=gamehot-linux-amd64,mode=max
-      - name: Start with docker compose
-        run: docker compose up -d --no-build
+          echo "MCP_ALLOWED_HOSTS=web,127.0.0.1" >> .env
+      - name: Build and start with docker compose
+        run: docker compose up -d --build
       - name: Smoke check
         run: |
           for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null && break; sleep 2; done
           docker compose ps
           docker compose run --rm --no-deps --entrypoint node setup scripts/smoke.ts --base http://web:3000
-          docker compose exec -T web node scripts/mcp-check.ts http://web:3000/api/mcp
+          node scripts/mcp-check.ts http://127.0.0.1:3000/api/mcp
           docker compose exec -T db psql -U aihot -d aihot -Atc "select count(*) from sources" | grep -qx "$(node -p "require('./industry/sources.json').sources.length")"
       - name: Logs
         if: failure()
