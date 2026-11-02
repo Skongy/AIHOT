@@ -6,7 +6,7 @@ import { chromium, expect, type Browser } from "@playwright/test";
 import { startWebServer, type WebServer } from "./web-server.ts";
 
 let web: WebServer, browser: Browser;
-const reports: Array<{ path: string; referrer: string; cookie?: string }> = [];
+const reports: Array<{ path: string; referrer: string; cookie?: string; visitor?: string }> = [];
 let reads = 0;
 const api = createServer(async (req, res) => {
   const url = new URL(req.url!, "http://api.local");
@@ -81,13 +81,19 @@ test("page tracking captures real navigation once and omits query strings and co
     await page.goto(web.origin + "/privacy?token=never-store", { referer: "https://example.com/private?token=never-store" });
     await expect.poll(() => reports.length).toBe(before + 1);
     assert.equal(reports.at(-1)!.path, "/privacy");
+    const visitor=reports.at(-1)!.visitor;assert.match(visitor!,/^[a-f0-9]{32}$/);
     assert.equal(reports.at(-1)!.cookie, undefined);
     assert.equal(reports.at(-1)!.referrer, "https://example.com");
     await page.locator('a[href="/terms"]').first().click();
     await expect.poll(() => reports.length).toBe(before + 2);
     assert.equal(reports.at(-1)!.path, "/terms");
-    await page.goBack();
+    assert.equal(reports.at(-1)!.visitor, visitor);
+    await page.reload();
     await expect.poll(() => reports.length).toBe(before + 3);
+    assert.equal(reports.at(-1)!.visitor, visitor);
+    await page.goBack();
+    await expect.poll(() => reports.length).toBe(before + 4);
     assert.equal(reports.at(-1)!.path, "/privacy");
+    assert.equal(reports.at(-1)!.visitor, visitor);
   } finally { await context.close(); }
 });
