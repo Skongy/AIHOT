@@ -43,6 +43,7 @@ const nav = (): Array<{ group: string; items: AdminNavEntry[] }> => [
       { to: "/admin/settings", label: "设置" },
       { to: "/admin/audit", label: "审计记录" },
       { to: "/admin/visits", label: "访问记录" },
+      { to: "/admin/analytics", label: "用户活跃分析" },
     ],
   },
 ];

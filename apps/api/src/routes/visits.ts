@@ -13,7 +13,7 @@ export function registerVisits(app: FastifyInstance) {
     if (req.headers.origin !== new URL(config.siteUrl).origin || (req.headers["sec-fetch-site"] && req.headers["sec-fetch-site"] !== "same-origin")) {
       return reply.code(403).send();
     }
-    const body = req.body as { path?: unknown; referrer?: unknown } | null;
+    const body = req.body as { path?: unknown; referrer?: unknown; visitor?: unknown } | null;
     const path = visitPath(body?.path);
     const ip = visitIp(req.headers["x-forwarded-for"] as string | undefined, req.raw.socket.remoteAddress ?? "");
     if (!path || !ip) return reply.code(400).send();
@@ -25,7 +25,7 @@ export function registerVisits(app: FastifyInstance) {
     clients.set(ip, count + 1);
     pending++;
     try {
-      await recordVisit({ ip, path, referrer: body?.referrer, userAgent: String(req.headers["user-agent"] ?? "") });
+      await recordVisit({ ip, path, referrer: body?.referrer, userAgent: String(req.headers["user-agent"] ?? ""), visitor: body?.visitor, siteUrl: config.siteUrl });
       return reply.code(204).send();
     } catch (err) {
       req.log.error({ err }, "visit recording failed");

@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { navCounts } from "@aihot/backend/admin/navigation";
 import { listVisits } from "@aihot/backend/admin/visits";
+import { analyticsOverview } from "@aihot/backend/admin/analytics";
 import { listAudit } from "@aihot/backend/audit";
 import { importSelectBenchRun, listSelectBenchRuns, selectBenchRun } from "@aihot/backend/admin/selectbench";
 import { modelsOverview, switchModel } from "@aihot/backend/admin/models";
@@ -36,6 +37,7 @@ function decodeImage(dataUrl: unknown): Buffer {
 
 export function registerAdmin(app: FastifyInstance) {
   app.get("/api/admin/visits", adminHandler(async (req) => listVisits(q(req))));
+  app.get("/api/admin/analytics", adminHandler(async (req) => analyticsOverview(q(req).days)));
   // Sources
   app.get("/api/admin/sources", adminHandler(async (req) => {
     const f = q(req);
