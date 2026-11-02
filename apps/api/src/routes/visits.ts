@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "@aihot/backend/config";
 import { recordVisit, visitIp, visitPath } from "@aihot/backend/operations/visits";
-import { recordActivity } from "@aihot/backend/operations/analytics";
 
 export function registerVisits(app: FastifyInstance) {
   // Bounded per-process protection: metrics are best effort, never a reason to block reading.
@@ -26,8 +25,7 @@ export function registerVisits(app: FastifyInstance) {
     clients.set(ip, count + 1);
     pending++;
     try {
-      await recordVisit({ ip, path, referrer: body?.referrer, userAgent: String(req.headers["user-agent"] ?? "") });
-      await recordActivity({ visitor: body?.visitor, path, referrer: body?.referrer, userAgent: String(req.headers["user-agent"] ?? ""), siteUrl: config.siteUrl });
+      await recordVisit({ ip, path, referrer: body?.referrer, userAgent: String(req.headers["user-agent"] ?? ""), visitor: body?.visitor, siteUrl: config.siteUrl });
       return reply.code(204).send();
     } catch (err) {
       req.log.error({ err }, "visit recording failed");

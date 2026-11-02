@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { isbot } from "isbot";
 import { beijingDate } from "@aihot/contracts/time";
-import { analyticsModule } from "@aihot/contracts/analytics";
+import { analyticsModule, referrerOrigin } from "@aihot/contracts/analytics";
 import { sql } from "../db.ts";
-import { referrerOrigin } from "./visits.ts";
 
 export function visitorKey(value: unknown): string | null {
   return typeof value === "string" && /^[a-f0-9]{32}$/.test(value) ? createHash("sha256").update("gamehot-analytics-v1:" + value).digest("hex") : null;

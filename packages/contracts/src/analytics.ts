@@ -28,3 +28,12 @@ export interface AdminAnalytics {
   sources: Array<{ label: string; visitors: number }>;
   devices: Array<{ label: string; visitors: number }>;
 }
+
+export function referrerOrigin(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 4096) return null;
+  try {
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol) ? url.origin : null;
+  } catch { return null; }
+}
+
