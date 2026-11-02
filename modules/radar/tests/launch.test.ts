@@ -39,8 +39,8 @@ test("legacy official snapshots backfill once; 50k upgrade retains discovery dat
   assert.ok(event.headline.includes("Top 100")); assert.ok(!event.headline.includes("此前低关注"));
 });
 
-test("off-chart counts, DLCs and cached duplicates cannot fabricate new launches", async () => {
-  for (const [id, type, source] of [[999100002, "game", "steam-current"], [999100003, "dlc", "steam-chart"]] as const) {
+test("DLCs and cached duplicates cannot fabricate new launches", async () => {
+  for (const [id, type, source] of [[999100003, "dlc", "steam-chart"]] as const) {
     await game(id, type); await insertPoints(id, [point(0, 90000), point(15, 100000)], source);
     assert.equal((await evaluateLaunch(id)).added, 0);
   }
@@ -55,6 +55,8 @@ test("off-chart counts, DLCs and cached duplicates cannot fabricate new launches
 test("live collection enriches a high-starting new game before evaluation and saves actual ranks", async () => {
   const id = 999100005, dlc = 999100006, upcoming = 999100007, retry = 999100008;
   await sql`UPDATE radar_games SET watch_until = now() - interval '1 day'`;
+  // A previously found launch must still be sampled after its initial candidate watch expires.
+  mock.get("https://api.steampowered.com").intercept({ path: "/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=999100001" }).reply(200, { response: { result: 1, player_count: 70000 } });
   const at = Math.floor(Date.now() / 1000) - 60;
   await remember({ app_id: id, name: "" }, "steam-chart");
   await insertPoints(id, [{ at: new Date((at - 900) * 1000).toISOString(), count: 110000, rank: 3 }], "steam-chart");

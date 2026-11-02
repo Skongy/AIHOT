@@ -1,14 +1,15 @@
 export type RadarKind = "breakout" | "comeback" | "watch" | "launch";
+export type RadarStatus = "confirmed" | "suspected" | "surging" | "cooled";
 export interface RadarPoint { at: string; count: number }
 export interface RadarEvidence { label: string; url: string; note: string; articleId?: string }
 export interface RadarEvent {
   id: string; appid: number; name: string; zh: string; date: string; genre: string;
-  kind: RadarKind; status: "confirmed" | "suspected";
+  kind: RadarKind; status: RadarStatus;
   baseline: number | null; baselineDays: number; peak: number; rankBefore: number | null; rankAfter: number | null;
   coverage: "complete" | "partial"; points: RadarPoint[]; headline: string;
   reason: string | null; evidence: RadarEvidence[]; coverUrl: string | null;
   source: "historical" | "live"; detectedAt: string; timezone: "Asia/Shanghai";
-  launch?: { releaseDay: string; qualifiedAt: string; peak: number; peakDay: string };
+  launch?: { releaseDay: string; qualifiedAt: string; peak: number; peakDay: string; basis?: "top100" | "players" };
 }
 export interface RadarMonth {
   month: string; events: RadarEvent[];

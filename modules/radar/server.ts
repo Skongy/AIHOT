@@ -2,16 +2,17 @@ import { defineQueue, defineServerModule } from "@aihot/backend/modules";
 import { enqueueOn, recordRun } from "@aihot/backend/jobs/queue";
 import { sql } from "@aihot/backend/db";
 import { loadRadarMonth } from "@aihot/backend/publication/radar";
-import { catalog, history, live, explainPending, newsCandidates } from "./backend/collect.ts";
+import { catalog, history, live, explainPending, refreshCandidates } from "./backend/collect.ts";
 const enabled = () => process.env.COLLECT_ENABLED === "true";
-interface Job { action: "live" | "catalog" | "history" | "explain"; appid?: number }
+interface Job { action: "live" | "catalog" | "candidates" | "history" | "explain"; appid?: number }
 export const radarQueue = defineQueue<Job>({ name: "radar.collect", options: { policy: "short", retryLimit: 2, retryDelay: 300, expireInSeconds: 900 },
   worker: { batchSize: 1, pollingIntervalSeconds: 5 },
   run: async jobs => {
     if (!enabled()) return { disabled: true };
     for (const job of jobs) await recordRun(`radar.execute.${job.action}`, async () => {
       if (job.action === "live") return live();
-      else if (job.action === "catalog") return { games: await catalog(), ...await newsCandidates() };
+      else if (job.action === "catalog") return { games: await catalog() };
+      else if (job.action === "candidates") return refreshCandidates();
       else if (job.action === "history" && job.appid) return { events: await history(job.appid) };
       else if (job.action === "explain") return explainPending();
     });
@@ -27,6 +28,7 @@ export default defineServerModule({ name: "radar",
   schedules: [
     { name: "radar.live", cron: "*/15 * * * *", when: enabled, run: () => enqueueOn(radarQueue, { action: "live" }, { singletonKey: "live" }) },
     { name: "radar.catalog", cron: "5 3 * * *", when: enabled, run: () => enqueueOn(radarQueue, { action: "catalog" }, { singletonKey: "catalog" }) },
+    { name: "radar.candidates", cron: "2 * * * *", when: enabled, run: () => enqueueOn(radarQueue, { action: "candidates" }, { singletonKey: "candidates" }) },
     { name: "radar.warmup", cron: "8,38 * * * *", when: enabled, run: async () => {
       const games = await sql`SELECT appid FROM radar_games WHERE history_loaded_at IS NULL ORDER BY (origin = 'news-link') DESC, first_seen_at DESC, appid DESC LIMIT 12`;
       for (const g of games) await enqueueOn(radarQueue, { action: "history", appid: g.appid }, { singletonKey: `history-${g.appid}` });

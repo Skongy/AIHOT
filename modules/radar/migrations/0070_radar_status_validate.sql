@@ -1,0 +1,1 @@
+ALTER TABLE radar_events VALIDATE CONSTRAINT radar_events_lifecycle_check;

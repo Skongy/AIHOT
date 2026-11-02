@@ -1,4 +1,4 @@
-// Explicit, idempotent operator command. Uses existing official chart samples; never calls a model.
+// Explicit, idempotent operator command. Uses existing official samples; never calls a model.
 import { parseArgs } from "node:util";
 import { sql, closeDb } from "@aihot/backend/db";
 import { metadata } from "../backend/collect.ts";
@@ -12,7 +12,7 @@ let processed = 0, added = 0;
 try {
   const games = await sql`SELECT g.appid FROM radar_games g WHERE (${appid}::bigint IS NULL OR g.appid = ${appid})
     AND (g.app_type IS NULL OR g.release_day >= (now() AT TIME ZONE 'Asia/Shanghai')::date - 13)
-    AND EXISTS (SELECT 1 FROM radar_samples s WHERE s.appid = g.appid AND s.source = 'steam-chart' AND s.observed_at > now() - interval '35 days')
+    AND EXISTS (SELECT 1 FROM radar_samples s WHERE s.appid = g.appid AND (s.source = 'steam-chart' OR (s.source = 'steam-current' AND s.count > 20000)) AND s.observed_at > now() - interval '35 days')
     ORDER BY g.first_seen_at DESC, g.appid DESC LIMIT ${limit}`;
   for (const game of games) {
     try {

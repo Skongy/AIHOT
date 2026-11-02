@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { confirmationPoints, dailyPoints, dayOf, detect, detectLaunch } from "../backend/detect.ts";
+import { confirmationPoints, dailyPoints, dayOf, detect, detectLaunch, lifecycle } from "../backend/detect.ts";
 import type { RadarPoint } from "../types.ts";
 import { appSchema, officialNewsUrl } from "../backend/steam.ts";
 function series(days = 8, before = 300, after = 6000): RadarPoint[] {
@@ -10,10 +10,10 @@ test("hourly historical growth has a seven-day baseline and emits one confirmed 
   const result = detect(series()); assert.equal(result.length, 1);
   assert.equal(result[0].date, "2026-10-08"); assert.equal(result[0].status, "confirmed"); assert.equal(result[0].baseline, 300);
 });
-test("short history is explicitly suspected; starting to monitor a hot game is not an ascent", () => {
-  assert.equal(detect(series(4))[0].status, "suspected");
+test("short history can confirm sustained measured growth; hot starts still are not growth", () => {
+  assert.equal(detect(series(4))[0].status, "confirmed");
   assert.deepEqual(detect(series(1, 6000, 6000)), []);
-  assert.deepEqual(detect(series(8, 0, 6000)).map(s => s.status), ["suspected"]);
+  assert.deepEqual(detect(series(8, 0, 6000)).map(s => s.status), ["confirmed"]);
 });
 test("large releases, known established games and everyday noise do not enter confirmed blackhorses", () => {
   assert.deepEqual(detect(series(), { established: true }), []);
@@ -41,8 +41,8 @@ test("watch promotion needs three independently timed readings above the full co
   const points = [5000, 5100, 5200].map((count, i) => ({ at: new Date(at + i * 3600000).toISOString(), count }));
   assert.equal(confirmationPoints(points, 1000).length, 3);
   assert.deepEqual(confirmationPoints(points.slice(0, 2), 1000), []);
-  assert.deepEqual(confirmationPoints(points, 0), []);
-  assert.deepEqual(confirmationPoints(points.map(p => ({ ...p, count: 4000 })), 1000), []);
+  assert.equal(confirmationPoints(points, 0).length, 3); // Genuine measured zero is a valid baseline.
+  assert.deepEqual(confirmationPoints(points.map(p => ({ ...p, count: 2500 })), 1000), []);
 });
 test("real catalog null metadata is accepted without inventing a game name or cover", () => {
   const game = appSchema.parse({ app_id: 123, name: null, header_image: null, player_count: 100 });
@@ -62,7 +62,7 @@ test("new launch needs independent Top100 observations, no low baseline or publi
   assert.equal(detectLaunch([first, second], "2026-10-28", "game")?.date, "2026-10-29");
   assert.equal(detectLaunch([first, first], "2026-10-28", "game"), null);
   assert.equal(detectLaunch([first], "2026-10-28", "game"), null);
-  assert.equal(detectLaunch([first, { ...second, at: "2026-10-29T02:00:00Z" }], "2026-10-28", "game"), null);
+  assert.equal(detectLaunch([first, { ...second, at: "2026-10-29T02:15:00Z" }], "2026-10-28", "game"), null);
   for (const type of ["dlc", "demo", null]) assert.equal(detectLaunch([first, second], "2026-10-28", type), null);
   for (const date of [null, "2026-02-30", "2026-10-01", "2026-10-30"]) assert.equal(detectLaunch([first, second], date, "game"), null);
   assert.equal(detectLaunch([first, second].map(p => ({ ...p, rank: 101 })), "2026-10-28", "game"), null);
@@ -75,4 +75,56 @@ test("launch confirmation crossing Shanghai midnight retains the first observati
   const points = [{ at: "2026-10-28T15:50:00Z", count: 12000, rank: 99 }, { at: "2026-10-28T16:05:00Z", count: 15000, rank: 95 }];
   const signal = detectLaunch(points, "2026-10-28", "game")!;
   assert.equal(signal.date, "2026-10-28"); assert.equal(dayOf(signal.qualifiedAt), "2026-10-29");
+});
+
+test("500 to 8000 publishes after two independent samples using a real same-day low baseline", () => {
+  const start = Date.parse("2026-10-09T00:00:00Z");
+  const p = (minutes: number, count: number) => ({ at: new Date(start + minutes * 60000).toISOString(), count });
+  const low = [p(0, 500), p(60, 500), p(120, 500)];
+  assert.deepEqual(detect([p(0, 500), p(120, 500), p(180, 8000), p(195, 8000)]), [], "two low readings do not establish a baseline");
+  assert.deepEqual(detect([...low, p(180, 8000)]), []);
+  assert.deepEqual(detect([...low, p(180, 8000), p(180, 8000)]), []);
+  const [signal] = detect([...low, p(180, 8000), p(195, 8000)]);
+  assert.equal(signal.status, "suspected"); assert.equal(signal.kind, "breakout");
+  assert.equal(signal.baseline, 500); assert.equal(signal.baselineDays, 1);
+  assert.equal(signal.baselinePoints.length, 3);
+  assert.deepEqual(detect([...low, p(180, 2499), p(195, 2499)]), [], "at least 2000 additional players required");
+  assert.deepEqual(detect([...low, p(180, 8000), p(185, 500), p(195, 8000)]), [], "an intervening low breaks qualification");
+  assert.deepEqual(detect([p(0, 6000), p(60, 6000), p(120, 6000), p(180, 50000), p(195, 50000)]), [], "not previously low population");
+});
+
+test("cross-midnight growth keeps its first-growth day, with no invented low baseline", () => {
+  const points = [18, 19, 20, 23.75, 24].map((hour, i) => ({ at: new Date(Date.parse("2026-10-10T00:00:00+08:00") + hour * 3600000).toISOString(), count: i < 3 ? 500 : 8000 }));
+  const signal = detect(points)[0]; assert.equal(signal.date, "2026-10-10");
+  assert.equal(dayOf(signal.qualifiedAt), "2026-10-11");
+  assert.deepEqual(detect(points.slice(3)), []);
+});
+
+test("off-chart launches use only official >20k observations, never third-party or an inferred rank", () => {
+  const points = [0, 30].map(minutes => ({ at: new Date(Date.parse("2026-10-29T01:00:00Z") + minutes * 60000).toISOString(), count: 20001, rank: null, source: "steam-current" }));
+  const signal = detectLaunch(points, "2026-10-28", "game")!;
+  assert.equal(signal.basis, "players"); assert.equal(signal.qualification.length, 2);
+  assert.equal(signal.qualification[0].rank, null);
+  assert.equal(detectLaunch(points.map(p => ({ ...p, count: 20000 })), "2026-10-28", "game"), null);
+  assert.equal(detectLaunch(points.map(p => ({ ...p, source: "steamdata-hourly" })), "2026-10-28", "game"), null);
+  assert.equal(detectLaunch(points.map(p => ({ ...p, count: NaN })), "2026-10-28", "game"), null);
+  assert.equal(detectLaunch([points[0], { ...points[0], at: "invalid" }], "2026-10-28", "game"), null);
+});
+
+test("lifecycle verifies a frozen baseline, cools only on sustained fresh lows and can recover without rediscovery", () => {
+  const start = Date.parse("2026-10-10T00:00:00Z");
+  const p = (minutes: number, count: number) => ({ at: new Date(start + minutes * 60000).toISOString(), count });
+  const event = { status: "suspected" as const, baseline: 500, peak: 8000, launch: false, qualifiedAt: p(0, 8000).at };
+  const high = [p(0, 8000), p(15, 8000)];
+  assert.equal(lifecycle(high, event, start + 15 * 60000), "suspected");
+  high.push(p(30, 8000)); assert.equal(lifecycle(high, event, start + 30 * 60000), "surging");
+  high.push(p(60, 8000), p(120, 8000)); assert.equal(lifecycle(high, event, start + 120 * 60000), "confirmed");
+  const confirmed = { ...event, status: "confirmed" as const };
+  assert.equal(lifecycle(high, confirmed, start + 10 * 3600000), "confirmed", "missing data is not cooling");
+  const falling = [...high, p(150, 1000), p(210, 1000), p(270, 1000), p(300, 1000)];
+  assert.equal(lifecycle(falling, confirmed, start + 300 * 60000), "cooled");
+  assert.equal(lifecycle([...high, p(180, 1000)], confirmed, start + 180 * 60000), "confirmed", "one dip is not cooling");
+  assert.equal(lifecycle([...falling, p(330, 8000), p(390, 8000), p(450, 8000)], { ...event, status: "cooled" }, start + 450 * 60000), "confirmed");
+  const interrupted = [p(0, 8000), p(60, 8000), p(90, 500), p(120, 8000)];
+  assert.deepEqual(confirmationPoints(interrupted, 500), [], "hourly maxima must not conceal an observed dip");
 });
