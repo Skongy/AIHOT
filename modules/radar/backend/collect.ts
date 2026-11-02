@@ -6,7 +6,7 @@ import { sha256 } from "@aihot/backend/lib/ids";
 import { radarNews } from "@aihot/backend/publication/radar";
 import { z } from "zod";
 import { completeReceipt } from "@aihot/backend/providers/receipts";
-import { confirmationPoints, dailyPoints, dayOf, detect, previousDay, RULE_VERSION } from "./detect.ts";
+import { dailyPoints, dayOf, detect, previousDay, RULE_VERSION, lifecycle } from "./detect.ts";
 import { appSchema, chartSchema, historySchema, listSchema, officialNewsUrl, parseCurrent, publicJson, safeCover, RadarHttpError } from "./steam.ts";
 import type { RadarPoint } from "../types.ts";
 import type { RadarEvidence } from "../types.ts";
@@ -16,7 +16,7 @@ export async function remember(app: { app_id: number; name: string; header_image
   const name = app.name.trim() || `Steam App ${app.app_id}`;
   await sql`INSERT INTO radar_games (appid, name, cover_url, origin) VALUES (${app.app_id}, ${name}, ${safeCover(app.header_image)}, ${origin})
     ON CONFLICT (appid) DO UPDATE SET name = CASE WHEN ${app.name.trim() !== ""} THEN excluded.name ELSE radar_games.name END,
-      cover_url = coalesce(excluded.cover_url, radar_games.cover_url)`;
+      cover_url = coalesce(excluded.cover_url, radar_games.cover_url), watch_until = greatest(radar_games.watch_until, excluded.watch_until)`;
 }
 export async function catalog(): Promise<number> {
   let count = 0;
@@ -25,19 +25,23 @@ export async function catalog(): Promise<number> {
     for (const app of data.apps) { await remember(app, "steamdata-catalog"); count++; }
     if (page + 1 >= data.pages) break;
   }
+  return count;
+}
+export async function refreshCandidates() {
+  const linked = await newsCandidates(); // News discovery survives an unavailable third-party movers feed.
   // A bounded public movers feed supplies fresh off-chart candidates after initial watches expire.
   const movers = await publicJson("https://api.steamdata.dev/api/movers?limit=10") as { tags?: Record<string, Record<string, unknown[]>> };
-  let admitted = 0;
+  const seen = new Set<number>();
   for (const group of Object.values(movers.tags ?? {})) for (const values of Object.values(group)) {
     if (!Array.isArray(values)) continue;
     for (const value of values.slice(0, 10)) {
-      const app = appSchema.safeParse(value); if (!app.success || admitted >= 40) continue;
+      const app = appSchema.safeParse(value); if (!app.success || seen.size >= 40 || seen.has(app.data.app_id)) continue;
+      seen.add(app.data.app_id);
       await remember(app.data, "steamdata-mover");
       await sql`UPDATE radar_games SET watch_until = now() + interval '14 days', origin = 'steamdata-mover' WHERE appid = ${app.data.app_id} AND origin <> 'news-link'`;
-      admitted++;
     }
   }
-  return count;
+  return { movers: seen.size, ...linked };
 }
 export async function insertPoints(appid: number, points: Array<RadarPoint & { rank?: number }>, source: string, fetchedAt = new Date().toISOString()) {
   const now = Date.now();
@@ -64,55 +68,60 @@ export async function metadata(appid: number) {
   const established = (data.publishers ?? []).some(p => /^(Valve|Electronic Arts|Ubisoft|Activision|Rockstar Games|Xbox Game Studios|PlayStation Publishing LLC|Square Enix)$|\bcapcom\b/i.test(p));
   await sql`UPDATE radar_games SET name = ${data.name ?? `Steam App ${appid}`}, app_type = ${data.type ?? null}, release_day = ${releaseDay}, established = ${established}, cover_url = coalesce(${safeCover(data.header_image)}, cover_url), metadata_at = now() WHERE appid = ${appid}`;
 }
-export async function evaluate(appid: number, origin: "historical" | "live", since = "2026-10-01"): Promise<number> {
-  const [game] = await sql`SELECT * FROM radar_games WHERE appid = ${appid}`;
+export async function evaluate(appid: number, origin: "historical" | "live", since = "2026-10-01", enrich = true): Promise<number> {
+  let [game] = await sql`SELECT * FROM radar_games WHERE appid = ${appid}`;
   if (!game || (game.app_type && game.app_type !== "game")) return 0;
+  const rows = await sql`SELECT observed_at, max(count)::int AS count FROM radar_samples WHERE appid = ${appid} AND observed_at > now() - interval '40 days' AND observed_at <= now() GROUP BY observed_at ORDER BY observed_at`;
+  const points = rows.map(r => ({ at: new Date(r.observed_at).toISOString(), count: r.count }));
+  const optionsFor = () => ({ releaseDay: game.release_day ? new Date(game.release_day).toISOString().slice(0, 10) : null, established: game.established });
+  let signals = detect(points, optionsFor()).filter(s => s.date >= since);
+  if (signals.length && !game.app_type) {
+    if (!enrich) return 0; // Live enrichment is bounded separately; retry metadata next scan.
+    await metadata(appid);
+    [game] = await sql`SELECT * FROM radar_games WHERE appid = ${appid}`;
+    if (game.app_type !== "game") return 0;
+    signals = detect(points, optionsFor()).filter(s => s.date >= since);
+  }
   const launch = await evaluateLaunch(appid);
   if (launch.handled) return launch.added;
-  const rows = await sql`SELECT observed_at, max(count)::int AS count FROM radar_samples WHERE appid = ${appid} AND observed_at > now() - interval '40 days' GROUP BY observed_at ORDER BY observed_at`;
-  const points = rows.map(r => ({ at: new Date(r.observed_at).toISOString(), count: r.count }));
-  let options = { releaseDay: game.release_day ? new Date(game.release_day).toISOString().slice(0, 10) : null, established: game.established };
-  let signals = detect(points, options).filter(s => s.date >= since && (origin === "historical" || s.date === dayOf(new Date())));
-  if (signals.length && !game.metadata_at) {
-    await metadata(appid); // If metadata is unavailable, retry rather than publish an unchecked launch.
-    const [fresh] = await sql`SELECT release_day, established FROM radar_games WHERE appid = ${appid}`;
-    options = { releaseDay: fresh.release_day ? new Date(fresh.release_day).toISOString().slice(0, 10) : null, established: fresh.established };
-    signals = detect(points, options).filter(s => s.date >= since && (origin === "historical" || s.date === dayOf(new Date())));
-  }
-  let added = 0;
-  for (const signal of signals) {
-    const exists = await sql`SELECT id FROM radar_events WHERE appid = ${appid} AND event_day < ${signal.date}::date AND event_day > ${signal.date}::date - 14 LIMIT 1`;
-    if (exists.length) continue;
-    const id = `${appid}-${signal.date}`;
-    const proof = { rule: RULE_VERSION, source: origin === "historical" ? "https://api.steamdata.dev/api/apps/" + appid + "/history?range=30d" : "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=" + appid,
-      timezone: "Asia/Shanghai", baselineMethod: "median of available preceding seven daily hourly observed maxima; at least 12 distinct hours/day", evaluatedAt: new Date().toISOString(), pointsSha256: sha256(JSON.stringify(points)),
-      baselineDays: dailyPoints(points).filter(d => d.date >= previousDay(signal.date, 7) && d.date < signal.date).map(({ points: _points, ...day }) => day), initialThresholdsUncalibrated: true };
-    const inserted = await sql`INSERT INTO radar_events (id, appid, event_day, origin, status, kind, peak, baseline, baseline_days, points, rule_version, proof)
-      VALUES (${id}, ${appid}, ${signal.date}, ${origin}, ${signal.status}, ${signal.kind}, ${signal.peak}, ${signal.baseline}, ${signal.baselineDays}, ${sql.json(signal.points as never)}, ${RULE_VERSION}, ${sql.json(proof)})
-      ON CONFLICT (appid, event_day) DO NOTHING RETURNING id`;
-    added += inserted.length;
-    // The discovery proof stays immutable; only measured discovery-day samples and peak may grow.
-    await sql`UPDATE radar_events SET peak = greatest(peak, ${signal.peak}), points = ${sql.json(signal.points as never)} WHERE id = ${id}`;
-  }
-  // Refresh a discovery-day trace even when the current rule no longer emits the same signal.
-  const today = dayOf(new Date()), todayPoints = points.filter(p => dayOf(p.at) === today);
-  if (todayPoints.length) await sql`UPDATE radar_events SET peak = greatest(peak, ${Math.max(...todayPoints.map(p => p.count))}), points = ${sql.json(todayPoints)} WHERE appid = ${appid} AND event_day = ${today}::date`;
-  // A watched signal can mature using its original, frozen pre-growth baseline. Never move the
-  // baseline forward into the surge, and never rewrite the historical discovery date or proof.
-  if (origin === "live" && !options.established) {
-    const pending = await sql`SELECT id, event_day, baseline, baseline_days, proof FROM radar_events
-      WHERE appid = ${appid} AND status = 'suspected' AND kind = 'watch' AND baseline > 0 AND baseline <= 5000
-        AND baseline_days >= 3 AND event_day >= ${today}::date - 7`;
-    for (const event of pending) {
-      const eventDay = new Date(event.event_day).toISOString().slice(0, 10);
-      if (options.releaseDay && options.releaseDay >= previousDay(eventDay, 14)) continue;
-      const confirming = confirmationPoints(todayPoints, event.baseline);
-      if (!confirming.length) continue;
-      const proof = { ...event.proof, confirmedAt: new Date().toISOString(), confirmation: "three fresh hourly readings against frozen pre-growth baseline", confirmationPoints: confirming };
-      await sql`UPDATE radar_events SET status = 'confirmed', kind = 'breakout', proof = ${sql.json(proof)} WHERE id = ${event.id}`;
+  // Live qualification can cross midnight. Keep the actual first-growth day instead of losing it.
+  if (origin === "live") signals = signals.filter(s => s.date >= previousDay(dayOf(new Date()), 1)
+    && points.length > 0 && Date.now() - Date.parse(points.at(-1)!.at) <= 90 * 60000);
+  return sql.begin(async db => {
+    await db`SELECT pg_advisory_xact_lock(hashtextextended(${`radar:${appid}`}, 0))`;
+    let added = launch.added;
+    for (const signal of signals) {
+      const exists = await db`SELECT id FROM radar_events WHERE appid = ${appid}
+        AND (event_day BETWEEN ${signal.date}::date - 13 AND ${signal.date}::date + 13
+          OR (${origin === "live"} AND kind <> 'launch' AND status <> 'cooled'
+            AND event_day BETWEEN ${signal.date}::date - 35 AND ${signal.date}::date)) LIMIT 1`;
+      if (exists.length) continue;
+      const id = `${appid}-${signal.date}`;
+      const proof = { rule: RULE_VERSION, source: origin === "historical" ? "https://api.steamdata.dev/api/apps/" + appid + "/history?range=30d" : "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=" + appid,
+        timezone: "Asia/Shanghai", baselineMethod: "median of at least 3 preceding daily peaks (12 hours/day), otherwise 3 low hourly observations spanning 2 hours in the preceding 24 hours",
+        evaluatedAt: new Date().toISOString(), qualifiedAt: signal.qualifiedAt, firstObservedAt: signal.firstObservedAt, pointsSha256: sha256(JSON.stringify(points)),
+        baselinePoints: signal.baselinePoints, baselineDays: dailyPoints(signal.baselinePoints).map(({ points: _points, ...day }) => day), initialThresholdsUncalibrated: true };
+      const inserted = await db`INSERT INTO radar_events (id, appid, event_day, origin, status, kind, peak, baseline, baseline_days, points, rule_version, proof)
+        VALUES (${id}, ${appid}, ${signal.date}, ${origin}, ${signal.status}, ${signal.kind}, ${signal.peak}, ${signal.baseline}, ${signal.baselineDays}, ${sql.json(signal.points as never)}, ${RULE_VERSION}, ${sql.json(proof as never)})
+        ON CONFLICT (appid, event_day) DO NOTHING RETURNING id`;
+      added += inserted.length;
     }
-  }
-  return added;
+    const events = await db`SELECT * FROM radar_events WHERE appid = ${appid} AND kind <> 'launch' AND event_day >= ${dayOf(new Date())}::date - 35`;
+    for (const event of events) {
+      const date = new Date(event.event_day).toISOString().slice(0, 10);
+      const merged = new Map<string, number>((event.points as RadarPoint[]).map(p => [p.at, p.count]));
+      for (const p of points) if (dayOf(p.at) === date) merged.set(p.at, Math.max(merged.get(p.at) ?? 0, p.count));
+      const trace = [...merged].map(([at, count]) => ({ at, count })).sort((a, b) => a.at.localeCompare(b.at));
+      const qualifiedAt = event.proof.firstObservedAt ?? event.proof.qualifiedAt ?? event.proof.confirmedAt ?? trace[0]?.at;
+      const after = qualifiedAt ? points.filter(p => p.at >= qualifiedAt) : [];
+      const peak = Math.max(event.peak, Number(event.proof.lifecycle?.peak ?? 0), ...after.map(p => p.count));
+      const status = qualifiedAt ? lifecycle(points, { status: event.status, baseline: event.baseline, peak, launch: false, qualifiedAt }) : event.status;
+      const proof = { ...event.proof, lifecycle: { status, evaluatedAt: new Date().toISOString(), latestAt: after.at(-1)?.at ?? null, peak } };
+      await db`UPDATE radar_events SET status = ${status}, peak = greatest(peak, ${Math.max(event.peak, ...trace.map(p => p.count))}),
+        points = ${sql.json(trace)}, proof = ${sql.json(proof)} WHERE id = ${event.id}`;
+    }
+    return added;
+  }) as Promise<number>;
 }
 export async function ingestHistory(appid: number, raw: unknown, fetchedAt = new Date().toISOString()): Promise<number> {
   const data = historySchema.parse(raw);
@@ -134,6 +143,18 @@ export async function history(appid: number): Promise<number> {
     return 0;
   }
 }
+export async function offChartCandidates(ids: number[]) {
+  return sql`WITH eligible AS (
+      SELECT g.*, (g.origin IN ('news-link', 'steamdata-mover') OR EXISTS
+        (SELECT 1 FROM radar_events e WHERE e.appid = g.appid AND e.event_day >= (now() AT TIME ZONE 'Asia/Shanghai')::date - 35)) AS priority
+      FROM radar_games g WHERE NOT (g.appid = ANY(${ids})) AND (g.app_type IS NULL OR g.app_type = 'game')
+      AND ((g.watch_until > now() AND (NOT g.established OR g.release_day >= (now() AT TIME ZONE 'Asia/Shanghai')::date - 13))
+        OR EXISTS (SELECT 1 FROM radar_events e WHERE e.appid = g.appid AND e.event_day >= (now() AT TIME ZONE 'Asia/Shanghai')::date - 35))
+    ), priority_pool AS (SELECT * FROM eligible WHERE priority ORDER BY last_sample_at ASC NULLS FIRST, appid LIMIT 30),
+    exploration AS (SELECT * FROM eligible WHERE appid NOT IN (SELECT appid FROM priority_pool)
+      ORDER BY priority, last_sample_at ASC NULLS FIRST, appid LIMIT (SELECT 50 - count(*) FROM priority_pool))
+    SELECT * FROM priority_pool UNION ALL SELECT * FROM exploration`;
+}
 export async function live() {
   const data = chartSchema.parse(await publicJson("https://api.steampowered.com/ISteamChartsService/GetGamesByConcurrentPlayers/v1/"));
   const at = new Date(data.response.last_update * 1000);
@@ -143,26 +164,25 @@ export async function live() {
     await sql`INSERT INTO radar_games (appid, name, origin) VALUES (${row.appid}, ${`Steam App ${row.appid}`}, 'steam-chart') ON CONFLICT (appid) DO NOTHING`;
     await insertPoints(row.appid, [{ at: at.toISOString(), count: row.concurrent_in_game, rank: row.rank }], "steam-chart");
   }
-  // Sample the whole chart first. Enrich at most eight games per pass, prioritizing fresh arrivals.
   const ids = data.response.ranks.map(r => r.appid);
-  const pendingMetadata = await sql`SELECT appid FROM radar_games WHERE appid = ANY(${ids})
+  // Oldest observations first across the bounded catalog: priority pools previously starved games.
+  // Existing events stay monitored for 35 days, including after leaving Top100 or watch expiry.
+  const candidates = await offChartCandidates(ids);
+  // Enrich chart arrivals and off-chart candidates, keeping the existing eight-request ceiling.
+  const metadataIds = [...ids, ...candidates.map(g => g.appid)];
+  const pendingMetadata = await sql`SELECT appid FROM radar_games WHERE appid = ANY(${metadataIds})
     AND (app_type IS NULL OR metadata_at IS NULL OR metadata_at < now() - interval '24 hours' OR (release_day IS NULL AND metadata_at < now() - interval '1 hour'))
-    ORDER BY first_seen_at DESC, appid DESC LIMIT 8`;
+    ORDER BY (app_type IS NULL) DESC, first_seen_at DESC, appid DESC LIMIT 8`;
   let metadataFailed = 0;
   for (const game of pendingMetadata) { try { await metadata(game.appid); } catch { metadataFailed++; } }
-  for (const row of data.response.ranks) await evaluate(row.appid, "live");
-  // At most 100 off-chart candidates; query 50 each pass in oldest-observed order.
-  const candidates = await sql`SELECT * FROM (
-      SELECT * FROM radar_games WHERE NOT (appid = ANY(${ids})) AND watch_until > now() AND NOT established
-      ORDER BY (origin = 'news-link') DESC, (origin = 'steamdata-mover') DESC, first_seen_at DESC, appid DESC LIMIT 100
-    ) pool ORDER BY last_sample_at ASC NULLS FIRST LIMIT 50`;
+  for (const row of data.response.ranks) await evaluate(row.appid, "live", "2026-10-01", false);
   let failed = 0;
   for (const game of candidates) {
     try {
       const count = parseCurrent(await publicJson(`https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${game.appid}`));
       if (count === null) { failed++; continue; }
       await insertPoints(game.appid, [{ at: new Date().toISOString(), count }], "steam-current");
-      await evaluate(game.appid, "live");
+      await evaluate(game.appid, "live", "2026-10-01", false);
     } catch (error) {
       failed++;
       if (error instanceof RadarHttpError && error.status === 404) await sql`UPDATE radar_games SET watch_until = now() WHERE appid = ${game.appid}`;

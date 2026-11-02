@@ -16,7 +16,10 @@ const api = createServer((req, res) => {
   if (u.pathname === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
   if (u.pathname === "/api/site/changelog") return res.end(readFileSync(new URL("../../../site/changelog.json", import.meta.url)));
   if (u.pathname === "/api/radar/month") { const month = u.searchParams.get("month") ?? "2026-10";
-    return res.end(JSON.stringify({ month, events: month === "2026-10" ? [fixture] : month === "2026-08" ? [launchFixture] : [], coverage: month === "2026-10" ? [{ date: "2026-10-10", games: 10, samples: 240 }] : [], status: { healthy: true, lastSuccess: "2026-10-26T12:00:00Z", lastAttempt: "2026-10-26T12:00:00Z", tracked: 10 } })); }
+    return res.end(JSON.stringify({ month, events: month === "2026-10" ? [fixture] : month === "2026-08" ? [launchFixture] : month === "2026-07" ? [
+      ...(["suspected", "surging", "cooled"] as const).map((status, i) => ({ ...fixture, id: `state-${i}`, name: `状态测试 ${i}`, date: "2026-07-10", kind: "breakout", status })),
+      { ...launchFixture, id: "off-chart", date: "2026-07-10", status: "suspected", launch: { ...launchFixture.launch!, basis: "players" } }
+    ] : [], coverage: month === "2026-10" ? [{ date: "2026-10-10", games: 10, samples: 240 }] : [], status: { healthy: true, lastSuccess: "2026-10-26T12:00:00Z", lastAttempt: "2026-10-26T12:00:00Z", tracked: 10 } })); }
   res.statusCode = u.pathname === "/api/test/broken.jpg" ? 502 : 404; res.end("{}");
 });
 before(async () => { web = await startWebServer(api); browser = await chromium.launch(process.env.ASK_TEST_CHROME_PATH ? { executablePath: process.env.ASK_TEST_CHROME_PATH } : { channel: "chromium" }); });
@@ -28,11 +31,11 @@ test("launch cards and reports show Top100 and a later 50k upgrade without a fab
       await context.addInitScript(t => localStorage.setItem("aihot-theme", t), theme);
       const page = await context.newPage(); await page.route("https://fonts.googleapis.com/**", r => r.abort());
       await page.goto(web.origin + "/radar?month=2026-08");
-      await expect(page.locator(".monthly-kind")).toHaveText("首发热门");
+      await expect(page.locator(".monthly-kind")).toHaveText("爆火新游");
       await expect(page.locator(".monthly-baseline")).toHaveText(/首发期最高 71,000 人/);
       await expect(page.locator(".monthly-stat strong")).toHaveText("21,000");
       await page.getByRole("button", { name: /展开 新游测试/ }).click();
-      await expect(page.getByRole("region", { name: "新游上榜依据" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "新游入选依据" })).toBeVisible();
       await expect(page.locator(".launch-release-date")).toContainText("8月9日");
       await expect(page.locator(".file-disclaimer")).toContainText("满足规则时间");
       await expect(page.locator(".file-chart-notes")).toContainText("旧样本未保存具体名次");
@@ -146,4 +149,34 @@ test("phone tapping a recorded point keeps its nearby tooltip available", async 
     await expect(page.locator(".radar-chart-tooltip time")).toContainText("10:00");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   } finally { await context.close(); }
+});
+
+
+test("existing cards, month counts and details show lifecycle states and truthful off-chart launch basis", async () => {
+  for (const width of [1440, 390]) for (const theme of ["light", "dark"] as const) {
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, colorScheme: theme, reducedMotion: "reduce" });
+    try {
+      await context.addInitScript(t => { localStorage.setItem("aihot-theme", t); sessionStorage.setItem("gamehot-intro-seen-v1", "1"); }, theme);
+      const page = await context.newPage(); await page.route("https://fonts.googleapis.com/**", r => r.abort());
+      await page.goto(web.origin + "/radar?month=2026-07");
+      await expect(page.locator(".monthly-event")).toHaveCount(4);
+      await expect(page.locator(".monthly-sim")).toHaveText(["待核实", "爆发中", "已降温", "待核实"]);
+      await expect(page.locator(".monthly-kind").first()).toHaveText("小众黑马");
+      await expect(page.locator(".monthly-kind").last()).toHaveText("爆火新游");
+      await expect(page.locator(".monthly-event").last().locator(".monthly-stat")).toContainText("在线超 2 万");
+      await page.locator(".month-day").nth(9).click();
+      await expect(page.locator(".month-focus-line")).toContainText("4 条发现");
+      await page.locator(".monthly-hit").nth(2).click();
+      await expect(page.locator(".file-tags")).toContainText("已降温");
+      await expect(page.locator(".file-disclaimer")).toContainText("持续回落");
+      await page.getByRole("button", { name: "返回月度事件流" }).click();
+      await page.locator(".monthly-hit").last().click();
+      await expect(page.locator(".file-verdict")).toContainText("新游在线人数超过 2 万");
+      await expect(page.locator(".file-chart-notes")).toContainText("未据此推断榜单名次");
+      await expect(page.locator(".file-tags")).toContainText("待核实");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await mkdir(".taste-skill/radar-discovery", { recursive: true });
+      await page.screenshot({ path: `.taste-skill/radar-discovery/${width}-${theme}.png`, fullPage: true });
+    } finally { await context.close(); }
+  }
 });

@@ -25,7 +25,7 @@ test("replayed history is idempotent, retains provenance, rolls up Shanghai days
   await sql`DELETE FROM radar_daily WHERE appid = ${id}`;
   await sql`DELETE FROM radar_games WHERE appid = ${id}`;
   await remember({ app_id: id, name: "Radar fixture" }, "test");
-  await sql`UPDATE radar_games SET metadata_at = now() WHERE appid = ${id}`;
+  await sql`UPDATE radar_games SET metadata_at = now(), app_type = 'game' WHERE appid = ${id}`;
   const start = new Date(); start.setUTCDate(start.getUTCDate() - 9); start.setUTCHours(16, 0, 0, 0);
   const points = Array.from({ length: 8 * 24 }, (_, h) => ({ t: Math.floor((start.getTime() + h * 3600000) / 1000), player_count: h >= 7 * 24 ? 6000 : 300 }));
   const raw = { app_id: id, resolution: "hour", points };

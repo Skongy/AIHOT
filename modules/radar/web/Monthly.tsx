@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode } f
 import { useNavigate, useSearchParams } from 'react-router';
 import { useReducedMotion } from 'motion/react';
 import { IconArrowRight, IconArrowUpRight, IconChevronLeft, IconChevronRight } from '../../../apps/web/app/components/icons';
-import { cover, fmt, eventLabel, multiplier, stamp, store, type RadarEvent } from './data';
+import { cover, fmt, eventLabel, statusLabels, multiplier, stamp, store, type RadarEvent } from './data';
 import { monthDays, moveMonth } from './dates';
 import type { RadarMonth } from '../types';
 import { onCardSpotlightMove } from '../../../apps/web/app/lib/spotlight';
@@ -141,7 +141,7 @@ export function Monthly({ data, renderImage, renderChart }: Props) {
 
     <div className="monthly-stream-top">
       <h2>本月发现<span>时间倒序 · 直接往下看</span></h2>
-      <details className="monthly-method"><summary>人数怎么算？</summary><p>当天最高在线记录为北京时间当天有效样本中的最大在线人数，是实际峰值的下界。倍数 = 当日采样峰值 ÷ 前 7 日采样日峰值中位数；缺基线不计算倍数。历史回溯基于第三方小时记录，持续监控基于Steam官方数据；历史不足的记录标为疑似，不代表全平台完整覆盖。</p></details>
+      <details className="monthly-method"><summary>人数怎么算？</summary><p>当天最高在线记录为北京时间当天有效样本中的最大在线人数，是实际峰值的下界。倍数 = 当天最高在线记录 ÷ 走红前实测参考值。优先使用此前七天内至少三天的日峰值，否则需此前至少三个小时、跨度两小时的低人数记录；缺基线不计算倍数。历史回溯基于第三方小时记录，持续监控基于Steam官方数据；两次独立采样达到门槛即可待核实展示，后续持续验证；已降温仍保留历史，不代表全平台完整覆盖。</p></details>
     </div>
 
     {records.length === 0 ? <div className="monthly-empty"><span className="empty-orbit" aria-hidden="true"/><h3>{monthNumber} 月暂无可靠事件记录。</h3><p>未覆盖的日期不代表没有异动，我们只展示可追溯的记录。</p><button className="primary" onClick={() => chooseMonth(new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Shanghai'}).slice(0,7))}>回到本月 <IconArrowRight size={16}/></button></div> :
@@ -150,7 +150,7 @@ export function Monthly({ data, renderImage, renderChart }: Props) {
         <div className="monthly-day-events">{dayEvents.map(e => <article className="monthly-event card-spotlight" key={e.id} onMouseMove={onCardSpotlightMove}>
           <button id={`open-${e.id}`} className="monthly-hit" onClick={() => open(e)} aria-label={`展开 ${e.name}，${stamp(e.date)}发现`}><span>查看事件详情</span></button>
           <div className="monthly-art">{renderImage(e)}</div>
-          <div className="monthly-copy"><div className="monthly-meta"><span className={`monthly-kind ${e.kind}`}>{eventLabel(e)}</span><span>{e.genre}</span><span className="monthly-sim">{e.kind === 'launch' ? '榜单核验' : e.status === "confirmed" ? "规则确认" : "待确认"}</span></div><h3>{e.name}</h3><p>{e.headline}</p><span className="monthly-cause">{e.reason ? '报道背景 · 附来源' : '原因未知 · 保留未知，不做推断'}</span></div>
+          <div className="monthly-copy"><div className="monthly-meta"><span className={`monthly-kind ${e.kind}`}>{eventLabel(e)}</span><span>{e.genre}</span><span className="monthly-sim">{statusLabels[e.status]}</span></div><h3>{e.name}</h3><p>{e.headline}</p><span className="monthly-cause">{e.reason ? '报道背景 · 附来源' : '原因未知 · 保留未知，不做推断'}</span></div>
           <div className="monthly-stat"><span>当天最高在线记录</span><div><strong>{fmt(e.peak)}</strong><small>人</small><b>{multiplier(e)}</b></div><div className="monthly-chart">{renderChart(e)}</div><span className="monthly-baseline">{e.kind === 'launch' ? `首发期最高 ${fmt(e.launch?.peak ?? e.peak)} 人 · ${stamp(e.launch?.peakDay ?? e.date)}` : e.baseline === null ? '历史记录不足 · 观察中' : `此前 ${e.baselineDays} 日参考 ${fmt(e.baseline)} 人`}</span></div>
           <a href={store(e)} className="monthly-steam" target="_blank" rel="noreferrer" aria-label={`在 Steam 查看 ${e.name}`} title="Steam 商店"><IconArrowUpRight size={19}/></a>
         </article>)}</div>
